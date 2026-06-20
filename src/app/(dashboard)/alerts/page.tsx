@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { AlertItem, PageHeader } from "@/components/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,9 +9,7 @@ import { Loader2 } from "lucide-react";
 
 export default function AlertsPage() {
   const { data, loading } = useTenantData();
-  const [filter, setFilter] = useState<AlertSeverity | "all">("all");
 
-  const alerts = data.alerts.filter((a) => filter === "all" || a.severity === filter);
   const unreadCount = data.alerts.filter((a) => !a.isRead).length;
   const criticalCount = data.alerts.filter((a) => a.severity === "critical").length;
 
@@ -22,6 +19,9 @@ export default function AlertsPage() {
     medium: data.alerts.filter((a) => a.severity === "medium").length,
     low: data.alerts.filter((a) => a.severity === "low").length,
   };
+
+  const filterAlerts = (severity: AlertSeverity | "all") =>
+    severity === "all" ? data.alerts : data.alerts.filter((a) => a.severity === severity);
 
   if (loading) {
     return (
@@ -75,40 +75,19 @@ export default function AlertsPage() {
 
       <Tabs defaultValue="all">
         <TabsList>
-          <TabsTrigger value="all" onClick={() => setFilter("all")}>
-            All ({data.alerts.length})
-          </TabsTrigger>
-          <TabsTrigger value="critical" onClick={() => setFilter("critical")}>
-            Critical ({severityCounts.critical})
-          </TabsTrigger>
-          <TabsTrigger value="high" onClick={() => setFilter("high")}>
-            High ({severityCounts.high})
-          </TabsTrigger>
-          <TabsTrigger value="medium" onClick={() => setFilter("medium")}>
-            Medium ({severityCounts.medium})
-          </TabsTrigger>
+          <TabsTrigger value="all">All ({data.alerts.length})</TabsTrigger>
+          <TabsTrigger value="critical">Critical ({severityCounts.critical})</TabsTrigger>
+          <TabsTrigger value="high">High ({severityCounts.high})</TabsTrigger>
+          <TabsTrigger value="medium">Medium ({severityCounts.medium})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="mt-6 space-y-4">
-          {alerts.map((alert) => (
-            <AlertItem key={alert.id} {...alert} />
-          ))}
-        </TabsContent>
-        <TabsContent value="critical" className="mt-6 space-y-4">
-          {alerts.map((alert) => (
-            <AlertItem key={alert.id} {...alert} />
-          ))}
-        </TabsContent>
-        <TabsContent value="high" className="mt-6 space-y-4">
-          {alerts.map((alert) => (
-            <AlertItem key={alert.id} {...alert} />
-          ))}
-        </TabsContent>
-        <TabsContent value="medium" className="mt-6 space-y-4">
-          {alerts.map((alert) => (
-            <AlertItem key={alert.id} {...alert} />
-          ))}
-        </TabsContent>
+        {(["all", "critical", "high", "medium"] as const).map((severity) => (
+          <TabsContent key={severity} value={severity} className="mt-6 space-y-4">
+            {filterAlerts(severity).map((alert) => (
+              <AlertItem key={alert.id} {...alert} />
+            ))}
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );

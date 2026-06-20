@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getTenantData } from "@/lib/mock-data";
 import { getConnection, getOrganizationConnections } from "@/lib/integrations/store";
 import type { IntegrationProvider } from "@/lib/integrations/types";
+import { requireApiAccess } from "@/lib/auth/access";
+import { authErrorResponse } from "@/lib/auth/api";
 
 const PROVIDER_MAP: Record<string, IntegrationProvider> = {
   "int-1": "quickbooks",
@@ -17,12 +19,15 @@ const PROVIDER_MAP: Record<string, IntegrationProvider> = {
 };
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const organizationId = searchParams.get("organizationId");
+  try {
+    const { searchParams } = new URL(request.url);
+    const organizationId = searchParams.get("organizationId");
 
-  if (!organizationId) {
-    return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
-  }
+    if (!organizationId) {
+      return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
+    }
+
+    await requireApiAccess({ organizationId });
 
   const mockIntegrations = getTenantData(organizationId).integrations;
   const liveConnections = await getOrganizationConnections(organizationId);
@@ -49,4 +54,7 @@ export async function GET(request: Request) {
   );
 
   return NextResponse.json({ integrations, connections: liveConnections });
+  } catch (error) {
+    return authErrorResponse(error);
+  }
 }

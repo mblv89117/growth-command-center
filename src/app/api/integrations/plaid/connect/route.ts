@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { isDemoModeAllowed, isProduction } from "@/lib/config";
-import { requireAuth, authErrorResponse } from "@/lib/auth/api";
+import { isDemoModeAllowed } from "@/lib/config";
+import { authErrorResponse } from "@/lib/auth/api";
+import { requireApiAccess } from "@/lib/auth/access";
 import { canManageIntegrations } from "@/lib/auth/permissions";
 import { connectPlaidDemo, createPlaidLinkToken, isPlaidConfigured } from "@/lib/integrations/plaid";
 
@@ -13,11 +14,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
     }
 
-    if (isProduction) {
-      const auth = await requireAuth();
-      if (!canManageIntegrations(auth.role)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    const access = await requireApiAccess({ organizationId });
+    if (!access.isDemoMode && !canManageIntegrations(access.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const useDemo = demo || !isPlaidConfigured();

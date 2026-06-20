@@ -76,6 +76,7 @@ export default function IntegrationsContent() {
 
   const categories = [...new Set(integrations.map((i) => i.category))];
   const connectedCount = integrations.filter((i) => i.status === "connected").length;
+  const liveConnectedCount = integrations.filter((i) => i.status === "connected" && i.isLive).length;
 
   if (loading) {
     return (
@@ -100,9 +101,10 @@ export default function IntegrationsContent() {
         <div>
           <p className="font-medium">
             {connectedCount} of {integrations.length} integrations connected
+            {liveConnectedCount > 0 ? ` (${liveConnectedCount} live)` : ""}
           </p>
           <p className="text-sm text-muted-foreground">
-            QuickBooks and Plaid are live — connect, sync, and disconnect via API
+            QuickBooks and Plaid are live — mock connectors are labeled Demo/Mock
           </p>
         </div>
         <Button variant="outline" size="sm" className="ml-auto" onClick={handleSyncAll} disabled={syncing}>
@@ -127,6 +129,7 @@ export default function IntegrationsContent() {
                   status={integration.status as IntegrationStatus}
                   lastSync={integration.lastSync}
                   isLive={integration.isLive}
+                  errorMessage={integration.errorMessage}
                   metadata={integration.metadata}
                   organizationId={organization.id}
                   onUpdate={fetchIntegrations}

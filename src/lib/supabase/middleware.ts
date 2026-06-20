@@ -64,8 +64,13 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Admin routes require platform_admin or founder role
-  if (isAdminRoute(pathname) && user) {
+  if (isAdminRoute(pathname)) {
+    if (demoMode || !user) {
+      const url = request.nextUrl.clone();
+      url.pathname = user || demoMode ? "/dashboard" : "/login";
+      return NextResponse.redirect(url);
+    }
+
     const role = user.user_metadata?.role as string | undefined;
     if (role !== "platform_admin" && role !== "founder") {
       const url = request.nextUrl.clone();

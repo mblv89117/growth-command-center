@@ -14,7 +14,10 @@ export function useTenantData() {
   useEffect(() => {
     setLoading(true);
     fetch(`/api/tenant?organizationId=${organization.id}`)
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Tenant API ${res.status}`);
+        return res.json();
+      })
       .then((json) => {
         if (json.data) {
           setData(json.data);

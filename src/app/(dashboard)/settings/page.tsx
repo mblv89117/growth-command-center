@@ -15,18 +15,48 @@ import { formatCurrency } from "@/lib/utils";
 import { STRIPE_PLANS, type PlanKey } from "@/lib/stripe/config";
 import { Loader2 } from "lucide-react";
 
+async function saveSettings(
+  organizationId: string,
+  section: string,
+  settings: Record<string, unknown>
+): Promise<{ message: string; preview?: boolean }> {
+  const res = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId, section, settings }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Failed to save settings");
+  return data;
+}
+
 export default function SettingsPage() {
   const { organization } = useTenant();
   const { settings } = organization;
   const searchParams = useSearchParams();
   const defaultTab = searchParams.get("tab") ?? "organization";
   const [billingLoading, setBillingLoading] = useState<PlanKey | "portal" | null>(null);
+  const [saveLoading, setSaveLoading] = useState<string | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const currentPlan = STRIPE_PLANS[organization.plan as PlanKey] ?? STRIPE_PLANS.growth;
   const [billingNotice, setBillingNotice] = useState<string | null>(() => {
     if (searchParams.get("success")) return "Subscription updated successfully.";
     if (searchParams.get("cancelled")) return "Checkout was cancelled.";
     return null;
   });
+
+  const handleSave = async (section: string, settingsPayload: Record<string, unknown>) => {
+    setSaveLoading(section);
+    setSaveNotice(null);
+    try {
+      const result = await saveSettings(organization.id, section, settingsPayload);
+      setSaveNotice(result.message);
+    } catch (error) {
+      setSaveNotice(error instanceof Error ? error.message : "Failed to save settings");
+    } finally {
+      setSaveLoading(null);
+    }
+  };
 
   const startCheckout = async (plan: PlanKey) => {
     setBillingLoading(plan);
@@ -69,6 +99,10 @@ export default function SettingsPage() {
         description="Organization settings, forecast assumptions, thresholds, and billing"
       />
 
+      {saveNotice && (
+        <div className="mb-4 rounded-lg border bg-muted/50 p-3 text-sm">{saveNotice}</div>
+      )}
+
       <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="organization">Organization</TabsTrigger>
@@ -102,7 +136,20 @@ export default function SettingsPage() {
                   <Input id="currency" defaultValue={settings.currency} />
                 </div>
               </div>
-              <Button>Save Changes</Button>
+              <Button
+                disabled={saveLoading === "organization"}
+                onClick={() =>
+                  handleSave("organization", {
+                    name: (document.getElementById("org-name") as HTMLInputElement)?.value,
+                    industry: (document.getElementById("industry") as HTMLInputElement)?.value,
+                    slug: (document.getElementById("slug") as HTMLInputElement)?.value,
+                    currency: (document.getElementById("currency") as HTMLInputElement)?.value,
+                  })
+                }
+              >
+                {saveLoading === "organization" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Changes
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -138,7 +185,22 @@ export default function SettingsPage() {
                 </div>
                 <Switch defaultChecked />
               </div>
-              <Button>Save Forecast Settings</Button>
+              <Button
+                disabled={saveLoading === "forecast"}
+                onClick={() =>
+                  handleSave("forecast", {
+                    forecastHorizonWeeks: Number(
+                      (document.getElementById("horizon") as HTMLInputElement)?.value
+                    ),
+                    fiscalYearStart: Number(
+                      (document.getElementById("fiscal") as HTMLInputElement)?.value
+                    ),
+                  })
+                }
+              >
+                {saveLoading === "forecast" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Forecast Settings
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -175,7 +237,19 @@ export default function SettingsPage() {
                 </div>
                 <Switch defaultChecked />
               </div>
-              <Button>Save Alert Settings</Button>
+              <Button
+                disabled={saveLoading === "alerts"}
+                onClick={() =>
+                  handleSave("alerts", {
+                    cashAlertThreshold: Number(
+                      (document.getElementById("cash-threshold") as HTMLInputElement)?.value
+                    ),
+                  })
+                }
+              >
+                {saveLoading === "alerts" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Alert Settings
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

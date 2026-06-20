@@ -16,6 +16,7 @@ interface IntegrationCardProps {
   status: IntegrationStatus;
   lastSync?: string;
   isLive?: boolean;
+  errorMessage?: string;
   metadata?: Record<string, string | number>;
   organizationId: string;
   onUpdate: () => void;
@@ -49,6 +50,7 @@ export function IntegrationCard({
   status,
   lastSync,
   isLive,
+  errorMessage,
   metadata,
   organizationId,
   onUpdate,
@@ -125,6 +127,11 @@ export function IntegrationCard({
                     Live
                   </Badge>
                 )}
+                {!isLive && (
+                  <Badge variant="secondary" className="text-xs">
+                    Mock
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -145,8 +152,17 @@ export function IntegrationCard({
             {metadata.lastRecordsSynced} records synced
           </p>
         )}
+        {status === "error" && errorMessage && (
+          <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
+            {errorMessage}
+          </p>
+        )}
         <div className="flex gap-2">
-          {status === "connected" ? (
+          {status === "connected" && !isLiveIntegration ? (
+            <Button variant="outline" size="sm" className="w-full" disabled title="Mock connector — sample data only">
+              Demo Data (Mock)
+            </Button>
+          ) : status === "connected" ? (
             <>
               {isLiveIntegration && (
                 <Button variant="outline" size="sm" className="flex-1" onClick={handleSync} disabled={loading}>
@@ -162,6 +178,16 @@ export function IntegrationCard({
                 disabled={loading || !isLiveIntegration}
               >
                 Disconnect
+              </Button>
+            </>
+          ) : status === "error" && isLiveIntegration ? (
+            <>
+              <Button variant="outline" size="sm" className="flex-1" onClick={handleSync} disabled={loading}>
+                {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+                Retry Sync
+              </Button>
+              <Button size="sm" className="flex-1" onClick={handleConnect} disabled={loading}>
+                Reconnect
               </Button>
             </>
           ) : (

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { syncQuickBooks } from "@/lib/integrations/quickbooks";
 import { syncPlaidBalances } from "@/lib/integrations/plaid";
 import { getConnection, recordSyncResult } from "@/lib/integrations/store";
+import { requireApiAccess } from "@/lib/auth/access";
+import { authErrorResponse, AuthError } from "@/lib/auth/api";
 
 export async function POST(request: Request) {
   try {
@@ -11,6 +13,8 @@ export async function POST(request: Request) {
     if (!organizationId) {
       return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
     }
+
+    await requireApiAccess({ organizationId });
 
     const results = [];
 
@@ -39,6 +43,9 @@ export async function POST(request: Request) {
       message: "Sync complete",
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Sync failed" },
       { status: 500 }

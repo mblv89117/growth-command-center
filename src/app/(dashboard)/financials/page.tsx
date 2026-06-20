@@ -8,11 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useTenantData } from "@/hooks/use-tenant-data";
 import { formatCurrency } from "@/lib/utils";
+import { activeMonthlyTrends } from "@/lib/forecast/validate";
 import { Loader2 } from "lucide-react";
 
 export default function FinancialsPage() {
   const { data, loading } = useTenantData();
   const { financialSnapshot, monthlyTrends, expenseCategories, revenueSources, arAging, apAging, transactions, invoices, bills } = data;
+  const chartTrends = activeMonthlyTrends(monthlyTrends);
 
   if (loading) {
     return (
@@ -51,7 +53,7 @@ export default function FinancialsPage() {
                 <CardDescription>Monthly performance</CardDescription>
               </CardHeader>
               <CardContent>
-                <TrendChart data={monthlyTrends} />
+                <TrendChart data={chartTrends} />
               </CardContent>
             </Card>
             <Card>

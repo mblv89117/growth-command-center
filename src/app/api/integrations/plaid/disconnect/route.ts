@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { disconnectPlaid } from "@/lib/integrations/plaid";
+import { requireApiAccess } from "@/lib/auth/access";
+import { authErrorResponse } from "@/lib/auth/api";
 
 export async function DELETE(request: Request) {
   try {
@@ -10,12 +12,11 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
     }
 
+    await requireApiAccess({ organizationId });
+
     const ok = await disconnectPlaid(organizationId);
     return NextResponse.json({ success: ok });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Disconnect failed" },
-      { status: 500 }
-    );
+    return authErrorResponse(error);
   }
 }

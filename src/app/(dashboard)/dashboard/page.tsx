@@ -12,6 +12,7 @@ import { useTenant } from "@/lib/tenant/context";
 import { getTenantData } from "@/lib/mock-data";
 import type { DashboardData } from "@/lib/data/dashboard";
 import { formatCurrency } from "@/lib/utils";
+import { activeMonthlyTrends, latestTrendMonthLabel } from "@/lib/forecast/validate";
 import { ArrowRight, AlertTriangle, Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -22,8 +23,11 @@ export default function DashboardPage() {
   useEffect(() => {
     setLoading(true);
     fetch(`/api/dashboard?organizationId=${organization.id}`)
-      .then((res) => res.json())
-      .then((json: DashboardData) => setData(json))
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Dashboard API ${res.status}`);
+        return res.json() as Promise<DashboardData>;
+      })
+      .then((json) => setData(json))
       .catch(() => {
         const mock = getTenantData(organization.id);
         setData({
@@ -47,6 +51,8 @@ export default function DashboardPage() {
   }
 
   const { financialSnapshot, monthlyTrends, alerts, kpis, budgetVsActual, source } = data;
+  const chartTrends = activeMonthlyTrends(monthlyTrends);
+  const budgetPeriodLabel = latestTrendMonthLabel(monthlyTrends);
   const criticalAlerts = alerts.filter((a) => !a.isRead && (a.severity === "critical" || a.severity === "high"));
 
   return (
@@ -147,7 +153,7 @@ export default function DashboardPage() {
             <CardDescription>Revenue, expenses, and profit trends</CardDescription>
           </CardHeader>
           <CardContent>
-            <TrendChart data={monthlyTrends} />
+            <TrendChart data={chartTrends} />
           </CardContent>
         </Card>
         <Card>
@@ -156,7 +162,7 @@ export default function DashboardPage() {
             <CardDescription>Monthly cash balance movement</CardDescription>
           </CardHeader>
           <CardContent>
-            <CashTrendLine data={monthlyTrends.map((m) => ({ month: m.month, cash: m.cash }))} />
+            <CashTrendLine data={chartTrends.map((m) => ({ month: m.month, cash: m.cash }))} />
           </CardContent>
         </Card>
       </div>
@@ -165,7 +171,7 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Budget vs Actual</CardTitle>
-            <CardDescription>September performance variance</CardDescription>
+            <CardDescription>{budgetPeriodLabel}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">

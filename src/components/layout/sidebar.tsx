@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Menu } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -49,6 +50,8 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { isDemoMode } = useAuth();
+  const visibleNav = navigation.filter((item) => !(isDemoMode && item.href === "/admin"));
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r bg-card lg:flex">
@@ -62,7 +65,7 @@ export function Sidebar() {
         </div>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-        {navigation.map((item) => {
+        {visibleNav.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
@@ -87,25 +90,52 @@ export function Sidebar() {
 
 export function MobileNav() {
   const pathname = usePathname();
+  const { isDemoMode } = useAuth();
+  const visibleNav = navigation.filter((item) => !(isDemoMode && item.href === "/admin"));
+  const primaryNav = visibleNav.slice(0, 5);
+  const moreNav = visibleNav.slice(5);
 
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b bg-card p-2 lg:hidden">
-      {navigation.slice(0, 6).map((item) => {
-        const isActive = pathname === item.href;
-        return (
-          <Link
-            key={item.name}
-            href={item.href}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium",
-              isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-            )}
-          >
-            <item.icon className="h-3.5 w-3.5" />
-            {item.name}
-          </Link>
-        );
-      })}
+    <nav className="flex items-center gap-1 border-b bg-card p-2 lg:hidden">
+      <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+        {primaryNav.map((item) => {
+          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={cn(
+                "flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium",
+                isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+              )}
+            >
+              <item.icon className="h-3.5 w-3.5" />
+              {item.name}
+            </Link>
+          );
+        })}
+      </div>
+      {moreNav.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex shrink-0 items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium text-muted-foreground">
+            <Menu className="h-3.5 w-3.5" />
+            More
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+            {moreNav.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <DropdownMenuItem key={item.name} asChild>
+                  <Link href={item.href} className={cn(isActive && "font-semibold text-primary")}>
+                    <item.icon className="mr-2 h-3.5 w-3.5" />
+                    {item.name}
+                  </Link>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </nav>
   );
 }

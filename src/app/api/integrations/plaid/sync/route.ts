@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { syncPlaidBalances } from "@/lib/integrations/plaid";
 import { recordSyncResult } from "@/lib/integrations/store";
+import { requireApiAccess } from "@/lib/auth/access";
+import { authErrorResponse } from "@/lib/auth/api";
 
 export async function POST(request: Request) {
   try {
@@ -11,14 +13,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
     }
 
+    await requireApiAccess({ organizationId });
+
     const result = await syncPlaidBalances(organizationId);
-    recordSyncResult(organizationId, "plaid", result);
+    await recordSyncResult(organizationId, "plaid", result);
 
     return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Sync failed" },
-      { status: 500 }
-    );
+    return authErrorResponse(error);
   }
 }

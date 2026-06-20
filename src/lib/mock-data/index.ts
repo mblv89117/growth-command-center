@@ -93,9 +93,6 @@ export const MONTHLY_TRENDS: MonthlyTrend[] = [
   { month: "Jul", revenue: 750000, expenses: 492000, profit: 258000, cash: 485000 },
   { month: "Aug", revenue: 710000, expenses: 488000, profit: 222000, cash: 487250 },
   { month: "Sep", revenue: 892400, expenses: 512000, profit: 380400, cash: 487250 },
-  { month: "Oct", revenue: 0, expenses: 0, profit: 0, cash: 0 },
-  { month: "Nov", revenue: 0, expenses: 0, profit: 0, cash: 0 },
-  { month: "Dec", revenue: 0, expenses: 0, profit: 0, cash: 0 },
 ];
 
 export const BUDGET_VS_ACTUAL: BudgetVsActual[] = [

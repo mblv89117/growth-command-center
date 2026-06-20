@@ -139,9 +139,13 @@ CREATE POLICY "gcc integrations all" ON gcc_integration_connections FOR ALL
   USING (organization_id IN (SELECT organization_id FROM gcc_profiles WHERE id = auth.uid()));
 
 CREATE OR REPLACE FUNCTION gcc_handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
-  INSERT INTO gcc_profiles (id, full_name, role, organization_id)
+  INSERT INTO public.gcc_profiles (id, full_name, role, organization_id)
   VALUES (
     NEW.id,
     NEW.raw_user_meta_data->>'full_name',
@@ -150,9 +154,16 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS gcc_on_auth_user_created ON auth.users;
 CREATE TRIGGER gcc_on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION gcc_handle_new_user();
+
+-- Default organizations (required before user signup — profiles FK references this table)
+INSERT INTO gcc_organizations (id, name, slug, industry, plan)
+VALUES
+  ('org-apex', 'Apex Construction Group', 'apex-construction', 'Commercial Construction', 'growth'),
+  ('org-summit', 'Summit Renovations LLC', 'summit-renovations', 'Residential Renovation', 'starter')
+ON CONFLICT (id) DO NOTHING;
