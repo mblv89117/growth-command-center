@@ -18,8 +18,8 @@
     "smtp:diagnose": "node scripts/smtp-diagnose.mjs",
     "smtp:rate-limit": "node scripts/update-email-rate-limit.mjs 100",
     "smtp:rate-limit-and-test": "node scripts/smtp-rate-limit-and-test.mjs",
-    "smtp:test-m365": "python3 scripts/test-m365-smtp.py",
     "smtp:check-resend": "node scripts/check-resend-domain.mjs",
+    "smtp:resend-dns": "node scripts/resend-domain-dns.mjs",
     "smtp:configure-resend": "SMTP_PROVIDER=resend node scripts/configure-supabase-smtp.mjs"
   },
   "dependencies": {
