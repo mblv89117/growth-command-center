@@ -1,5 +1,6 @@
-import { NotFoundError } from "@/lib/api/errors";
+import { NotFoundError, ValidationError } from "@/lib/api/errors";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { validateKpiNumericValue } from "@/lib/kpi/limits";
 import type { KPI, KpiStatus } from "@/lib/types";
 
 export interface KpiUpdateInput {
@@ -45,6 +46,17 @@ function applyPatch(kpi: KPI, patch: KpiUpdateInput): KPI {
   };
 }
 
+function validatePatchForUnit(unit: KPI["unit"], patch: KpiUpdateInput): void {
+  if (patch.value !== undefined) {
+    const error = validateKpiNumericValue(unit, patch.value, "Value");
+    if (error) throw new ValidationError(error);
+  }
+  if (patch.target !== undefined && patch.target != null) {
+    const error = validateKpiNumericValue(unit, patch.target, "Target");
+    if (error) throw new ValidationError(error);
+  }
+}
+
 export async function updateKpi(
   organizationId: string,
   kpiKey: string,
@@ -70,6 +82,8 @@ export async function updateKpi(
         manualOverride: true,
       } satisfies KPI);
 
+    validatePatchForUnit(existing.unit, patch);
+
     const updated = applyPatch(existing, patch);
     memoryKpis.set(key, updated);
     return updated;
@@ -88,6 +102,8 @@ export async function updateKpi(
 
   if (fetchError) throw new Error(fetchError.message);
   if (!existing) throw new NotFoundError("KPI not found");
+
+  validatePatchForUnit(mapRow(existing).unit, patch);
 
   const rowPatch: Record<string, unknown> = {
     manual_override: true,

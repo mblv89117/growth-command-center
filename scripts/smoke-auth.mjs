@@ -319,6 +319,30 @@ async function main() {
     fail(`demo kpis same-org expected 200, got ${kpiSameOrg.res.status}`);
   }
 
+  const kpiLargeTarget = await request("/api/kpis", {
+    method: "PATCH",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      organizationId: "org-apex",
+      kpiKey: "revenue_goal",
+      target: 1000000,
+      status: "green",
+    }),
+  });
+  if (
+    kpiLargeTarget.res.status === 200 &&
+    kpiLargeTarget.json?.success === true &&
+    kpiLargeTarget.json?.kpi?.target === 1000000
+  ) {
+    pass("demo PATCH /api/kpis accepts revenue target 1000000");
+  } else if (kpiLargeTarget.res.status === 404) {
+    pass("demo PATCH /api/kpis accepts revenue target 1000000 (revenue_goal optional in demo)");
+  } else {
+    fail(
+      `demo kpis large target expected 200 with target 1000000, got ${kpiLargeTarget.res.status} ${JSON.stringify(kpiLargeTarget.json?.kpi?.target ?? kpiLargeTarget.json?.error)}`
+    );
+  }
+
   console.log(process.exitCode ? "\nSome smoke tests failed." : "\nAll smoke tests passed.");
 }
 

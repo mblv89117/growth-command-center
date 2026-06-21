@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { suggestKpiStatus } from "@/lib/kpi/status";
+import { getKpiNumericLimits, validateKpiNumericValue } from "@/lib/kpi/limits";
+import { parseKpiNumericInput } from "@/lib/kpi/parse";
 import type { KPI, KpiStatus } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import { CheckCircle2, Loader2, X } from "lucide-react";
 
 interface KpiEditModalProps {
@@ -42,8 +44,8 @@ export function KpiEditModal({
 
   const suggestedStatus = suggestKpiStatus({
     ...kpi,
-    value: Number(value) || 0,
-    target: target ? Number(target) : undefined,
+    value: parseKpiNumericInput(value) ?? kpi.value,
+    target: target.trim() ? (parseKpiNumericInput(target) ?? undefined) : undefined,
   });
 
   useEffect(() => {
@@ -59,24 +61,42 @@ export function KpiEditModal({
 
   if (!open) return null;
 
+  const limits = getKpiNumericLimits(kpi.unit);
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     setSuccess(false);
 
-    const parsedValue = Number(value);
-    const parsedTarget = target.trim() ? Number(target) : null;
+    const parsedValue = parseKpiNumericInput(value);
+    const parsedTarget = target.trim() ? parseKpiNumericInput(target) : null;
 
-    if (Number.isNaN(parsedValue)) {
+    if (parsedValue == null) {
       setError("Value must be a valid number.");
       setSaving(false);
       return;
     }
-    if (target.trim() && Number.isNaN(Number(target))) {
+    if (target.trim() && parsedTarget == null) {
       setError("Target must be a valid number.");
       setSaving(false);
       return;
     }
+
+    const valueError = validateKpiNumericValue(kpi.unit, parsedValue, "Value");
+    if (valueError) {
+      setError(valueError);
+      setSaving(false);
+      return;
+    }
+    if (parsedTarget != null) {
+      const targetError = validateKpiNumericValue(kpi.unit, parsedTarget, "Target");
+      if (targetError) {
+        setError(targetError);
+        setSaving(false);
+        return;
+      }
+    }
+
     if (status === "yellow" && !plan.trim()) {
       setError("Plan is required when status is yellow.");
       setSaving(false);
@@ -149,22 +169,32 @@ export function KpiEditModal({
               <Label htmlFor="kpi-value">Value</Label>
               <Input
                 id="kpi-value"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
+                placeholder={kpi.unit === "currency" ? "e.g. 1000000" : undefined}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="kpi-target">Target</Label>
               <Input
                 id="kpi-target"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
-                placeholder="Optional"
+                placeholder={kpi.unit === "currency" ? "e.g. 1000000" : "Optional"}
               />
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            {kpi.unit === "currency"
+              ? `Financial KPIs accept up to $${formatNumber(limits.max)}. Commas are allowed.`
+              : kpi.unit === "percent"
+                ? "Percent KPIs accept values up to 1,000%."
+                : null}
+          </p>
 
           <div className="space-y-2">
             <Label htmlFor="kpi-status">Status</Label>
