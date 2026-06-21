@@ -11,7 +11,10 @@
     "db:seed": "node --env-file=.env.local scripts/seed-supabase.mjs",
     "db:setup": "node --env-file=.env.local scripts/run-supabase-sql.mjs setup",
     "db:verify": "node --env-file=.env.local scripts/run-supabase-sql.mjs verify",
-    "db:assign-platform-admin": "node --env-file=.env.local scripts/assign-platform-admin.mjs"
+    "db:assign-platform-admin": "node --env-file=.env.local scripts/assign-platform-admin.mjs",
+    "smtp:verify": "node scripts/verify-supabase-auth-config.mjs",
+    "smtp:configure": "node scripts/configure-supabase-smtp.mjs",
+    "smtp:dry-run": "node scripts/configure-supabase-smtp.mjs --dry-run"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",
