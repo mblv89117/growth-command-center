@@ -1,30 +1,21 @@
 "use client";
 
-import { KPICard, PageHeader } from "@/components/shared";
+import { useEffect, useState } from "react";
+import { PageHeader } from "@/components/shared";
+import { KpiScorecardGrid } from "@/components/dashboard/kpi-scorecard-grid";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTenant } from "@/lib/tenant/context";
 import { useTenantData } from "@/hooks/use-tenant-data";
+import { getReportTypeForId } from "@/lib/reports/config";
+import type { KPI } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 
-const REPORT_TYPE_MAP: Record<string, string> = {
-  "rpt-1": "executive",
-  "rpt-2": "cash-forecast",
-  "rpt-3": "executive",
-  "rpt-4": "executive",
-  "rpt-5": "executive",
-  "rpt-6": "executive",
-  "rpt-7": "pipeline",
-  "rpt-8": "jobs",
-  "rpt-9": "executive",
-  "rpt-10": "cash-forecast",
-  "rpt-11": "kpi",
-};
-
 function exportReport(organizationId: string, reportId: string, format: "pdf" | "excel") {
-  const type = REPORT_TYPE_MAP[reportId] ?? "executive";
+  const type = getReportTypeForId(reportId);
+  if (!type) return;
   window.open(
     `/api/reports/export?organizationId=${organizationId}&type=${type}&format=${format}`,
     "_blank"
@@ -34,7 +25,12 @@ function exportReport(organizationId: string, reportId: string, format: "pdf" | 
 export default function ReportsPage() {
   const { organization } = useTenant();
   const { data, loading } = useTenantData();
-  const { reports, kpis } = data;
+  const { reports } = data;
+  const [kpis, setKpis] = useState<KPI[]>(data.kpis);
+
+  useEffect(() => {
+    setKpis(data.kpis);
+  }, [data.kpis]);
 
   const categories = [...new Set(reports.map((r) => r.category))];
 
@@ -56,14 +52,16 @@ export default function ReportsPage() {
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>KPI Scorecard</CardTitle>
-          <CardDescription>Key performance indicators snapshot</CardDescription>
+          <CardDescription>Key performance indicators snapshot — click edit to update KPIs</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {kpis.map((kpi) => (
-              <KPICard key={kpi.id} {...kpi} />
-            ))}
-          </div>
+          <KpiScorecardGrid
+            kpis={kpis}
+            organizationId={organization.id}
+            onKpiUpdated={(updated) => {
+              setKpis((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+            }}
+          />
           <div className="mt-4 flex gap-2">
             <Button
               variant="outline"
@@ -110,6 +108,7 @@ export default function ReportsPage() {
                         size="sm"
                         className="flex-1"
                         onClick={() => exportReport(organization.id, report.id, "pdf")}
+                        disabled={!getReportTypeForId(report.id)}
                       >
                         <FileText className="mr-1 h-3 w-3" /> PDF
                       </Button>
@@ -117,6 +116,7 @@ export default function ReportsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => exportReport(organization.id, report.id, "excel")}
+                        disabled={!getReportTypeForId(report.id)}
                       >
                         <Download className="h-3 w-3" />
                       </Button>

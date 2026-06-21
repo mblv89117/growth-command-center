@@ -3,6 +3,8 @@
  * Auth and tenant isolation smoke tests.
  * Requires dev server: npm run dev (default http://localhost:3000)
  */
+import ExcelJS from "exceljs";
+
 const BASE = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
 
 function fail(message) {
@@ -17,18 +19,33 @@ function pass(message) {
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, { redirect: "manual", ...options });
   const setCookie = res.headers.getSetCookie?.() ?? [];
-  const text = await res.text();
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const text = buffer.toString("utf8");
   let json = null;
   try {
     json = text ? JSON.parse(text) : null;
   } catch {
     json = null;
   }
-  return { res, setCookie, text, json };
+  return { res, setCookie, text, json, buffer };
 }
 
 function cookieHeader(setCookies) {
   return setCookies.map((c) => c.split(";")[0]).join("; ");
+}
+
+function contentDispositionFilename(res) {
+  const header = res.res.headers.get("content-disposition") ?? "";
+  const match = header.match(/filename=\"([^\"]+)\"/);
+  return match?.[1] ?? "";
+}
+
+async function excelContentMarker(res) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(res.buffer);
+  const sheet = workbook.worksheets[0];
+  if (!sheet) return null;
+  return sheet.getRow(2)?.getCell(2)?.value ?? null;
 }
 
 async function main() {
@@ -142,6 +159,90 @@ async function main() {
     pass("PDF export works for demo org-apex");
   } else {
     fail(`PDF export expected 200 application/pdf, got ${pdf.res.status}`);
+  }
+
+  const invalidReportType = await request(
+    "/api/reports/export?organizationId=org-apex&format=pdf&type=not-a-report",
+    demoOpts
+  );
+  if (invalidReportType.res.status === 400) {
+    pass("invalid report export type returns 400");
+  } else {
+    fail(`invalid report type expected 400, got ${invalidReportType.res.status}`);
+  }
+
+  const cashForecastPdf = await request(
+    "/api/reports/export?organizationId=org-apex&format=pdf&type=cash-forecast",
+    demoOpts
+  );
+  const cashForecastName = contentDispositionFilename(cashForecastPdf);
+  const cashForecastExcel = await request(
+    "/api/reports/export?organizationId=org-apex&format=excel&type=cash-forecast",
+    demoOpts
+  );
+  const cashForecastMarker = await excelContentMarker(cashForecastExcel);
+  if (
+    cashForecastPdf.res.status === 200 &&
+    cashForecastName.includes("cash-forecast") &&
+    cashForecastExcel.res.status === 200 &&
+    cashForecastMarker === "13-WEEK CASH FORECAST"
+  ) {
+    pass("cash forecast export uses cash forecast filename and content");
+  } else {
+    fail(
+      `cash forecast export mismatch: pdf=${cashForecastName} marker=${cashForecastMarker}`
+    );
+  }
+
+  const kpiPdf = await request(
+    "/api/reports/export?organizationId=org-apex&format=pdf&type=kpi",
+    demoOpts
+  );
+  const kpiName = contentDispositionFilename(kpiPdf);
+  const kpiExcel = await request(
+    "/api/reports/export?organizationId=org-apex&format=excel&type=kpi",
+    demoOpts
+  );
+  const kpiMarker = await excelContentMarker(kpiExcel);
+  if (
+    kpiPdf.res.status === 200 &&
+    kpiName.includes("kpi-scorecard") &&
+    kpiExcel.res.status === 200 &&
+    kpiMarker === "KPI SCORECARD"
+  ) {
+    pass("KPI scorecard export uses KPI filename and content");
+  } else {
+    fail(`KPI scorecard export mismatch: pdf=${kpiName} marker=${kpiMarker}`);
+  }
+
+  const financialPdf = await request(
+    "/api/reports/export?organizationId=org-apex&format=pdf&type=financial-summary",
+    demoOpts
+  );
+  const financialName = contentDispositionFilename(financialPdf);
+  const financialExcel = await request(
+    "/api/reports/export?organizationId=org-apex&format=excel&type=financial-summary",
+    demoOpts
+  );
+  const financialMarker = await excelContentMarker(financialExcel);
+  if (
+    financialPdf.res.status === 200 &&
+    financialName.includes("financial-summary") &&
+    financialExcel.res.status === 200 &&
+    financialMarker === "FINANCIAL SUMMARY"
+  ) {
+    pass("financial summary export uses financial filename and content");
+  } else {
+    fail(`financial summary export mismatch: pdf=${financialName} marker=${financialMarker}`);
+  }
+
+  if (
+    kpiExcel.res.status === 200 &&
+    contentDispositionFilename(kpiExcel).includes("kpi-scorecard")
+  ) {
+    pass("KPI scorecard Excel export uses KPI filename");
+  } else {
+    fail(`KPI scorecard excel filename mismatch: ${contentDispositionFilename(kpiExcel)}`);
   }
 
   // Excel export
@@ -340,6 +441,24 @@ async function main() {
   } else {
     fail(
       `demo kpis large target expected 200 with target 1000000, got ${kpiLargeTarget.res.status} ${JSON.stringify(kpiLargeTarget.json?.kpi?.target ?? kpiLargeTarget.json?.error)}`
+    );
+  }
+
+  const kpiReportsEdit = await request("/api/kpis", {
+    method: "PATCH",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      organizationId: "org-apex",
+      kpiKey: "revenue_growth",
+      value: 14.2,
+      status: "green",
+    }),
+  });
+  if (kpiReportsEdit.res.status === 200 && kpiReportsEdit.json?.kpi?.value === 14.2) {
+    pass("KPI PATCH returns updated KPI payload for scorecard editing flow");
+  } else {
+    fail(
+      `KPI scorecard edit expected value 14.2 in response, got status=${kpiReportsEdit.res.status} value=${kpiReportsEdit.json?.kpi?.value}`
     );
   }
 
