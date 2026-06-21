@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { isAnthropicConfigured } from "@/lib/ai/config";
+import { getAnthropicApiKey, isAnthropicConfigured } from "@/lib/ai/config";
 import {
   getAtRiskKpis,
   getFinancialRiskSignals,
@@ -78,7 +78,7 @@ export async function generateAdvisorInsights(context: AdvisorRequestContext): P
     );
   }
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = new Anthropic({ apiKey: getAnthropicApiKey() });
   const prompt = buildAdvisorPrompt(context);
 
   try {
