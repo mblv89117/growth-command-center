@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "smoke:auth": "node scripts/smoke-auth.mjs",
-    "db:seed": "node --env-file=.env.local scripts/seed-supabase.mjs"
+    "db:seed": "node --env-file=.env.local scripts/seed-supabase.mjs",
+    "db:setup": "node --env-file=.env.local scripts/run-supabase-sql.mjs setup",
+    "db:verify": "node --env-file=.env.local scripts/run-supabase-sql.mjs verify",
+    "db:assign-platform-admin": "node --env-file=.env.local scripts/assign-platform-admin.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",
@@ -47,6 +50,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^15.2.0",
+    "pg": "^8.16.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
