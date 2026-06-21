@@ -169,6 +169,51 @@ async function main() {
     fail(`demo PDF org-summit expected 403, got ${pdfSummit.res.status}`);
   }
 
+  // AI Advisor security guards
+  const aiUnauth = await request("/api/ai-advisor", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "org-apex" }),
+  });
+  if (aiUnauth.res.status === 401) {
+    pass("unauth POST /api/ai-advisor returns 401");
+  } else {
+    fail(`unauth /api/ai-advisor expected 401, got ${aiUnauth.res.status}`);
+  }
+
+  const aiCrossTenant = await request("/api/ai-advisor", {
+    method: "POST",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "org-summit" }),
+  });
+  if (aiCrossTenant.res.status === 403) {
+    pass("demo POST /api/ai-advisor for org-summit returns 403");
+  } else {
+    fail(`demo ai-advisor org-summit expected 403, got ${aiCrossTenant.res.status}`);
+  }
+
+  const aiInvalid = await request("/api/ai-advisor", {
+    method: "POST",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (aiInvalid.res.status === 400) {
+    pass("invalid POST /api/ai-advisor body returns 400");
+  } else {
+    fail(`invalid ai-advisor body expected 400, got ${aiInvalid.res.status}`);
+  }
+
+  const aiConfigured = await request("/api/ai-advisor", {
+    method: "POST",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "org-apex" }),
+  });
+  if (aiConfigured.res.status === 503 || aiConfigured.res.status === 200) {
+    pass("demo POST /api/ai-advisor returns 503 when unconfigured or 200 when configured");
+  } else {
+    fail(`demo ai-advisor expected 503 or 200, got ${aiConfigured.res.status}`);
+  }
+
   console.log(process.exitCode ? "\nSome smoke tests failed." : "\nAll smoke tests passed.");
 }
 

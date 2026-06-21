@@ -20,7 +20,13 @@ function getDefaultStore(): RateLimitStore {
 export async function checkRateLimit(options: RateLimitOptions): Promise<RateLimitResult> {
   const store = options.store ?? getDefaultStore();
   const key = buildRateLimitKey(options.route, options.userId);
-  return store.consume(key, options.limit, options.windowMs);
+
+  try {
+    return await store.consume(key, options.limit, options.windowMs);
+  } catch (error) {
+    if (store === memoryRateLimitStore) throw error;
+    return memoryRateLimitStore.consume(key, options.limit, options.windowMs);
+  }
 }
 
 export async function enforceRateLimit(options: RateLimitOptions): Promise<RateLimitResult> {

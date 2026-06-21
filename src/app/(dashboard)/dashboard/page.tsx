@@ -13,6 +13,7 @@ import { getTenantData } from "@/lib/mock-data";
 import type { DashboardData } from "@/lib/data/dashboard";
 import { formatCurrency } from "@/lib/utils";
 import { activeMonthlyTrends, latestTrendMonthLabel } from "@/lib/forecast/validate";
+import { AiAdvisorPanel } from "@/components/dashboard/ai-advisor-panel";
 import { ArrowRight, AlertTriangle, Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -73,6 +74,10 @@ export default function DashboardPage() {
           </div>
         }
       />
+
+      <div className="mb-6">
+        <AiAdvisorPanel department="executive" />
+      </div>
 
       {criticalAlerts.length > 0 && (
         <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
