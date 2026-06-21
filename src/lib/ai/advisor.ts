@@ -8,7 +8,7 @@ import {
 import type { DashboardData } from "@/lib/data/dashboard";
 import { ServiceUnavailableError } from "@/lib/api/errors";
 
-const ADVISOR_MODEL = "claude-sonnet-4-20250514";
+const ADVISOR_MODEL = "claude-sonnet-4-6";
 
 export interface AdvisorRequestContext {
   organizationName: string;
