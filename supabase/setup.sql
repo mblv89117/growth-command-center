@@ -1,6 +1,7 @@
 -- Growth Command Center — CANONICAL database setup
--- Run this entire file once in Supabase SQL Editor before launch.
+-- Run this entire file in Supabase SQL Editor before launch (safe to re-run).
 -- Includes tables, RLS policies, signup trigger, and default organizations.
+-- Policies use DROP IF EXISTS + CREATE so partial runs can be retried safely.
 -- Do not use supabase/fix-signup.sql for new installs (deprecated pointer only).
 
 CREATE TABLE IF NOT EXISTS gcc_organizations (
@@ -120,23 +121,40 @@ ALTER TABLE gcc_kpis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gcc_alerts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gcc_integration_connections ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "gcc org read" ON gcc_organizations;
 CREATE POLICY "gcc org read" ON gcc_organizations FOR SELECT
   USING (id IN (SELECT organization_id FROM gcc_profiles WHERE id = auth.uid()));
 
+DROP POLICY IF EXISTS "gcc profile read" ON gcc_profiles;
 CREATE POLICY "gcc profile read" ON gcc_profiles FOR SELECT USING (id = auth.uid());
+
+DROP POLICY IF EXISTS "gcc profile update" ON gcc_profiles;
 CREATE POLICY "gcc profile update" ON gcc_profiles FOR UPDATE USING (id = auth.uid());
+
+DROP POLICY IF EXISTS "gcc profile insert" ON gcc_profiles;
 CREATE POLICY "gcc profile insert" ON gcc_profiles FOR INSERT WITH CHECK (id = auth.uid());
 
+DROP POLICY IF EXISTS "gcc financials read" ON gcc_financial_snapshots;
 CREATE POLICY "gcc financials read" ON gcc_financial_snapshots FOR SELECT
   USING (organization_id IN (SELECT organization_id FROM gcc_profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "gcc trends read" ON gcc_monthly_trends;
 CREATE POLICY "gcc trends read" ON gcc_monthly_trends FOR SELECT
   USING (organization_id IN (SELECT organization_id FROM gcc_profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "gcc budget read" ON gcc_budget_vs_actual;
 CREATE POLICY "gcc budget read" ON gcc_budget_vs_actual FOR SELECT
   USING (organization_id IN (SELECT organization_id FROM gcc_profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "gcc kpis read" ON gcc_kpis;
 CREATE POLICY "gcc kpis read" ON gcc_kpis FOR SELECT
   USING (organization_id IN (SELECT organization_id FROM gcc_profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "gcc alerts read" ON gcc_alerts;
 CREATE POLICY "gcc alerts read" ON gcc_alerts FOR SELECT
   USING (organization_id IN (SELECT organization_id FROM gcc_profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "gcc integrations all" ON gcc_integration_connections;
 CREATE POLICY "gcc integrations all" ON gcc_integration_connections FOR ALL
   USING (organization_id IN (SELECT organization_id FROM gcc_profiles WHERE id = auth.uid()));
 
