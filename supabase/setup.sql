@@ -112,6 +112,12 @@ CREATE TABLE IF NOT EXISTS gcc_integration_connections (
   UNIQUE(organization_id, provider)
 );
 
+CREATE TABLE IF NOT EXISTS gcc_api_rate_limits (
+  bucket_key TEXT PRIMARY KEY,
+  request_count INTEGER NOT NULL DEFAULT 1,
+  window_start TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 ALTER TABLE gcc_organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gcc_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gcc_financial_snapshots ENABLE ROW LEVEL SECURITY;
