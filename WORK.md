@@ -1,7 +1,7 @@
 # Growth Command Center — Working Notes
 
-Last updated: June 20, 2026  
-Branch: `main`  
+Last updated: June 21, 2026  
+Branch: `main` @ `281ca4c`  
 Production URL: https://growth-command-center-lbnt.vercel.app
 
 **Status: GO for controlled production use** — production UAT accepted (June 21, 2026).
@@ -33,7 +33,16 @@ Track after controlled production launch. Not blockers for current GO status.
 - [ ] **6. Clean up org switcher** — remove mock multi-tenant UI; bind header to authenticated user's org only
 - [ ] **7. Wire admin to real Supabase tenant data** — replace mock `PLATFORM_TENANTS` on `/admin` with live queries
 - [ ] **8. Add invite audit trail** — e.g. `gcc_team_invites` table; log pending/sent/failed invites
-- [ ] **9. Add authenticated smoke tests in CI** — test user session; cover settings, exports, admin gate, tenant 403
+- [x] **9. Add authenticated smoke tests in CI** — test user session; cover settings, exports, admin gate, tenant 403
+
+---
+
+## AI features
+
+- [x] **AI safety foundation** — Zod validation, tenant-safe API helpers, pluggable rate limiting (`gcc_api_rate_limits`), commit `9721079`
+- [x] **AI Advisor MVP — production verified** (June 21, 2026) — `/api/ai-advisor`, dashboard panel, Anthropic `claude-sonnet-4-6`, 20 req/user/hr; production checks pass (401/400/405 unauth, 403 cross-tenant, 200 same-org insights); commits `2c2813a`, `401ffca`, `281ca4c`
+- [ ] **Next phase: AI Onboarding MVP** — `/onboarding`, `/api/ai-onboard`, conversation persistence, onboarding tools (not started)
+- [ ] **Merge.dev integration** — not started
 
 ---
 
@@ -51,6 +60,11 @@ curl -s "$SMOKE_BASE_URL/api/health"
 curl -sI "$SMOKE_BASE_URL/dashboard" | grep -i location
 curl -s -o /dev/null -w "%{http_code}\n" "$SMOKE_BASE_URL/api/integrations?organizationId=org-apex"
 curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/auth/demo"
+
+# AI Advisor production smoke (unauthenticated)
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/ai-advisor" -H "Content-Type: application/json" -d '{"organizationId":"org-apex"}'
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/ai-advisor" -H "Content-Type: application/json" -d '{}'
+curl -s -o /dev/null -w "%{http_code}\n" "$SMOKE_BASE_URL/api/ai-advisor"
 ```
 
 ---
