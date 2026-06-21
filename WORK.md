@@ -1,136 +1,124 @@
 # Growth Command Center — Working Notes
 
-Last updated: May 24, 2026  
-Branch: `cursor/fix-tailwind-esm-import` (committed) · base: `main`
+Last updated: June 21, 2026  
+Branch: `main` (production readiness merged via PR #1 @ `b7969d8`)
 
-Use this file as a running checklist while you continue development.
+Use this file as a running checklist for deployment and follow-up work.
 
-**Agent prompt:** [`docs/production-qa-prompt.md`](docs/production-qa-prompt.md) — full orchestrator + sub-agent production QA workflow (P0–P3 priorities, required commands, final report format). Paste into a coding agent or follow manually.
-
----
-
-## Done (this session)
-
-- [x] **Tailwind ESM fix** — `tailwind.config.ts` now imports `tailwindcss-animate` instead of `require()`. Fixes dev crash: `ReferenceError: require is not defined` when compiling dashboard pages.
-- [x] **QA pass** — Full end-user test of all routes, APIs, integrations, and auth flows (see findings below).
-- [x] **Production build verified** — `npm run build` succeeds after a clean `.next` delete.
+**Agent prompt:** [`docs/production-qa-prompt.md`](docs/production-qa-prompt.md) — orchestrator + sub-agent production QA workflow.
 
 ---
 
-## Uncommitted local changes (not on branch)
+## Production readiness — complete
 
-These exist in your working tree but were **not** included in the Tailwind commit:
+Merged to `main` (PR #1). Launch blockers addressed:
 
-| File | Summary |
-|------|---------|
-| `src/app/(dashboard)/dashboard/page.tsx` | Checks `res.ok` before parsing dashboard API JSON; falls back to mock on error |
-| `src/hooks/use-tenant-data.ts` | Same pattern for tenant API |
-| `supabase/setup.sql` | Hardened `gcc_handle_new_user()` trigger + default org seed rows |
-| `supabase/fix-signup.sql` | Untracked — signup-related SQL fix |
-
-Review and commit separately when ready.
-
----
-
-## Priority backlog (from QA)
-
-Aligned with `docs/production-qa-prompt.md` priority labels: **P0** = launch blocker, **P1** = before paid users, **P2** = before broad launch.
-
-### P0 — launch blockers
-
-1. **Auth middleware bypass**
-   - **Symptom:** `/dashboard` returns HTTP 200 with full app shell when no session or demo cookie.
-   - **Where:** `middleware.ts` → `src/lib/supabase/middleware.ts`
-   - **Fix:** Ensure redirect to `/login` when `!user && !demoMode` on all protected routes. Verify Edge middleware cookie handling with Supabase SSR.
-
-2. **PDF report export (500)**
-   - **Symptom:** `GET /api/reports/export?format=pdf` fails with missing `Helvetica.afm`.
-   - **Where:** `src/lib/reports/generate.ts`, `src/app/api/reports/export/route.ts`
-   - **Fix:** Bundle pdfkit font files for Next.js App Router, or switch PDF library. Excel export works today.
-
-### P1 — before paid users
-
-3. **QuickBooks Error UX**
-   - **Symptom:** Error badge + Connect button; no `errorMessage` shown; no Retry action.
-   - **Where:** `src/components/integrations/integration-card.tsx`, `integrations-content.tsx`
-   - **Fix:** When `status === "error"`, render `errorMessage`, show **Retry Sync** / **Reconnect**, keep Live badge.
-
-4. **Admin page in demo mode**
-   - **Symptom:** Platform admin tenant table visible without `founder` / `platform_admin` role.
-   - **Where:** `src/lib/supabase/middleware.ts` — admin check only runs when `user` exists.
-   - **Fix:** Block `/admin` for demo mode unless role is explicitly allowed.
-
-5. **API auth in development**
-   - **Symptom:** `/api/integrations`, `/api/reports/export`, etc. callable without session.
-   - **Fix:** Add `requireAuth()` (or equivalent) to sensitive API routes in all environments.
-
-### P2 — before broad launch
-
-6. **Mock integration cards** — Stripe/Gusto/HubSpot show Connected + disabled Disconnect. Label as **Mock** or enable demo toggle.
-7. **Settings save buttons** — No handlers on Organization / Forecast / Alerts tabs (`src/app/(dashboard)/settings/page.tsx`).
-8. **Team invites** — Invite buttons have no `onClick` (`src/app/(dashboard)/team/page.tsx`).
-9. **Alerts tabs** — Use controlled `Tabs` `value`/`onValueChange`; filter state and tab UI desync (`src/app/(dashboard)/alerts/page.tsx`).
-
-### P3 — backlog
-
-10. Dashboard “Budget vs Actual” says September; data context is May 2026.
-11. Mobile nav only shows first 6 sidebar items (`src/components/layout/sidebar.tsx` → `MobileNav`).
-12. Monthly trend chart includes Oct–Dec with $0 values in mock data.
+- [x] Auth middleware + dashboard layout redirect unauthenticated users
+- [x] Sensitive API routes use `requireApiAccess()` / `requireAuth()`
+- [x] Demo tenant isolation pinned to `org-apex` (cross-tenant → 403)
+- [x] Admin gate: `platform_admin` only (profile-based, demo blocked)
+- [x] PDF export fix (`serverExternalPackages: pdfkit`)
+- [x] Settings/team honest responses (preview in demo; persist/invite or 501 in production)
+- [x] Production `/api/health` minimal payload
+- [x] `supabase/setup.sql` canonical; `fix-signup.sql` deprecated
+- [x] Smoke test script: `npm run smoke:auth`
 
 ---
 
-## Quick test commands
+## Pre-deployment checklist
+
+Do **not** deploy until all gates pass. Full detail in `README.md`.
+
+### Supabase
+
+- [ ] Run **`supabase/setup.sql`** in SQL Editor (do **not** run `fix-signup.sql`)
+- [ ] Configure Auth URLs: Site URL + `https://<domain>/auth/callback`
+- [ ] Configure SMTP for team invite emails
+- [ ] Create `platform_admin` user if using `/admin`
+- [ ] Optional: `npm run db:seed` for Apex/Summit demo financial data
+
+### Vercel environment variables (required)
+
+- [ ] `NEXT_PUBLIC_SUPABASE_URL`
+- [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- [ ] `SUPABASE_SERVICE_ROLE_KEY`
+- [ ] `NEXT_PUBLIC_APP_URL`
+- [ ] Confirm **`ALLOW_DEMO_MODE` is unset** in production
+
+### Post-deploy smoke tests
 
 ```bash
-# Dev server
-npm run dev
+export SMOKE_BASE_URL=https://your-production-domain
 
-# Demo login cookie
+curl -s "$SMOKE_BASE_URL/api/health"                    # {"status":"ok"}
+curl -sI "$SMOKE_BASE_URL/dashboard" | grep location    # → /login
+curl -s -o /dev/null -w "%{http_code}\n" \
+  "$SMOKE_BASE_URL/api/integrations?organizationId=org-apex"  # 401
+curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+  "$SMOKE_BASE_URL/api/auth/demo"                       # 403
+```
+
+Plus manual authenticated checks: settings save, team invite email, PDF/Excel export, admin gate, cross-tenant 403.
+
+**Staging only:** `SMOKE_BASE_URL=<staging> npm run smoke:auth` (13 tests; requires demo enabled).
+
+---
+
+## Post-launch hardening (P2 — not launch blockers)
+
+| Item | Notes |
+|------|-------|
+| Role checks on settings/team | Any authenticated org member can save settings or send invites |
+| Signup org assignment | Users without `organization_id` in metadata default to `org-apex` |
+| Org switcher UX | Header still lists mock orgs; API blocks cross-tenant, UI can confuse |
+| Platform admin data | `/admin` renders mock `PLATFORM_TENANTS`; wire to Supabase |
+| Invite audit trail | No `gcc_team_invites` table yet |
+| Authenticated CI smoke tests | No test-user automation for prod-auth paths |
+| README / docs drift | Keep in sync after feature changes |
+| ESLint migration | `next lint` deprecated; migrate before Next.js 16 |
+
+---
+
+## Quick test commands (local)
+
+```bash
+npm run dev
+npm run lint
+npx tsc --noEmit
+npm run build
+npm run smoke:auth          # 13/13 with demo enabled on localhost
+
+# Demo cookie
 curl -c /tmp/gcc.txt -X POST http://localhost:3000/api/auth/demo
 
-# Health check
+# Dev health (detailed)
 curl http://localhost:3000/api/health
 
-# Page smoke test (with demo cookie)
-curl -b /tmp/gcc.txt -o /dev/null -w "%{http_code}\n" http://localhost:3000/integrations
+# Unauth redirect
+curl -sI http://localhost:3000/dashboard | grep -i location
 
-# PDF export (currently fails)
-curl -b /tmp/gcc.txt "http://localhost:3000/api/reports/export?organizationId=org-apex&type=executive&format=pdf" -o /tmp/test.pdf
-
-# Unauth check (should redirect to /login — currently fails)
-curl -o /dev/null -w "%{http_code} %{redirect_url}\n" http://localhost:3000/dashboard
-
-# Clean rebuild if .next corrupts (e.g. build + dev at same time)
-rm -rf .next && npm run build && npm run dev
+# Forecast validation
+npx tsx scripts/validate-forecast.ts
 ```
 
 ---
 
-## App context (for testing)
+## App context
 
 | Item | Value |
 |------|-------|
-| URL | http://localhost:3000 |
-| Demo entry | Login → **Enter Demo Mode** (dev only) |
+| URL (local) | http://localhost:3000 |
+| Demo entry | Login → **Enter Demo Mode** (dev only; pinned to `org-apex`) |
 | Sample tenant | Apex Construction Group (`org-apex`) |
-| Live integrations | QuickBooks (`int-1`), Plaid (`int-4`) |
-| Supabase setup | Run `supabase/setup.sql`, then `npm run db:seed` |
+| SQL setup | **`supabase/setup.sql`** only |
+| Health (prod) | `{"status":"ok"}` minimal |
+| Health (dev) | Full connection details + org count |
 
 ---
 
-## Suggested next session order
+## Suggested next steps
 
-Follow **Sub-Agent B → F → E → G** in `docs/production-qa-prompt.md`:
-
-1. **P0** Auth middleware + API auth + admin gate (Sub-Agent B/C).
-2. **P0** PDF export fonts (Sub-Agent F).
-3. **P1** QuickBooks error UX + mock integration labels (Sub-Agent E).
-4. Commit or discard uncommitted dashboard/tenant/supabase changes.
-5. **P2** Settings/team dead buttons, alerts tabs, mobile nav (Sub-Agent G).
-6. Run final verification block (Sub-Agent I) and fill in the required report format from the prompt.
-
----
-
-## QA rating (May 24, 2026)
-
-**Needs moderate fixes** — Strong demo UX and data layer; not launch-ready until auth, PDF exports, and integration error handling are resolved.
+1. Complete pre-deployment checklist above
+2. Deploy to Vercel when approved (not yet deployed)
+3. Run production smoke tests
+4. Tackle P2 hardening items based on priority after launch

@@ -20,7 +20,7 @@ Growth Command Center is a multi-tenant SaaS application that delivers real-time
 - **Alerts** — Cash, AR, margin, payroll, and debt coverage alerts
 - **Integrations** — QuickBooks live connector (OAuth + sync), mock connectors for others
 - **Team & Settings** — Roles, invitations, forecast assumptions, billing
-- **Platform Admin** — Tenant management for platform owners
+- **Platform Admin** — Tenant management for platform owners (`platform_admin` only)
 
 ## Tech Stack
 
@@ -30,7 +30,7 @@ Growth Command Center is a multi-tenant SaaS application that delivers real-time
 - **shadcn/ui** (Radix UI components)
 - **Recharts**
 - **next-themes** (dark/light mode)
-- **Supabase** (Auth + PostgreSQL ready)
+- **Supabase** (Auth + PostgreSQL)
 
 ## Getting Started
 
@@ -51,49 +51,157 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — click **Enter Demo Mode** on the login page to explore the app.
+Open [http://localhost:3000](http://localhost:3000) — click **Enter Demo Mode** on the login page to explore the app (development only).
 
 ### Authentication
 
-**Demo mode (no setup):** Click "Enter Demo Mode" on `/login` to access the full dashboard with sample data.
+**Demo mode (development only):** Click "Enter Demo Mode" on `/login` to access the dashboard with sample data. Demo sessions are pinned to `org-apex` only.
 
 **Supabase Auth:**
+
 1. Create a project at [supabase.com](https://supabase.com)
 2. Copy `.env.example` to `.env.local` and add your keys
-3. Run `supabase/schema.sql` in the Supabase SQL Editor
-4. Sign up at `/signup` or sign in at `/login`
+3. Run **`supabase/setup.sql`** in the Supabase SQL Editor (canonical setup — see below)
+4. Optionally run `npm run db:seed` to load Apex/Summit demo financial data
+5. Sign up at `/signup` or sign in at `/login`
 
 ### QuickBooks Integration
 
-**Demo mode:** Click Connect on the QuickBooks card — syncs 847 mock records instantly.
+**Demo mode:** Click Connect on the QuickBooks card — syncs mock records instantly.
 
 **Live OAuth:**
+
 1. Create an app at [developer.intuit.com](https://developer.intuit.com)
 2. Add redirect URI: `http://localhost:3000/api/integrations/quickbooks/callback`
 3. Set `QUICKBOOKS_CLIENT_ID`, `QUICKBOOKS_CLIENT_SECRET`, and `QUICKBOOKS_REDIRECT_URI` in `.env.local`
 4. Connect from the Integrations page — redirects to Intuit OAuth
 
-### Production Deployment (Vercel)
+## Supabase database setup
 
-1. Push to GitHub and import project in [Vercel](https://vercel.com)
-2. Set all environment variables from `.env.example`
-3. Set `NEXT_PUBLIC_APP_URL` to your production domain
-4. Set `QUICKBOOKS_REDIRECT_URI` to `https://your-domain.com/api/integrations/quickbooks/callback`
-5. In Supabase → Authentication → URL Configuration, add your production URL
-6. Deploy — Vercel runs `npm run build` automatically
+| File | Use |
+|------|-----|
+| **`supabase/setup.sql`** | **Canonical** — run this once before launch (tables, RLS, signup trigger, default org seeds) |
+| `supabase/fix-signup.sql` | **Deprecated** — pointer only; do **not** run |
+| `supabase/schema.sql` | Legacy; superseded by `setup.sql` |
+| `supabase/seed.sql` | Reference only; prefer `npm run db:seed` for seeding |
 
-**Production checklist:**
-- [ ] `supabase/setup.sql` run in Supabase SQL Editor
-- [ ] `npm run db:seed` executed (or seed data in production DB)
-- [ ] All env vars set in Vercel (never commit `.env.local`)
-- [ ] Supabase RLS policies active (`gcc_*` tables)
-- [ ] QuickBooks OAuth redirect URI updated for production domain
-- [ ] Demo mode disabled (automatic in production)
-- [ ] Health check: `GET /api/health` returns `"productionReady": true`
+**How to apply:** Supabase Dashboard → SQL Editor → paste entire `supabase/setup.sql` → Run. Safe to re-run (`IF NOT EXISTS` / `ON CONFLICT DO NOTHING`).
 
-### Production Build
+**After setup:**
+
+1. Add API keys to `.env.local` or Vercel
+2. Configure Auth URLs (Site URL + `/auth/callback` redirect)
+3. Configure SMTP for team invites (see Production Deployment)
+4. Create a `platform_admin` user if you need `/admin` access
+
+## Production Deployment (Vercel)
+
+1. Push to GitHub and import the project in [Vercel](https://vercel.com)
+2. Set **required** environment variables (see below)
+3. Run `supabase/setup.sql` in Supabase SQL Editor
+4. Configure Supabase Auth URLs and SMTP
+5. Deploy — Vercel runs `npm run build` automatically
+
+### Required environment variables (production)
+
+These four are **required** for a production-ready deployment:
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client-side Supabase auth |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server admin ops (settings persist, team invites, webhooks) |
+| `NEXT_PUBLIC_APP_URL` | Canonical production URL (OAuth, invite links, Stripe returns) |
+
+Additional variables for integrations are listed in `.env.example` (QuickBooks, Stripe, Plaid).
+
+### Demo mode in production
+
+**Leave `ALLOW_DEMO_MODE` unset in Vercel production.**
+
+Demo mode is disabled automatically when `NODE_ENV=production` unless `ALLOW_DEMO_MODE=true` is explicitly set. Do not enable demo mode in production.
+
+### Team invites (Supabase Auth email / SMTP)
+
+Team invites call Supabase `inviteUserByEmail`. Configure email before launch:
+
+1. Supabase Dashboard → **Authentication** → **Email** (or **SMTP Settings**)
+2. Enable custom SMTP (Resend, SendGrid, Postmark, SES, etc.)
+3. Verify sender domain (SPF/DKIM)
+4. Ensure `/auth/callback` is in Supabase redirect allowlist
+5. Set `NEXT_PUBLIC_APP_URL` to your production domain (used as invite `redirectTo`)
+
+Without SMTP, invite requests return **501** with an honest error — they do not silently succeed.
+
+### Health check
+
+**Development:** `GET /api/health` returns detailed status (connection info, org count, missing env).
+
+**Production:** returns minimal payload only:
+
+```json
+{ "status": "ok" }
+```
+
+HTTP 503 with `{ "status": "degraded" }` when misconfigured.
 
 ```bash
+curl -s https://your-domain.com/api/health
+```
+
+### Production smoke tests
+
+`npm run smoke:auth` is for **local/staging with demo enabled** (13 checks). In production, demo tests are expected to fail because demo mode is disabled.
+
+Run these against your deployed URL after launch:
+
+```bash
+export SMOKE_BASE_URL=https://your-production-domain
+
+# Health — minimal status
+curl -s "$SMOKE_BASE_URL/api/health"
+# Expected: {"status":"ok"} HTTP 200
+
+# Unauthenticated page protection
+curl -sI "$SMOKE_BASE_URL/dashboard" | grep -i location
+# Expected: redirect to /login
+
+# Unauthenticated API protection
+curl -s -o /dev/null -w "%{http_code}\n" "$SMOKE_BASE_URL/api/integrations?organizationId=org-apex"
+# Expected: 401
+
+# Demo mode disabled
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/auth/demo"
+# Expected: 403
+```
+
+**Manual checks (authenticated test account):**
+
+- Sign in → dashboard loads
+- Settings save → "Settings saved successfully." (not preview)
+- Team invite → email received; link completes at `/auth/callback`
+- PDF and Excel exports return 200
+- Cross-tenant API with wrong `organizationId` → 403
+- `/admin` blocked for non–`platform_admin`; accessible for `platform_admin`
+
+**Staging (optional):** with `ALLOW_DEMO_MODE=true`, run `SMOKE_BASE_URL=<staging-url> npm run smoke:auth` for the full 13-test suite.
+
+### Pre-deploy checklist
+
+- [ ] `supabase/setup.sql` run in Supabase SQL Editor
+- [ ] Core env vars set in Vercel (never commit `.env.local`)
+- [ ] `ALLOW_DEMO_MODE` **not** set in production
+- [ ] Supabase Auth URLs + SMTP configured
+- [ ] `platform_admin` user created (if using `/admin`)
+- [ ] Optional: `npm run db:seed` for demo financial data
+- [ ] Production smoke tests pass (above)
+- [ ] Integration redirect URIs updated for production domain
+
+### Production build
+
+```bash
+npm run lint
+npx tsc --noEmit
 npm run build
 npm start
 ```
@@ -120,66 +228,86 @@ src/
     ├── mock-data/            # Realistic construction company data
     ├── forecast-engine/      # Cash forecast calculations
     ├── supabase/             # Client, server, middleware helpers
-    ├── auth/                 # Auth context
+    ├── auth/                 # Auth context + access control
     ├── integrations/         # QuickBooks connector + store
     ├── tenant/               # Multi-tenant context
     └── utils.ts
+scripts/
+├── smoke-auth.mjs            # Auth/tenant smoke tests (dev/staging)
+└── validate-forecast.ts      # 13-week forecast math validation
+supabase/
+└── setup.sql                 # Canonical database setup
 ```
 
 ## Architecture Notes
 
 ### Multi-Tenant
 
-Each organization has isolated data via `TenantProvider`. The org switcher in the header lets you switch between sample tenants. Production deployment should use row-level security (Supabase/PostgreSQL) or schema-per-tenant isolation.
+Each organization has isolated data via `TenantProvider` and Supabase RLS on `gcc_*` tables. API routes enforce tenant access through `requireApiAccess()`. Demo sessions are pinned to `org-apex` only.
 
 ### Mock Data Layer
 
-All data lives in `src/lib/mock-data/`. The `getTenantData(orgId)` function returns tenant-scoped data. Replace this with Supabase queries or API calls when connecting live integrations.
+Tenant data is served from `src/lib/mock-data/` and Supabase seed tables. Live integrations write to `gcc_integration_connections`.
 
 ### Integrations
 
-QuickBooks has a full API integration at `/api/integrations/quickbooks/`:
+QuickBooks API routes under `/api/integrations/quickbooks/`:
+
 - `POST /connect` — Demo connect or OAuth redirect URL
 - `GET /callback` — OAuth callback handler
 - `POST /sync` — Pull invoices and financial data
 - `DELETE /disconnect` — Remove connection
 
-Other integrations show "Coming Soon" and use mock status from the data layer.
+Other integrations show mock status or "Coming Soon".
 
 ### Authentication
 
-Supabase Auth protects all dashboard routes via `middleware.ts`. Demo mode uses an HTTP-only cookie when Supabase is not configured. User metadata stores `full_name`, `role`, and `organization_id`.
+Supabase Auth protects dashboard routes via `middleware.ts` and layout redirects. Sensitive API routes use `requireApiAccess()`. Demo mode uses an HTTP-only cookie (`gcc_demo_mode`) when allowed. User profiles store `role` and `organization_id` in `gcc_profiles`.
+
+### Security (Production)
+
+- Demo mode disabled unless `ALLOW_DEMO_MODE=true` (do not set in production)
+- API routes require auth via `requireApiAccess()` or `requireAuth()`
+- Security headers enabled (HSTS, X-Frame-Options, etc.)
+- Integration tokens stored server-side in Supabase
+- Row-level security on all `gcc_*` tables
+- Admin routes restricted to `platform_admin` role (profile-based)
+
+## Post-launch hardening (P2 — not launch blockers)
+
+Track after initial deployment:
+
+- Role checks on settings save and team invite (any org member can act today)
+- Signup org assignment: users without `organization_id` metadata default to `org-apex`
+- Org switcher in header still lists mock orgs in UI (API blocks cross-tenant access)
+- Wire `/admin` to real Supabase tenant data (currently mock `PLATFORM_TENANTS`)
+- Add invite audit trail (`gcc_team_invites` table)
+- Authenticated smoke tests in CI
+- Migrate from deprecated `next lint` before Next.js 16
 
 ## Environment Variables
 
-Copy `.env.example` to `.env.local`:
+Copy `.env.example` to `.env.local` for development:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-QUICKBOOKS_CLIENT_ID=your-client-id
-QUICKBOOKS_CLIENT_SECRET=your-client-secret
-QUICKBOOKS_REDIRECT_URI=http://localhost:3000/api/integrations/quickbooks/callback
-QUICKBOOKS_ENV=sandbox
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-### Supabase setup checklist
+See `.env.example` for QuickBooks, Stripe, and Plaid variables.
 
-1. Run `supabase/setup.sql` in the Supabase SQL Editor
-2. Run `npm run db:seed` to load Apex Construction demo data
-3. Add your **service_role** key to `.env.local`
-4. Verify: `curl http://localhost:3000/api/health` → `"ok": true`, `"organizations": 2`
-5. Dashboard shows **Live Data** badge when Supabase is connected
+### Local verification
 
-### Security (Production)
+```bash
+npm run dev
+curl http://localhost:3000/api/health
+# Development: detailed JSON with organizations count, connection status
 
-- Demo mode disabled in production (`NODE_ENV=production`)
-- API routes require Supabase auth in production
-- Security headers enabled (HSTS, X-Frame-Options, etc.)
-- Integration tokens stored in Supabase (`gcc_integration_connections`)
-- Row-level security on all `gcc_*` tables
-- Admin routes restricted to `founder` and `platform_admin` roles
+npm run smoke:auth
+# 13/13 pass against localhost with demo enabled
+```
 
 ## User Roles
 
@@ -192,7 +320,7 @@ QUICKBOOKS_ENV=sandbox
 | Project Manager | Job-level data |
 | Admin / Staff | Configurable permissions |
 | External Advisor | Read-only reports |
-| Platform Admin | Tenant management |
+| Platform Admin | Platform owner dashboard (`/admin`) |
 
 ## License
 
