@@ -14,6 +14,7 @@ import type { DashboardData } from "@/lib/data/dashboard";
 import { formatCurrency } from "@/lib/utils";
 import { activeMonthlyTrends, latestTrendMonthLabel } from "@/lib/forecast/validate";
 import { AiAdvisorPanel } from "@/components/dashboard/ai-advisor-panel";
+import { OnboardingCta } from "@/components/dashboard/onboarding-cta";
 import { ArrowRight, AlertTriangle, Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -74,6 +75,8 @@ export default function DashboardPage() {
           </div>
         }
       />
+
+      <OnboardingCta />
 
       <div className="mb-6">
         <AiAdvisorPanel department="executive" />

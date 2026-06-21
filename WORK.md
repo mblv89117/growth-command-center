@@ -41,8 +41,10 @@ Track after controlled production launch. Not blockers for current GO status.
 
 - [x] **AI safety foundation** — Zod validation, tenant-safe API helpers, pluggable rate limiting (`gcc_api_rate_limits`), commit `9721079`
 - [x] **AI Advisor MVP — production verified** (June 21, 2026) — `/api/ai-advisor`, dashboard panel, Anthropic `claude-sonnet-4-6`, 20 req/user/hr; production checks pass (401/400/405 unauth, 403 cross-tenant, 200 same-org insights); commits `2c2813a`, `401ffca`, `281ca4c`
-- [ ] **Next phase: AI Onboarding MVP** — `/onboarding`, `/api/ai-onboard`, conversation persistence, onboarding tools (not started)
+- [x] **AI Onboarding MVP — added, pending UAT** — `/onboarding`, `/api/ai-onboard`, `/api/onboarding`, `gcc_onboarding_messages`, onboarding tools, dashboard CTA; integration connect is pending/manual placeholder only (Merge.dev not started)
 - [ ] **Merge.dev integration** — not started
+
+**Vercel env note:** Prefer canonical `ANTHROPIC_API_KEY` over lowercase `anthropic_api_key` (code supports fallback).
 
 ---
 

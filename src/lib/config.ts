@@ -44,6 +44,7 @@ export const PROTECTED_PREFIXES = [
   "/integrations",
   "/team",
   "/settings",
+  "/onboarding",
   "/admin",
 ];
 

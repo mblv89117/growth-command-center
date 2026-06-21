@@ -9,6 +9,8 @@ export const AI_ADVISOR_RATE_LIMIT = {
   windowMs: 60 * 60 * 1000,
 } as const;
 
+export const AI_ONBOARD_RATE_LIMIT = AI_ADVISOR_RATE_LIMIT;
+
 function buildRateLimitKey(route: string, userId: string): string {
   return `${route}:${userId}`;
 }

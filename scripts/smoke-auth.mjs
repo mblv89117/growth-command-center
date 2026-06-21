@@ -214,6 +214,61 @@ async function main() {
     fail(`demo ai-advisor expected 503 or 200, got ${aiConfigured.res.status}`);
   }
 
+  // AI Onboarding security guards
+  const onboardUnauth = await request("/api/ai-onboard", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "org-apex" }),
+  });
+  if (onboardUnauth.res.status === 401) {
+    pass("unauth POST /api/ai-onboard returns 401");
+  } else {
+    fail(`unauth /api/ai-onboard expected 401, got ${onboardUnauth.res.status}`);
+  }
+
+  const onboardCrossTenant = await request("/api/ai-onboard", {
+    method: "POST",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "org-summit" }),
+  });
+  if (onboardCrossTenant.res.status === 403) {
+    pass("demo POST /api/ai-onboard for org-summit returns 403");
+  } else {
+    fail(`demo ai-onboard org-summit expected 403, got ${onboardCrossTenant.res.status}`);
+  }
+
+  const onboardInvalid = await request("/api/ai-onboard", {
+    method: "POST",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (onboardInvalid.res.status === 400) {
+    pass("invalid POST /api/ai-onboard body returns 400");
+  } else {
+    fail(`invalid ai-onboard body expected 400, got ${onboardInvalid.res.status}`);
+  }
+
+  const onboardStatus = await request("/api/onboarding?organizationId=org-apex", demoOpts);
+  if (
+    onboardStatus.res.status === 200 &&
+    typeof onboardStatus.json?.onboardingComplete === "boolean"
+  ) {
+    pass("demo GET /api/onboarding returns onboarding status");
+  } else {
+    fail(`demo onboarding status expected 200, got ${onboardStatus.res.status}`);
+  }
+
+  const onboardSameOrg = await request("/api/ai-onboard", {
+    method: "POST",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "org-apex", message: "Hello" }),
+  });
+  if (onboardSameOrg.res.status === 503 || onboardSameOrg.res.status === 200) {
+    pass("demo POST /api/ai-onboard returns 503 when unconfigured or 200 when configured");
+  } else {
+    fail(`demo ai-onboard expected 503 or 200, got ${onboardSameOrg.res.status}`);
+  }
+
   console.log(process.exitCode ? "\nSome smoke tests failed." : "\nAll smoke tests passed.");
 }
 
