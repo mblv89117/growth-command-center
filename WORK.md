@@ -1,7 +1,7 @@
 # Growth Command Center — Working Notes
 
 Last updated: June 21, 2026  
-Branch: `main` @ `563f816`  
+Branch: `main` @ `6b86fc1`  
 Production URL: https://growth-command-center-lbnt.vercel.app
 
 **Status: GO for controlled production use** — production UAT accepted (June 21, 2026).
@@ -25,7 +25,7 @@ Production URL: https://growth-command-center-lbnt.vercel.app
 
 Track after controlled production launch. Not blockers for current GO status.
 
-- [ ] **1. Configure Supabase SMTP (Resend)** — `npm run smtp:configure-resend`; verify domain with `npm run smtp:check-resend`
+- [x] **1. Configure Supabase SMTP (Resend)** — complete (June 21, 2026). Active provider: **Resend** (`smtp.resend.com`, sender `connect@highvaluecapitalgroup.com`, domain verified). Microsoft 365 SMTP was abandoned — Security Defaults blocked SMTP AUTH for `manny@highvaluecapitalgroup.com`. Team invites verified in production.
 - [x] **2. Create non-admin test user and verify cross-tenant 403** — `gcc-uat-tenant@example.com` (`staff`, `org-apex`); cross-tenant API returns 403 (verified June 21, 2026)
 - [ ] **3. Confirm Supabase Auth URLs** — Site URL and redirect allowlist include `https://growth-command-center-lbnt.vercel.app/auth/callback`
 - [ ] **4. Configure QuickBooks / Stripe / Plaid when ready** — add Vercel env vars and OAuth redirect URIs; non-blocking until integrations needed
