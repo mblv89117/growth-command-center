@@ -1,5 +1,7 @@
--- Growth Command Center — Full setup (safe for existing Supabase projects)
--- Run this entire file in Supabase SQL Editor
+-- Growth Command Center — CANONICAL database setup
+-- Run this entire file once in Supabase SQL Editor before launch.
+-- Includes tables, RLS policies, signup trigger, and default organizations.
+-- Do not use supabase/fix-signup.sql for new installs (deprecated pointer only).
 
 CREATE TABLE IF NOT EXISTS gcc_organizations (
   id TEXT PRIMARY KEY,

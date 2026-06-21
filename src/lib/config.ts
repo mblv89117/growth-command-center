@@ -27,6 +27,9 @@ export function getAppUrl(): string {
 
 export const DEMO_MODE_COOKIE = "gcc_demo_mode";
 
+/** Demo sessions are pinned to this organization only */
+export const DEMO_ORGANIZATION_ID = "org-apex";
+
 export const PUBLIC_ROUTES = ["/login", "/signup", "/auth/callback"];
 
 export const PROTECTED_PREFIXES = [

@@ -71,8 +71,14 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    const role = user.user_metadata?.role as string | undefined;
-    if (role !== "platform_admin" && role !== "founder") {
+    const { data: profile } = await supabase
+      .from("gcc_profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const role = profile?.role ?? (user.user_metadata?.role as string | undefined);
+    if (role !== "platform_admin") {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);

@@ -19,14 +19,16 @@ async function saveSettings(
   organizationId: string,
   section: string,
   settings: Record<string, unknown>
-): Promise<{ message: string; preview?: boolean }> {
+): Promise<{ message: string; preview?: boolean; success?: boolean }> {
   const res = await fetch("/api/settings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ organizationId, section, settings }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Failed to save settings");
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(data.error ?? "Failed to save settings");
+  }
   return data;
 }
 
@@ -37,7 +39,10 @@ export default function SettingsPage() {
   const defaultTab = searchParams.get("tab") ?? "organization";
   const [billingLoading, setBillingLoading] = useState<PlanKey | "portal" | null>(null);
   const [saveLoading, setSaveLoading] = useState<string | null>(null);
-  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [saveNotice, setSaveNotice] = useState<{
+    message: string;
+    variant: "success" | "preview" | "error";
+  } | null>(null);
   const currentPlan = STRIPE_PLANS[organization.plan as PlanKey] ?? STRIPE_PLANS.growth;
   const [billingNotice, setBillingNotice] = useState<string | null>(() => {
     if (searchParams.get("success")) return "Subscription updated successfully.";
@@ -50,9 +55,15 @@ export default function SettingsPage() {
     setSaveNotice(null);
     try {
       const result = await saveSettings(organization.id, section, settingsPayload);
-      setSaveNotice(result.message);
+      setSaveNotice({
+        message: result.message,
+        variant: result.preview ? "preview" : result.success ? "success" : "error",
+      });
     } catch (error) {
-      setSaveNotice(error instanceof Error ? error.message : "Failed to save settings");
+      setSaveNotice({
+        message: error instanceof Error ? error.message : "Failed to save settings",
+        variant: "error",
+      });
     } finally {
       setSaveLoading(null);
     }
@@ -100,7 +111,17 @@ export default function SettingsPage() {
       />
 
       {saveNotice && (
-        <div className="mb-4 rounded-lg border bg-muted/50 p-3 text-sm">{saveNotice}</div>
+        <div
+          className={`mb-4 rounded-lg border p-3 text-sm ${
+            saveNotice.variant === "success"
+              ? "border-success/30 bg-success/10"
+              : saveNotice.variant === "preview"
+                ? "border-warning/30 bg-warning/10"
+                : "border-destructive/30 bg-destructive/10"
+          }`}
+        >
+          {saveNotice.message}
+        </div>
       )}
 
       <Tabs defaultValue={defaultTab}>

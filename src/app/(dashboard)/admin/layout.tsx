@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect("/login");
   }
 
-  if (auth.role !== "platform_admin" && auth.role !== "founder") {
+  if (auth.role !== "platform_admin") {
     redirect("/dashboard");
   }
 

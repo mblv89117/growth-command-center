@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess } from "@/lib/auth/access";
 import { authErrorResponse } from "@/lib/auth/api";
+import { persistOrganizationSettings } from "@/lib/data/settings";
 
 export async function POST(request: Request) {
   try {
@@ -20,12 +21,33 @@ export async function POST(request: Request) {
 
     const access = await requireApiAccess({ organizationId });
 
+    if (access.isDemoMode) {
+      return NextResponse.json({
+        success: false,
+        preview: true,
+        message:
+          "Demo preview only — settings were not saved to the database. Sign in to persist changes.",
+        section,
+      });
+    }
+
+    const result = await persistOrganizationSettings(organizationId, section, settings);
+    if (!result.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          preview: false,
+          message: `Settings could not be saved: ${result.message}`,
+          section,
+        },
+        { status: 501 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      message: access.isDemoMode
-        ? "Settings saved for this demo session (preview — not persisted to database yet)."
-        : "Settings saved successfully.",
-      preview: access.isDemoMode,
+      preview: false,
+      message: "Settings saved successfully.",
       section,
     });
   } catch (error) {

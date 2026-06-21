@@ -30,7 +30,10 @@ export default function TeamPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("staff");
   const [inviteLoading, setInviteLoading] = useState(false);
-  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
+  const [inviteNotice, setInviteNotice] = useState<{
+    message: string;
+    variant: "success" | "preview" | "error";
+  } | null>(null);
 
   const activeCount = teamMembers.filter((m) => m.status === "active").length;
   const invitedCount = teamMembers.filter((m) => m.status === "invited").length;
@@ -45,11 +48,19 @@ export default function TeamPage() {
         body: JSON.stringify({ organizationId: organization.id, email, role }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error ?? "Invite failed");
-      setInviteNotice(result.message);
-      setEmail("");
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(result.error ?? "Invite failed");
+      }
+      setInviteNotice({
+        message: result.message,
+        variant: result.preview ? "preview" : result.success ? "success" : "error",
+      });
+      if (result.success) setEmail("");
     } catch (error) {
-      setInviteNotice(error instanceof Error ? error.message : "Invite failed");
+      setInviteNotice({
+        message: error instanceof Error ? error.message : "Invite failed",
+        variant: "error",
+      });
     } finally {
       setInviteLoading(false);
     }
@@ -76,7 +87,17 @@ export default function TeamPage() {
       />
 
       {inviteNotice && (
-        <div className="mb-4 rounded-lg border bg-muted/50 p-3 text-sm">{inviteNotice}</div>
+        <div
+          className={`mb-4 rounded-lg border p-3 text-sm ${
+            inviteNotice.variant === "success"
+              ? "border-success/30 bg-success/10"
+              : inviteNotice.variant === "preview"
+                ? "border-warning/30 bg-warning/10"
+                : "border-destructive/30 bg-destructive/10"
+          }`}
+        >
+          {inviteNotice.message}
+        </div>
       )}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "smoke:auth": "node scripts/smoke-auth.mjs",
     "db:seed": "node --env-file=.env.local scripts/seed-supabase.mjs"
   },
   "dependencies": {
