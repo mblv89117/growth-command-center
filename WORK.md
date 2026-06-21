@@ -1,7 +1,7 @@
 # Growth Command Center — Working Notes
 
 Last updated: June 21, 2026  
-Branch: `main` @ `281ca4c`  
+Branch: `main` @ `904be72`  
 Production URL: https://growth-command-center-lbnt.vercel.app
 
 **Status: GO for controlled production use** — production UAT accepted (June 21, 2026).
@@ -41,8 +41,10 @@ Track after controlled production launch. Not blockers for current GO status.
 
 - [x] **AI safety foundation** — Zod validation, tenant-safe API helpers, pluggable rate limiting (`gcc_api_rate_limits`), commit `9721079`
 - [x] **AI Advisor MVP — production verified** (June 21, 2026) — `/api/ai-advisor`, dashboard panel, Anthropic `claude-sonnet-4-6`, 20 req/user/hr; production checks pass (401/400/405 unauth, 403 cross-tenant, 200 same-org insights); commits `2c2813a`, `401ffca`, `281ca4c`
-- [x] **AI Onboarding MVP — added, pending UAT** — `/onboarding`, `/api/ai-onboard`, `/api/onboarding`, `gcc_onboarding_messages`, onboarding tools, dashboard CTA; integration connect is pending/manual placeholder only (Merge.dev not started)
-- [ ] **Merge.dev integration** — not started
+- [x] **AI Onboarding MVP — production verified** (June 21, 2026) — `/onboarding`, `/api/ai-onboard`, `/api/onboarding`, `gcc_onboarding_messages`, onboarding tools, dashboard CTA; manual UAT passed for `org-apex` (`onboarding_complete`, KPI targets, messages persisted); production smoke passes (401 unauth, 400 invalid body, 307 unauth `/onboarding` → `/login`); no global onboarding redirect; commit `904be72`
+- [ ] **Merge.dev integration** — not started. `connect_integration` records **pending/manual intent only** in `gcc_integration_connections` (no Merge link-token, no sync pipeline).
+
+**Next phase (pending approval):** KPI editing / targets hardening **OR** Merge.dev planning — do not start either without explicit approval.
 
 **Vercel env note:** Prefer canonical `ANTHROPIC_API_KEY` over lowercase `anthropic_api_key` (code supports fallback).
 
@@ -67,6 +69,11 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/auth/demo"
 curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/ai-advisor" -H "Content-Type: application/json" -d '{"organizationId":"org-apex"}'
 curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/ai-advisor" -H "Content-Type: application/json" -d '{}'
 curl -s -o /dev/null -w "%{http_code}\n" "$SMOKE_BASE_URL/api/ai-advisor"
+
+# AI Onboarding production smoke (unauthenticated)
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/ai-onboard" -H "Content-Type: application/json" -d '{"organizationId":"org-apex","message":"hi"}'
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/ai-onboard" -H "Content-Type: application/json" -d '{}'
+curl -sI "$SMOKE_BASE_URL/onboarding" | grep -i location
 ```
 
 ---
