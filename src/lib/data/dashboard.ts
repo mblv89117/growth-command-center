@@ -81,6 +81,10 @@ async function fetchFromSupabase(
       change: Number(r.change),
       changeLabel: r.change_label ?? "",
       target: r.target != null ? Number(r.target) : undefined,
+      status: (r.status as KPI["status"]) ?? undefined,
+      plan: r.plan ?? undefined,
+      updatedAt: r.updated_at ?? undefined,
+      manualOverride: r.manual_override ?? undefined,
     })),
     alerts: (alertsRes.data ?? []).map((r) => ({
       id: r.alert_key,

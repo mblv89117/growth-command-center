@@ -15,6 +15,7 @@ import { formatCurrency } from "@/lib/utils";
 import { activeMonthlyTrends, latestTrendMonthLabel } from "@/lib/forecast/validate";
 import { AiAdvisorPanel } from "@/components/dashboard/ai-advisor-panel";
 import { OnboardingCta } from "@/components/dashboard/onboarding-cta";
+import { KpiList } from "@/components/dashboard/kpi-list";
 import { ArrowRight, AlertTriangle, Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -207,33 +208,20 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Key KPIs</CardTitle>
-            <CardDescription>Critical metrics at a glance</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {kpis.slice(0, 6).map((kpi) => (
-                <div key={kpi.id} className="flex items-center justify-between border-b pb-3 last:border-0">
-                  <span className="text-sm text-muted-foreground">{kpi.name}</span>
-                  <span className="font-semibold">
-                    {kpi.unit === "currency"
-                      ? formatCurrency(kpi.value, true)
-                      : kpi.unit === "percent"
-                        ? `${kpi.value}%`
-                        : kpi.unit === "days"
-                          ? `${kpi.value}d`
-                          : kpi.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <Button variant="outline" className="mt-4 w-full" asChild>
-              <Link href="/reports">View KPI Scorecard</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <KpiList
+          kpis={kpis}
+          organizationId={organization.id}
+          onKpiUpdated={(updated) => {
+            setData((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    kpis: prev.kpis.map((item) => (item.id === updated.id ? updated : item)),
+                  }
+                : prev
+            );
+          }}
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

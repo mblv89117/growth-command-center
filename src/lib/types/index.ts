@@ -197,6 +197,8 @@ export interface Alert {
   createdAt: string;
 }
 
+export type KpiStatus = "green" | "yellow" | "red";
+
 export interface KPI {
   id: string;
   name: string;
@@ -205,6 +207,10 @@ export interface KPI {
   change: number;
   changeLabel: string;
   target?: number;
+  status?: KpiStatus;
+  plan?: string;
+  updatedAt?: string;
+  manualOverride?: boolean;
 }
 
 export interface Integration {

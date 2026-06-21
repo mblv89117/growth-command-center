@@ -269,6 +269,56 @@ async function main() {
     fail(`demo ai-onboard expected 503 or 200, got ${onboardSameOrg.res.status}`);
   }
 
+  // KPI editing security guards
+  const kpiUnauth = await request("/api/kpis", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "org-apex", kpiKey: "revenue_growth", value: 12 }),
+  });
+  if (kpiUnauth.res.status === 401) {
+    pass("unauth PATCH /api/kpis returns 401");
+  } else {
+    fail(`unauth /api/kpis expected 401, got ${kpiUnauth.res.status}`);
+  }
+
+  const kpiCrossTenant = await request("/api/kpis", {
+    method: "PATCH",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "org-summit", kpiKey: "revenue_growth", value: 12 }),
+  });
+  if (kpiCrossTenant.res.status === 403) {
+    pass("demo PATCH /api/kpis for org-summit returns 403");
+  } else {
+    fail(`demo kpis org-summit expected 403, got ${kpiCrossTenant.res.status}`);
+  }
+
+  const kpiInvalid = await request("/api/kpis", {
+    method: "PATCH",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "org-apex" }),
+  });
+  if (kpiInvalid.res.status === 400) {
+    pass("invalid PATCH /api/kpis body returns 400");
+  } else {
+    fail(`invalid kpis body expected 400, got ${kpiInvalid.res.status}`);
+  }
+
+  const kpiSameOrg = await request("/api/kpis", {
+    method: "PATCH",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      organizationId: "org-apex",
+      kpiKey: "revenue_growth",
+      value: 13.5,
+      status: "green",
+    }),
+  });
+  if (kpiSameOrg.res.status === 200 && kpiSameOrg.json?.success === true) {
+    pass("demo PATCH /api/kpis same-org succeeds");
+  } else {
+    fail(`demo kpis same-org expected 200, got ${kpiSameOrg.res.status}`);
+  }
+
   console.log(process.exitCode ? "\nSome smoke tests failed." : "\nAll smoke tests passed.");
 }
 

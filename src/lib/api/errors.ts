@@ -28,6 +28,13 @@ export class ServiceUnavailableError extends Error {
   }
 }
 
+export class NotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NotFoundError";
+  }
+}
+
 export function apiErrorResponse(error: unknown) {
   if (error instanceof AuthError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
@@ -52,6 +59,10 @@ export function apiErrorResponse(error: unknown) {
 
   if (error instanceof ServiceUnavailableError) {
     return NextResponse.json({ error: error.message }, { status: 503 });
+  }
+
+  if (error instanceof NotFoundError) {
+    return NextResponse.json({ error: error.message }, { status: 404 });
   }
 
   return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -77,6 +77,10 @@ CREATE TABLE IF NOT EXISTS gcc_kpis (
   change NUMERIC NOT NULL DEFAULT 0,
   change_label TEXT,
   target NUMERIC,
+  status TEXT DEFAULT 'green' CHECK (status IN ('green', 'yellow', 'red')),
+  plan TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  manual_override BOOLEAN DEFAULT TRUE,
   UNIQUE(organization_id, kpi_key)
 );
 

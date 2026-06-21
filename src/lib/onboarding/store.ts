@@ -338,6 +338,9 @@ async function setMetricTarget(
         unit: definition.unit,
         change: 0,
         target: targetValue,
+        status: "green",
+        manual_override: true,
+        updated_at: new Date().toISOString(),
       },
       { onConflict: "organization_id,kpi_key" }
     );

@@ -116,6 +116,8 @@ export async function getFullTenantData(organizationId: string): Promise<TenantD
     kpis: (kpisRes.data ?? []).map((r) => ({
       id: r.kpi_key, name: r.name, value: Number(r.value), unit: r.unit as KPI["unit"],
       change: Number(r.change), changeLabel: r.change_label ?? "", target: r.target != null ? Number(r.target) : undefined,
+      status: r.status ?? undefined, plan: r.plan ?? undefined, updatedAt: r.updated_at ?? undefined,
+      manualOverride: r.manual_override ?? undefined,
     })),
     alerts: (alertsRes.data ?? []).map((r) => ({
       id: r.alert_key, title: r.title, description: r.description,

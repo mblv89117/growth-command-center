@@ -42,9 +42,10 @@ Track after controlled production launch. Not blockers for current GO status.
 - [x] **AI safety foundation** — Zod validation, tenant-safe API helpers, pluggable rate limiting (`gcc_api_rate_limits`), commit `9721079`
 - [x] **AI Advisor MVP — production verified** (June 21, 2026) — `/api/ai-advisor`, dashboard panel, Anthropic `claude-sonnet-4-6`, 20 req/user/hr; production checks pass (401/400/405 unauth, 403 cross-tenant, 200 same-org insights); commits `2c2813a`, `401ffca`, `281ca4c`
 - [x] **AI Onboarding MVP — production verified** (June 21, 2026) — `/onboarding`, `/api/ai-onboard`, `/api/onboarding`, `gcc_onboarding_messages`, onboarding tools, dashboard CTA; manual UAT passed for `org-apex` (`onboarding_complete`, KPI targets, messages persisted); production smoke passes (401 unauth, 400 invalid body, 307 unauth `/onboarding` → `/login`); no global onboarding redirect; commit `904be72`
-- [ ] **Merge.dev integration** — not started. `connect_integration` records **pending/manual intent only** in `gcc_integration_connections` (no Merge link-token, no sync pipeline).
+- [x] **KPI editing MVP — added, pending UAT** — `PATCH /api/kpis`, dashboard KPI edit modal, stoplight status/plan fields, `manual_override` for future integration sync; requires `supabase/kpi-editing.sql` before production use
+- [ ] **Merge.dev integration** — not started. `connect_integration` records **pending/manual intent only** in `gcc_integration_connections` (no Merge link-token, no sync pipeline). Integration sync must respect manual KPI override (`manual_override`) until mapping rules are finalized.
 
-**Next phase (pending approval):** KPI editing / targets hardening **OR** Merge.dev planning — do not start either without explicit approval.
+**Next phase (pending approval):** Merge.dev planning **OR** KPI editing production UAT — do not start Merge.dev without explicit approval.
 
 **Vercel env note:** Prefer canonical `ANTHROPIC_API_KEY` over lowercase `anthropic_api_key` (code supports fallback).
 
@@ -74,6 +75,10 @@ curl -s -o /dev/null -w "%{http_code}\n" "$SMOKE_BASE_URL/api/ai-advisor"
 curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/ai-onboard" -H "Content-Type: application/json" -d '{"organizationId":"org-apex","message":"hi"}'
 curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/ai-onboard" -H "Content-Type: application/json" -d '{}'
 curl -sI "$SMOKE_BASE_URL/onboarding" | grep -i location
+
+# KPI editing smoke (unauthenticated)
+curl -s -o /dev/null -w "%{http_code}\n" -X PATCH "$SMOKE_BASE_URL/api/kpis" -H "Content-Type: application/json" -d '{"organizationId":"org-apex","kpiKey":"revenue_growth","value":12}'
+curl -s -o /dev/null -w "%{http_code}\n" -X PATCH "$SMOKE_BASE_URL/api/kpis" -H "Content-Type: application/json" -d '{}'
 ```
 
 ---
