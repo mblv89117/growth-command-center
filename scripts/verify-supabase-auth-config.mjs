@@ -1,23 +1,37 @@
 #!/usr/bin/env node
 /**
- * Read Supabase Auth config via Management API — never prints secrets.
+ * Verify Supabase Auth SMTP config — never prints secrets.
  *
  * Usage:
- *   export SUPABASE_ACCESS_TOKEN="..."   # https://supabase.com/dashboard/account/tokens
- *   node scripts/verify-supabase-auth-config.mjs
+ *   export SUPABASE_ACCESS_TOKEN="..."
+ *   npm run smtp:verify
+ *
+ * Provider (default resend):
+ *   SMTP_PROVIDER=resend npm run smtp:verify
  */
+import { loadLocalEnv } from "./load-local-env.mjs";
+import {
+  EMAIL_RATE_LIMIT,
+  PRODUCTION_CALLBACK,
+  PRODUCTION_SITE_URL,
+  resolveSmtpProvider,
+} from "./smtp-providers.mjs";
+
+loadLocalEnv();
+
 const PROJECT_REF = process.env.SUPABASE_PROJECT_REF ?? "igyaebtymornywjeidrl";
-const PRODUCTION_SITE_URL = "https://growth-command-center-lbnt.vercel.app";
-const PRODUCTION_CALLBACK = `${PRODUCTION_SITE_URL}/auth/callback`;
-const EXPECTED_SMTP_HOST = "smtp.office365.com";
-const EXPECTED_SMTP_PORT = "587";
-const EXPECTED_SMTP_USER = process.env.SMTP_USERNAME ?? "manny@highvaluecapitalgroup.com";
-const EXPECTED_SENDER = process.env.SMTP_SENDER_EMAIL ?? "connect@highvaluecapitalgroup.com";
-const EXPECTED_SENDER_NAME = "Growth Command Center";
+
+let expected;
+try {
+  expected = resolveSmtpProvider();
+} catch (error) {
+  console.error(`FAIL: ${error.message}`);
+  process.exit(1);
+}
 
 const token = process.env.SUPABASE_ACCESS_TOKEN;
 if (!token) {
-  console.error("FAIL: Set SUPABASE_ACCESS_TOKEN (Supabase Dashboard → Account → Access Tokens)");
+  console.error("FAIL: Set SUPABASE_ACCESS_TOKEN (https://supabase.com/dashboard/account/tokens)");
   process.exit(1);
 }
 
@@ -42,7 +56,7 @@ function fail(label, detail = "") {
 const siteUrl = cfg.site_url ?? "";
 const allowList = cfg.uri_allow_list ?? cfg.additional_redirect_urls ?? "";
 
-console.log("--- Supabase Auth URLs ---");
+console.log(`--- Supabase Auth URLs (provider: ${expected.label}) ---`);
 console.log(`site_url: ${siteUrl || "(empty)"}`);
 console.log(`redirect allowlist: ${allowList || "(empty)"}`);
 
@@ -64,34 +78,34 @@ const hasPassword = Boolean(cfg.smtp_pass);
 
 console.log(`smtp_host: ${host || "(not set)"}`);
 console.log(`smtp_port: ${port ?? "(not set)"}`);
-console.log(`smtp_user: ${smtpUser ? smtpUser.replace(/(.{2}).*(@.*)/, "$1***$2") : "(not set)"}`);
+console.log(`smtp_user: ${smtpUser || "(not set)"}`);
 console.log(`smtp_admin_email: ${adminEmail || "(not set)"}`);
 console.log(`smtp_sender_name: ${senderName || "(not set)"}`);
 console.log(`smtp_pass configured: ${hasPassword ? "yes (hidden)" : "no"}`);
 
 let smtpOk = true;
-if (host !== EXPECTED_SMTP_HOST) {
-  fail("SMTP host", `expected ${EXPECTED_SMTP_HOST}`);
+if (host !== expected.host) {
+  fail("SMTP host", `expected ${expected.host}`);
   smtpOk = false;
 } else pass("SMTP host");
 
-if (String(port) !== EXPECTED_SMTP_PORT) {
-  fail("SMTP port", `expected "${EXPECTED_SMTP_PORT}"`);
+if (String(port) !== expected.port) {
+  fail("SMTP port", `expected "${expected.port}"`);
   smtpOk = false;
 } else pass("SMTP port");
 
-if (smtpUser.toLowerCase() !== EXPECTED_SMTP_USER.toLowerCase()) {
-  fail("SMTP username", `expected ${EXPECTED_SMTP_USER} (primary mailbox, not alias)`);
+if (smtpUser.toLowerCase() !== expected.user.toLowerCase()) {
+  fail("SMTP username", `expected ${expected.user}`);
   smtpOk = false;
-} else pass("SMTP username (primary mailbox)");
+} else pass("SMTP username");
 
-if (adminEmail.toLowerCase() !== EXPECTED_SENDER.toLowerCase()) {
-  fail("Sender email", `expected ${EXPECTED_SENDER} (alias From)`);
+if (adminEmail.toLowerCase() !== expected.adminEmail.toLowerCase()) {
+  fail("Sender email", `expected ${expected.adminEmail}`);
   smtpOk = false;
-} else pass("Sender email (alias From)");
+} else pass("Sender email");
 
-if (senderName !== EXPECTED_SENDER_NAME) {
-  fail("Sender name", `expected ${EXPECTED_SENDER_NAME}`);
+if (senderName !== expected.senderName) {
+  fail("Sender name", `expected ${expected.senderName}`);
   smtpOk = false;
 } else pass("Sender name");
 
@@ -101,10 +115,25 @@ if (!hasPassword) {
 } else pass("SMTP password present");
 
 console.log("");
-if (smtpOk) {
-  console.log("SMTP configured overall: PASS");
-  console.log("Reminder: test a Team invite and confirm From is connect@, not manny@.");
+console.log("--- Email provider & rate limits ---");
+const usingCustomSmtp = Boolean(host && hasPassword);
+if (usingCustomSmtp && host === "smtp.resend.com") {
+  console.log("provider: Custom SMTP (Resend)");
+} else if (usingCustomSmtp && host === "smtp.office365.com") {
+  console.log("provider: Custom SMTP (Microsoft 365 — migrate to Resend)");
+} else if (host) {
+  console.log("provider: Incomplete custom SMTP");
+  smtpOk = false;
 } else {
-  console.log("SMTP configured overall: FAIL");
+  console.log("provider: Supabase default email");
+  smtpOk = false;
 }
+
+const emailRateLimit = cfg.rate_limit_email_sent;
+console.log(`rate_limit_email_sent: ${emailRateLimit ?? "(not returned)"}`);
+if (Number(emailRateLimit) === EMAIL_RATE_LIMIT) pass("Rate limit");
+else fail("Rate limit", `expected ${EMAIL_RATE_LIMIT}`);
+
+console.log("");
+console.log(`SMTP configured overall: ${smtpOk ? "PASS" : "FAIL"}`);
 process.exit(smtpOk ? 0 : 1);

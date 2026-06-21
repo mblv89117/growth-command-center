@@ -14,7 +14,13 @@
     "db:assign-platform-admin": "node --env-file=.env.local scripts/assign-platform-admin.mjs",
     "smtp:verify": "node scripts/verify-supabase-auth-config.mjs",
     "smtp:configure": "node scripts/configure-supabase-smtp.mjs",
-    "smtp:dry-run": "node scripts/configure-supabase-smtp.mjs --dry-run"
+    "smtp:dry-run": "node scripts/configure-supabase-smtp.mjs --dry-run",
+    "smtp:diagnose": "node scripts/smtp-diagnose.mjs",
+    "smtp:rate-limit": "node scripts/update-email-rate-limit.mjs 100",
+    "smtp:rate-limit-and-test": "node scripts/smtp-rate-limit-and-test.mjs",
+    "smtp:test-m365": "python3 scripts/test-m365-smtp.py",
+    "smtp:check-resend": "node scripts/check-resend-domain.mjs",
+    "smtp:configure-resend": "SMTP_PROVIDER=resend node scripts/configure-supabase-smtp.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",

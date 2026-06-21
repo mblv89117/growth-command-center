@@ -25,7 +25,7 @@ Production URL: https://growth-command-center-lbnt.vercel.app
 
 Track after controlled production launch. Not blockers for current GO status.
 
-- [ ] **1. Configure Supabase SMTP** — Authentication → Email → SMTP; verify SPF/DKIM; test team invite delivery
+- [ ] **1. Configure Supabase SMTP (Resend)** — `npm run smtp:configure-resend`; verify domain with `npm run smtp:check-resend`
 - [x] **2. Create non-admin test user and verify cross-tenant 403** — `gcc-uat-tenant@example.com` (`staff`, `org-apex`); cross-tenant API returns 403 (verified June 21, 2026)
 - [ ] **3. Confirm Supabase Auth URLs** — Site URL and redirect allowlist include `https://growth-command-center-lbnt.vercel.app/auth/callback`
 - [ ] **4. Configure QuickBooks / Stripe / Plaid when ready** — add Vercel env vars and OAuth redirect URIs; non-blocking until integrations needed

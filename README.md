@@ -123,13 +123,21 @@ Demo mode is disabled automatically when `NODE_ENV=production` unless `ALLOW_DEM
 
 ### Team invites (Supabase Auth email / SMTP)
 
-Team invites call Supabase `inviteUserByEmail`. Configure email before launch:
+Team invites call Supabase `inviteUserByEmail`. Production uses **Resend** SMTP (Microsoft 365 blocked by Security Defaults).
 
-1. Supabase Dashboard → **Authentication** → **Email** (or **SMTP Settings**)
-2. Enable custom SMTP (Resend, SendGrid, Postmark, SES, etc.)
-3. Verify sender domain (SPF/DKIM)
-4. Ensure `/auth/callback` is in Supabase redirect allowlist
-5. Set `NEXT_PUBLIC_APP_URL` to your production domain (used as invite `redirectTo`)
+**Configure locally (secrets in env only, not chat):**
+
+```bash
+export SUPABASE_ACCESS_TOKEN='...'   # Supabase Dashboard → Account → Access Tokens
+export RESEND_API_KEY='...'         # Resend Dashboard → API Keys
+npm run smtp:configure-resend
+npm run smtp:verify
+npm run smtp:check-resend
+```
+
+Resend SMTP: `smtp.resend.com:465`, user `resend`, sender `connect@highvaluecapitalgroup.com`.
+
+Ensure `/auth/callback` is in Supabase redirect allowlist and `NEXT_PUBLIC_APP_URL` matches production.
 
 Without SMTP, invite requests return **501** with an honest error — they do not silently succeed.
 
