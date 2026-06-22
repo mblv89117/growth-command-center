@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { disconnectPlaid } from "@/lib/integrations/plaid";
-import { requireApiAccess } from "@/lib/auth/access";
+import { requireApiAccess, requirePermission } from "@/lib/auth/access";
 import { authErrorResponse } from "@/lib/auth/api";
 
 export async function DELETE(request: Request) {
@@ -12,7 +12,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
     }
 
-    await requireApiAccess({ organizationId });
+    const access = await requireApiAccess({ organizationId });
+    requirePermission(access, "integrations:manage");
 
     const ok = await disconnectPlaid(organizationId);
     return NextResponse.json({ success: ok });

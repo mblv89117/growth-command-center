@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import type { IntegrationStatus } from "@/lib/types";
+import { hasPermission } from "@/lib/auth/permissions";
+import { useTenant } from "@/lib/tenant/context";
 import { Loader2, RefreshCw } from "lucide-react";
 
 interface IntegrationCardProps {
@@ -55,6 +57,8 @@ export function IntegrationCard({
   organizationId,
   onUpdate,
 }: IntegrationCardProps) {
+  const { user } = useTenant();
+  const canManage = hasPermission(user.role, "integrations:manage");
   const [loading, setLoading] = useState(false);
   const config = statusConfig[status];
   const routes = LIVE_INTEGRATIONS[id];
@@ -158,7 +162,11 @@ export function IntegrationCard({
           </p>
         )}
         <div className="flex gap-2">
-          {status === "connected" && !isLiveIntegration ? (
+          {!canManage ? (
+            <p className="text-xs text-muted-foreground">
+              Integration management requires founder or CFO permissions.
+            </p>
+          ) : status === "connected" && !isLiveIntegration ? (
             <Button variant="outline" size="sm" className="w-full" disabled title="Mock connector — sample data only">
               Demo Data (Mock)
             </Button>

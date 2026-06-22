@@ -29,7 +29,7 @@ Track after controlled production launch. Not blockers for current GO status.
 - [x] **2. Create non-admin test user and verify cross-tenant 403** — `gcc-uat-tenant@example.com` (`staff`, `org-apex`); cross-tenant API returns 403 (verified June 21, 2026)
 - [ ] **3. Confirm Supabase Auth URLs** — Site URL and redirect allowlist include `https://growth-command-center-lbnt.vercel.app/auth/callback`
 - [ ] **4. Configure QuickBooks / Stripe / Plaid when ready** — add Vercel env vars and OAuth redirect URIs; non-blocking until integrations needed
-- [ ] **5. Add role checks for settings/team** — restrict save/invite to founder/admin roles, not all org members
+- [ ] **5. Add role checks for settings/team** — **Phase A RBAC added locally, pending UAT** — `requirePermission` on settings save (`settings:manage`), team invite (`team:manage`), integration connect/sync/disconnect (`integrations:manage`); invite role enum validation; Admin nav hidden unless `platform_admin`; client role aligned from `gcc_profiles`; integration list no longer exposes tokens
 - [ ] **6. Clean up org switcher** — remove mock multi-tenant UI; bind header to authenticated user's org only
 - [ ] **7. Wire admin to real Supabase tenant data** — replace mock `PLATFORM_TENANTS` on `/admin` with live queries
 - [ ] **8. Add invite audit trail** — e.g. `gcc_team_invites` table; log pending/sent/failed invites
@@ -45,7 +45,18 @@ Track after controlled production launch. Not blockers for current GO status.
 - [x] **KPI editing MVP — production verified** (June 20, 2026) — `PATCH /api/kpis`, dashboard KPI edit modal, **reports page KPI Scorecard editing** (`KpiScorecardGrid` + shared edit modal), stoplight status/plan fields; large revenue/target inputs fixed in `34c207c` (text + `inputMode="decimal"`, values up to 100M); report export routing/filename/content mismatch fixed in `5936b51` (type-specific PDF/Excel, invalid type → 400); manual UAT passed; commits `7990017`, `34c207c`, `5936b51`
 - [ ] **Merge.dev integration** — not started. `connect_integration` records **pending/manual intent only** in `gcc_integration_connections` (no Merge link-token, no sync pipeline). **Future integration sync must respect `manual_override`** on edited KPIs until mapping rules are finalized.
 
-**Next phase (pending approval):** Merge.dev planning — do not start Merge.dev without explicit approval.
+**Next phase (pending approval):** Phase A RBAC production UAT, then Merge.dev planning — **do not start Merge.dev** without explicit approval.
+
+### Phase A — RBAC enforcement (local, pending UAT)
+
+- `requirePermission(access, permission)` server helper using `gcc_profiles.role`
+- Settings save requires `settings:manage` (founder, cfo, admin, platform_admin)
+- Team invite requires `team:manage`; invite roles validated; `platform_admin` blocked
+- Integration connect/sync/disconnect/sync-all require `integrations:manage`
+- `GET /api/integrations` strips tokens from `connections` response
+- Admin sidebar hidden unless `platform_admin`
+- Tenant context prefers server profile role over JWT metadata
+- Smoke tests extended for staff 403, invalid invite role 400, token leak check
 
 **Vercel env note:** Prefer canonical `ANTHROPIC_API_KEY` over lowercase `anthropic_api_key` (code supports fallback).
 

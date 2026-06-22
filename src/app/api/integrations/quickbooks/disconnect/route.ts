@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { disconnectQuickBooks } from "@/lib/integrations/quickbooks";
-import { requireApiAccess } from "@/lib/auth/access";
+import { requireApiAccess, requirePermission } from "@/lib/auth/access";
 import { authErrorResponse } from "@/lib/auth/api";
 
 export async function DELETE(request: Request) {
@@ -12,7 +12,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
     }
 
-    await requireApiAccess({ organizationId });
+    const access = await requireApiAccess({ organizationId });
+    requirePermission(access, "integrations:manage");
 
     const disconnected = await disconnectQuickBooks(organizationId);
     return NextResponse.json({ success: disconnected });

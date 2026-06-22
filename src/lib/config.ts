@@ -27,6 +27,9 @@ export function getAppUrl(): string {
 
 export const DEMO_MODE_COOKIE = "gcc_demo_mode";
 
+/** Demo-only role override for local smoke tests (ignored in production). */
+export const DEMO_ROLE_COOKIE = "gcc_demo_role";
+
 /** Demo sessions are pinned to this organization only */
 export const DEMO_ORGANIZATION_ID = "org-apex";
 

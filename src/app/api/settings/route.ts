@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiAccess } from "@/lib/auth/access";
+import { requireApiAccess, requirePermission } from "@/lib/auth/access";
 import { authErrorResponse } from "@/lib/auth/api";
 import { persistOrganizationSettings } from "@/lib/data/settings";
 
@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     }
 
     const access = await requireApiAccess({ organizationId });
+    requirePermission(access, "settings:manage");
 
     if (access.isDemoMode) {
       return NextResponse.json({

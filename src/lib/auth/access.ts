@@ -1,6 +1,14 @@
 import { cookies } from "next/headers";
-import { DEMO_MODE_COOKIE, DEMO_ORGANIZATION_ID, isDemoModeAllowed } from "@/lib/config";
+import {
+  DEMO_MODE_COOKIE,
+  DEMO_ORGANIZATION_ID,
+  DEMO_ROLE_COOKIE,
+  isDemoModeAllowed,
+} from "@/lib/config";
 import { AuthError, getAuthContext, type AuthContext } from "@/lib/auth/api";
+import { hasPermission, type Permission } from "@/lib/auth/permissions";
+import { isUserRole } from "@/lib/auth/roles";
+import type { UserRole } from "@/lib/types";
 
 export interface AccessContext extends AuthContext {
   isDemoMode: boolean;
@@ -9,6 +17,21 @@ export interface AccessContext extends AuthContext {
 export async function isDemoSession(): Promise<boolean> {
   const cookieStore = await cookies();
   return isDemoModeAllowed() && cookieStore.get(DEMO_MODE_COOKIE)?.value === "1";
+}
+
+async function getDemoRole(): Promise<UserRole> {
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(DEMO_ROLE_COOKIE)?.value;
+  if (raw && isUserRole(raw) && raw !== "platform_admin") {
+    return raw;
+  }
+  return "founder";
+}
+
+export function requirePermission(access: AccessContext, permission: Permission): void {
+  if (!hasPermission(access.role, permission)) {
+    throw new AuthError("Forbidden", 403);
+  }
 }
 
 export async function requireApiAccess(options?: {
@@ -23,7 +46,7 @@ export async function requireApiAccess(options?: {
     return {
       userId: "demo",
       email: "demo@gcc.local",
-      role: "founder",
+      role: await getDemoRole(),
       organizationId: DEMO_ORGANIZATION_ID,
       isDemoMode: true,
     };

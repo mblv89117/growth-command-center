@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Header, MobileNav, Sidebar } from "@/components/layout/sidebar";
 import { AuthProvider } from "@/lib/auth/context";
 import { TenantProvider } from "@/lib/tenant/context";
+import { getAuthContext } from "@/lib/auth/api";
 import { DEMO_MODE_COOKIE, isDemoModeAllowed, isSupabaseConfigured } from "@/lib/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,9 +22,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login");
   }
 
+  const authContext = session ? await getAuthContext() : null;
+
   return (
     <AuthProvider initialSession={session} demoMode={demoMode}>
-      <TenantProvider authUser={session?.user ?? null} demoMode={demoMode}>
+      <TenantProvider
+        authUser={session?.user ?? null}
+        serverRole={authContext?.role}
+        serverOrganizationId={authContext?.organizationId}
+        demoMode={demoMode}
+      >
         <div className="min-h-screen bg-background">
           <Sidebar />
           <div className="lg:pl-64">

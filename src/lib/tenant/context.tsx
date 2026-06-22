@@ -14,14 +14,18 @@ interface TenantContextValue {
 
 const TenantContext = createContext<TenantContextValue | null>(null);
 
-function mapAuthUser(authUser: SupabaseUser): User {
+function mapAuthUser(
+  authUser: SupabaseUser,
+  serverRole?: UserRole,
+  serverOrganizationId?: string
+): User {
   const metadata = authUser.user_metadata ?? {};
   return {
     id: authUser.id,
     email: authUser.email ?? "",
     name: (metadata.full_name as string) ?? authUser.email?.split("@")[0] ?? "User",
-    role: (metadata.role as UserRole) ?? "founder",
-    organizationId: (metadata.organization_id as string) ?? ORGANIZATIONS[0].id,
+    role: serverRole ?? ((metadata.role as UserRole) ?? "founder"),
+    organizationId: serverOrganizationId ?? ((metadata.organization_id as string) ?? ORGANIZATIONS[0].id),
     lastActiveAt: new Date().toISOString(),
   };
 }
@@ -29,13 +33,19 @@ function mapAuthUser(authUser: SupabaseUser): User {
 export function TenantProvider({
   children,
   authUser,
+  serverRole,
+  serverOrganizationId,
   demoMode = false,
 }: {
   children: ReactNode;
   authUser?: SupabaseUser | null;
+  serverRole?: UserRole;
+  serverOrganizationId?: string;
   demoMode?: boolean;
 }) {
-  const mappedUser = authUser ? mapAuthUser(authUser) : { ...CURRENT_USER };
+  const mappedUser = authUser
+    ? mapAuthUser(authUser, serverRole, serverOrganizationId)
+    : { ...CURRENT_USER };
   const [organization, setOrganization] = useState(
     ORGANIZATIONS.find((o) => o.id === mappedUser.organizationId) ?? ORGANIZATIONS[0]
   );

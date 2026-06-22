@@ -9,22 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTenant } from "@/lib/tenant/context";
 import { useTenantData } from "@/hooks/use-tenant-data";
+import { INVITABLE_ROLE_LABELS } from "@/lib/auth/roles";
+import { hasPermission } from "@/lib/auth/permissions";
 import { formatDate } from "@/lib/utils";
 import { Loader2, Mail, UserPlus } from "lucide-react";
 
 const roleLabels: Record<string, string> = {
-  founder: "Founder / CEO",
-  cfo: "CFO / Controller",
-  operations: "Operations Manager",
-  sales: "Sales Manager",
-  project_manager: "Project Manager",
-  admin: "Admin",
-  staff: "Staff",
-  advisor: "External Advisor",
+  ...INVITABLE_ROLE_LABELS,
+  platform_admin: "Platform Admin",
 };
 
 export default function TeamPage() {
-  const { organization } = useTenant();
+  const { organization, user } = useTenant();
+  const canManageTeam = hasPermission(user.role, "team:manage");
   const { data, loading } = useTenantData();
   const { teamMembers } = data;
   const [email, setEmail] = useState("");
@@ -80,9 +77,11 @@ export default function TeamPage() {
         title="Team"
         description="Manage users, roles, invitations, and permissions"
         actions={
-          <Button onClick={() => document.getElementById("email")?.focus()}>
-            <UserPlus className="mr-2 h-4 w-4" /> Invite Member
-          </Button>
+          canManageTeam ? (
+            <Button onClick={() => document.getElementById("email")?.focus()}>
+              <UserPlus className="mr-2 h-4 w-4" /> Invite Member
+            </Button>
+          ) : undefined
         }
       />
 
@@ -131,7 +130,11 @@ export default function TeamPage() {
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Invite Team Member</CardTitle>
-          <CardDescription>Send an invitation to join {organization.name}</CardDescription>
+          <CardDescription>
+            {canManageTeam
+              ? `Send an invitation to join ${organization.name}`
+              : "You need team management permission to invite members."}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -143,24 +146,26 @@ export default function TeamPage() {
                 placeholder="colleague@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={!canManageTeam}
               />
             </div>
             <div className="flex-1 space-y-2">
               <Label htmlFor="role">Role</Label>
               <select
                 id="role"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm disabled:opacity-50"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
+                disabled={!canManageTeam}
               >
-                {Object.entries(roleLabels).map(([value, label]) => (
+                {Object.entries(INVITABLE_ROLE_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
                   </option>
                 ))}
               </select>
             </div>
-            <Button disabled={inviteLoading || !email.trim()} onClick={sendInvite}>
+            <Button disabled={!canManageTeam || inviteLoading || !email.trim()} onClick={sendInvite}>
               {inviteLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
               Send Invite
             </Button>

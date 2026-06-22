@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useTenant } from "@/lib/tenant/context";
+import { hasPermission } from "@/lib/auth/permissions";
 import { formatCurrency } from "@/lib/utils";
 import { STRIPE_PLANS, type PlanKey } from "@/lib/stripe/config";
 import { Loader2 } from "lucide-react";
@@ -33,7 +34,8 @@ async function saveSettings(
 }
 
 export default function SettingsPage() {
-  const { organization } = useTenant();
+  const { organization, user } = useTenant();
+  const canManageSettings = hasPermission(user.role, "settings:manage");
   const { settings } = organization;
   const searchParams = useSearchParams();
   const defaultTab = searchParams.get("tab") ?? "organization";
@@ -110,6 +112,12 @@ export default function SettingsPage() {
         description="Organization settings, forecast assumptions, thresholds, and billing"
       />
 
+      {!canManageSettings && (
+        <div className="mb-4 rounded-lg border border-muted bg-muted/30 p-3 text-sm text-muted-foreground">
+          You have read-only access to organization settings. Contact a founder or admin to make changes.
+        </div>
+      )}
+
       {saveNotice && (
         <div
           className={`mb-4 rounded-lg border p-3 text-sm ${
@@ -158,7 +166,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <Button
-                disabled={saveLoading === "organization"}
+                disabled={!canManageSettings || saveLoading === "organization"}
                 onClick={() =>
                   handleSave("organization", {
                     name: (document.getElementById("org-name") as HTMLInputElement)?.value,
@@ -207,7 +215,7 @@ export default function SettingsPage() {
                 <Switch defaultChecked />
               </div>
               <Button
-                disabled={saveLoading === "forecast"}
+                disabled={!canManageSettings || saveLoading === "forecast"}
                 onClick={() =>
                   handleSave("forecast", {
                     forecastHorizonWeeks: Number(
@@ -259,7 +267,7 @@ export default function SettingsPage() {
                 <Switch defaultChecked />
               </div>
               <Button
-                disabled={saveLoading === "alerts"}
+                disabled={!canManageSettings || saveLoading === "alerts"}
                 onClick={() =>
                   handleSave("alerts", {
                     cashAlertThreshold: Number(

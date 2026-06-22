@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { isDemoModeAllowed } from "@/lib/config";
 import { authErrorResponse } from "@/lib/auth/api";
-import { requireApiAccess } from "@/lib/auth/access";
-import { canManageIntegrations } from "@/lib/auth/permissions";
+import { requireApiAccess, requirePermission } from "@/lib/auth/access";
+import { sanitizeConnectionForClient } from "@/lib/integrations/types";
 import { connectPlaidDemo, createPlaidLinkToken, isPlaidConfigured } from "@/lib/integrations/plaid";
 
 export async function POST(request: Request) {
@@ -15,9 +15,7 @@ export async function POST(request: Request) {
     }
 
     const access = await requireApiAccess({ organizationId });
-    if (!access.isDemoMode && !canManageIntegrations(access.role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    requirePermission(access, "integrations:manage");
 
     const useDemo = demo || !isPlaidConfigured();
     if (useDemo) {
@@ -25,7 +23,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Configure Plaid credentials for production" }, { status: 400 });
       }
       const connection = await connectPlaidDemo(organizationId);
-      return NextResponse.json({ mode: "demo", connection, message: "Plaid connected" });
+      return NextResponse.json({
+        mode: "demo",
+        connection: sanitizeConnectionForClient(connection),
+        message: "Plaid connected",
+      });
     }
 
     const linkToken = await createPlaidLinkToken(organizationId);

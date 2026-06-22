@@ -462,6 +462,106 @@ async function main() {
     );
   }
 
+  // RBAC enforcement (demo role override via POST /api/auth/demo { role })
+  const staffDemo = await request("/api/auth/demo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role: "staff" }),
+  });
+  const staffCookies = cookieHeader(staffDemo.setCookie);
+  const staffOpts = { headers: { Cookie: staffCookies } };
+
+  const staffSettings = await request("/api/settings", {
+    method: "POST",
+    headers: { ...staffOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      organizationId: "org-apex",
+      section: "organization",
+      settings: { currency: "USD" },
+    }),
+  });
+  if (staffSettings.res.status === 403) {
+    pass("staff demo settings save returns 403");
+  } else {
+    fail(`staff settings expected 403, got ${staffSettings.res.status}`);
+  }
+
+  const staffInvite = await request("/api/team/invite", {
+    method: "POST",
+    headers: { ...staffOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      organizationId: "org-apex",
+      email: "staff-blocked@example.com",
+      role: "staff",
+    }),
+  });
+  if (staffInvite.res.status === 403) {
+    pass("staff demo team invite returns 403");
+  } else {
+    fail(`staff invite expected 403, got ${staffInvite.res.status}`);
+  }
+
+  const staffSync = await request("/api/integrations/plaid/sync", {
+    method: "POST",
+    headers: { ...staffOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "org-apex" }),
+  });
+  if (staffSync.res.status === 403) {
+    pass("staff demo integration sync returns 403");
+  } else {
+    fail(`staff sync expected 403, got ${staffSync.res.status}`);
+  }
+
+  const staffDisconnect = await request("/api/integrations/plaid/disconnect", {
+    method: "DELETE",
+    headers: { ...staffOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "org-apex" }),
+  });
+  if (staffDisconnect.res.status === 403) {
+    pass("staff demo integration disconnect returns 403");
+  } else {
+    fail(`staff disconnect expected 403, got ${staffDisconnect.res.status}`);
+  }
+
+  const invalidInviteRole = await request("/api/team/invite", {
+    method: "POST",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      organizationId: "org-apex",
+      email: "bad-role@example.com",
+      role: "not-a-role",
+    }),
+  });
+  if (invalidInviteRole.res.status === 400) {
+    pass("invalid team invite role returns 400");
+  } else {
+    fail(`invalid invite role expected 400, got ${invalidInviteRole.res.status}`);
+  }
+
+  const platformAdminInvite = await request("/api/team/invite", {
+    method: "POST",
+    headers: { ...demoOpts.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      organizationId: "org-apex",
+      email: "platform-admin@example.com",
+      role: "platform_admin",
+    }),
+  });
+  if (platformAdminInvite.res.status === 400) {
+    pass("platform_admin team invite returns 400");
+  } else {
+    fail(`platform_admin invite expected 400, got ${platformAdminInvite.res.status}`);
+  }
+
+  const integrationsList = await request("/api/integrations?organizationId=org-apex", demoOpts);
+  const connections = integrationsList.json?.connections ?? [];
+  const exposesTokens = connections.some((c) => c?.accessToken || c?.refreshToken);
+  if (integrationsList.res.status === 200 && !exposesTokens) {
+    pass("integrations list does not expose access or refresh tokens");
+  } else {
+    fail(`integrations list should not expose tokens, got exposesTokens=${exposesTokens}`);
+  }
+
   console.log(process.exitCode ? "\nSome smoke tests failed." : "\nAll smoke tests passed.");
 }
 

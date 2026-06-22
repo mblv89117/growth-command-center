@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { syncQuickBooks } from "@/lib/integrations/quickbooks";
 import { syncPlaidBalances } from "@/lib/integrations/plaid";
 import { getConnection, recordSyncResult } from "@/lib/integrations/store";
-import { requireApiAccess } from "@/lib/auth/access";
+import { requireApiAccess, requirePermission } from "@/lib/auth/access";
 import { authErrorResponse, AuthError } from "@/lib/auth/api";
 
 export async function POST(request: Request) {
@@ -14,7 +14,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
     }
 
-    await requireApiAccess({ organizationId });
+    const access = await requireApiAccess({ organizationId });
+    requirePermission(access, "integrations:manage");
 
     const results = [];
 

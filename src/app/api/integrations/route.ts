@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getTenantData } from "@/lib/mock-data";
 import { getConnection, getOrganizationConnections } from "@/lib/integrations/store";
+import { sanitizeConnectionForClient } from "@/lib/integrations/types";
 import type { IntegrationProvider } from "@/lib/integrations/types";
 import { requireApiAccess } from "@/lib/auth/access";
 import { authErrorResponse } from "@/lib/auth/api";
@@ -53,7 +54,10 @@ export async function GET(request: Request) {
     })
   );
 
-  return NextResponse.json({ integrations, connections: liveConnections });
+  return NextResponse.json({
+    integrations,
+    connections: liveConnections.map(sanitizeConnectionForClient),
+  });
   } catch (error) {
     return authErrorResponse(error);
   }

@@ -25,6 +25,21 @@ export interface IntegrationConnection {
   metadata?: Record<string, string | number>;
 }
 
+export function sanitizeConnectionForClient(
+  connection: IntegrationConnection
+): Omit<IntegrationConnection, "accessToken" | "refreshToken"> {
+  return {
+    organizationId: connection.organizationId,
+    provider: connection.provider,
+    status: connection.status,
+    realmId: connection.realmId,
+    lastSync: connection.lastSync,
+    connectedAt: connection.connectedAt,
+    errorMessage: connection.errorMessage,
+    metadata: connection.metadata,
+  };
+}
+
 export interface SyncResult {
   provider: IntegrationProvider;
   success: boolean;

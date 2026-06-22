@@ -1,7 +1,13 @@
 import { z } from "zod";
+import { INVITABLE_ROLES } from "@/lib/auth/roles";
 
 export const organizationIdSchema = z.object({
   organizationId: z.string().min(1, "organizationId is required"),
+});
+
+export const teamInviteSchema = organizationIdSchema.extend({
+  email: z.string().email("Invalid email address"),
+  role: z.enum(INVITABLE_ROLES, { message: "Invalid role" }),
 });
 
 export const kpiStatusSchema = z.enum(["green", "yellow", "red"]);

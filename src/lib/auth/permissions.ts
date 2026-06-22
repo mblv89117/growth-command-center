@@ -1,6 +1,6 @@
 import type { UserRole } from "@/lib/types";
 
-type Permission =
+export type Permission =
   | "dashboard:read"
   | "financials:read"
   | "financials:write"

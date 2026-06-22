@@ -1,51 +1,40 @@
 import { NextResponse } from "next/server";
-import { requireApiAccess } from "@/lib/auth/access";
+import { ValidationError } from "@/lib/api/errors";
+import { requireApiAccess, requirePermission } from "@/lib/auth/access";
 import { authErrorResponse } from "@/lib/auth/api";
 import { sendTeamInvite } from "@/lib/data/team-invite";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { parseJsonBody } from "@/lib/validation/parse-body";
+import { teamInviteSchema } from "@/lib/validation/schemas";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { organizationId, email, role } = body as {
-      organizationId?: string;
-      email?: string;
-      role?: string;
-    };
-
-    if (!organizationId || !email || !role) {
-      return NextResponse.json(
-        { error: "organizationId, email, and role are required" },
-        { status: 400 }
-      );
-    }
-
-    if (!EMAIL_RE.test(email)) {
-      return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
-    }
-
-    const access = await requireApiAccess({ organizationId });
+    const body = await parseJsonBody(request, teamInviteSchema);
+    const access = await requireApiAccess({ organizationId: body.organizationId });
+    requirePermission(access, "team:manage");
 
     if (access.isDemoMode) {
       return NextResponse.json({
         success: false,
         preview: true,
-        message: `Demo preview only — no invitation was sent to ${email}. Sign in to invite team members.`,
-        email,
-        role,
+        message: `Demo preview only — no invitation was sent to ${body.email}. Sign in to invite team members.`,
+        email: body.email,
+        role: body.role,
       });
     }
 
-    const result = await sendTeamInvite({ organizationId, email, role });
+    const result = await sendTeamInvite({
+      organizationId: body.organizationId,
+      email: body.email,
+      role: body.role,
+    });
     if (!result.ok) {
       return NextResponse.json(
         {
           success: false,
           preview: false,
           message: `Invitation could not be sent: ${result.message}`,
-          email,
-          role,
+          email: body.email,
+          role: body.role,
         },
         { status: 501 }
       );
@@ -54,11 +43,14 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       preview: false,
-      message: `Invitation sent to ${email}.`,
-      email,
-      role,
+      message: `Invitation sent to ${body.email}.`,
+      email: body.email,
+      role: body.role,
     });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return authErrorResponse(error);
   }
 }

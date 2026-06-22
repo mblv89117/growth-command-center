@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/shared";
 import { IntegrationCard } from "@/components/integrations/integration-card";
 import { Button } from "@/components/ui/button";
 import { useTenant } from "@/lib/tenant/context";
+import { hasPermission } from "@/lib/auth/permissions";
 import type { Integration, IntegrationStatus } from "@/lib/types";
 import { Loader2, RefreshCw } from "lucide-react";
 
@@ -26,7 +27,8 @@ interface LiveIntegration extends Integration {
 }
 
 export default function IntegrationsContent() {
-  const { organization } = useTenant();
+  const { organization, user } = useTenant();
+  const canManageIntegrations = hasPermission(user.role, "integrations:manage");
   const searchParams = useSearchParams();
   const [integrations, setIntegrations] = useState<LiveIntegration[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,7 +109,13 @@ export default function IntegrationsContent() {
             QuickBooks and Plaid are live — mock connectors are labeled Demo/Mock
           </p>
         </div>
-        <Button variant="outline" size="sm" className="ml-auto" onClick={handleSyncAll} disabled={syncing}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto"
+          onClick={handleSyncAll}
+          disabled={!canManageIntegrations || syncing}
+        >
           {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
           Sync All
         </Button>

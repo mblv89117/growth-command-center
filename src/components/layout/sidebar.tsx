@@ -33,6 +33,8 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Menu } from "lucide-react";
 
+import type { UserRole } from "@/lib/types";
+
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Cash Forecast", href: "/cash-forecast", icon: Wallet },
@@ -48,10 +50,19 @@ const navigation = [
   { name: "Admin", href: "/admin", icon: Shield },
 ];
 
+function filterNavigation(isDemoMode: boolean, role: UserRole) {
+  return navigation.filter((item) => {
+    if (isDemoMode && item.href === "/admin") return false;
+    if (item.href === "/admin" && role !== "platform_admin") return false;
+    return true;
+  });
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { isDemoMode } = useAuth();
-  const visibleNav = navigation.filter((item) => !(isDemoMode && item.href === "/admin"));
+  const { user } = useTenant();
+  const visibleNav = filterNavigation(isDemoMode, user.role);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r bg-card lg:flex">
@@ -91,7 +102,8 @@ export function Sidebar() {
 export function MobileNav() {
   const pathname = usePathname();
   const { isDemoMode } = useAuth();
-  const visibleNav = navigation.filter((item) => !(isDemoMode && item.href === "/admin"));
+  const { user } = useTenant();
+  const visibleNav = filterNavigation(isDemoMode, user.role);
   const primaryNav = visibleNav.slice(0, 5);
   const moreNav = visibleNav.slice(5);
 
