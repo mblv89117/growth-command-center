@@ -17,17 +17,21 @@ export async function POST(request: Request) {
     const access = await requireApiAccess({ organizationId });
     requirePermission(access, "integrations:manage");
 
-    const useDemo = demo || !isPlaidConfigured();
+    const useDemo = isDemoModeAllowed() && (Boolean(demo) || !isPlaidConfigured());
     if (useDemo) {
-      if (!isDemoModeAllowed()) {
-        return NextResponse.json({ error: "Configure Plaid credentials for production" }, { status: 400 });
-      }
       const connection = await connectPlaidDemo(organizationId);
       return NextResponse.json({
         mode: "demo",
         connection: sanitizeConnectionForClient(connection),
         message: "Plaid connected",
       });
+    }
+
+    if (!isPlaidConfigured()) {
+      return NextResponse.json(
+        { error: "Configure Plaid credentials for production" },
+        { status: 400 }
+      );
     }
 
     const linkToken = await createPlaidLinkToken(organizationId);

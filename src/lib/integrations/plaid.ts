@@ -62,6 +62,16 @@ export async function syncPlaidBalances(organizationId: string): Promise<SyncRes
     };
   }
 
+  if (isProduction) {
+    return {
+      provider: "plaid",
+      success: false,
+      syncedAt: new Date().toISOString(),
+      recordsSynced: 0,
+      message: "Live Plaid balance sync is not enabled in this release",
+    };
+  }
+
   const admin = createAdminClient();
   const demoBalance = 487250;
   const accounts = [

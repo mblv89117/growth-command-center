@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { CashTrendLine, TrendChart } from "@/components/charts";
-import { AlertItem, PageHeader } from "@/components/shared";
+import { AlertItem, DataSourceBanner, PageHeader } from "@/components/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,8 +65,8 @@ export default function DashboardPage() {
         description={`Real-time financial overview for ${organization.name}`}
         actions={
           <div className="flex items-center gap-2">
-            <Badge variant={source === "supabase" ? "success" : "secondary"}>
-              {source === "supabase" ? "Live Data" : "Mock Data"}
+            <Badge variant="secondary">
+              {source === "supabase" ? "Seeded Demo Data" : "Demo Data"}
             </Badge>
             <Button asChild>
               <Link href="/cash-forecast">
@@ -76,6 +76,8 @@ export default function DashboardPage() {
           </div>
         }
       />
+
+      <DataSourceBanner source={source} />
 
       <OnboardingCta />
 

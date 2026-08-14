@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { getTenantData } from "@/lib/mock-data";
 import { getConnection, getOrganizationConnections } from "@/lib/integrations/store";
-import { sanitizeConnectionForClient } from "@/lib/integrations/types";
+import { isDemoConnection, sanitizeConnectionForClient } from "@/lib/integrations/types";
 import type { IntegrationProvider } from "@/lib/integrations/types";
 import { requireApiAccess } from "@/lib/auth/access";
 import { authErrorResponse } from "@/lib/auth/api";
+import { isProduction, isQuickBooksConfigured } from "@/lib/config";
+import { isPlaidConfigured } from "@/lib/integrations/plaid";
 
 const PROVIDER_MAP: Record<string, IntegrationProvider> = {
   "int-1": "quickbooks",
@@ -19,6 +21,14 @@ const PROVIDER_MAP: Record<string, IntegrationProvider> = {
   "int-10": "google_sheets",
 };
 
+const LIVE_CONNECT_IDS = new Set(["int-1", "int-4"]);
+
+function isProviderConfigured(provider?: IntegrationProvider): boolean {
+  if (provider === "quickbooks") return isQuickBooksConfigured();
+  if (provider === "plaid") return isPlaidConfigured();
+  return false;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -30,34 +40,59 @@ export async function GET(request: Request) {
 
     await requireApiAccess({ organizationId });
 
-  const mockIntegrations = getTenantData(organizationId).integrations;
-  const liveConnections = await getOrganizationConnections(organizationId);
+    const mockIntegrations = getTenantData(organizationId).integrations;
+    const liveConnections = await getOrganizationConnections(organizationId);
 
-  const integrations = await Promise.all(
-    mockIntegrations.map(async (integration) => {
-      const provider = PROVIDER_MAP[integration.id];
-      const live = provider ? await getConnection(organizationId, provider) : undefined;
+    const integrations = await Promise.all(
+      mockIntegrations.map(async (integration) => {
+        const provider = PROVIDER_MAP[integration.id];
+        const live = provider ? await getConnection(organizationId, provider) : undefined;
+        const usableLive = live && !(isProduction && isDemoConnection(live)) ? live : undefined;
+        const connectConfigured = isProviderConfigured(provider);
 
-      if (live) {
-        return {
-          ...integration,
-          status: live.status,
-          lastSync: live.lastSync,
-          connectedAt: live.connectedAt,
-          errorMessage: live.errorMessage,
-          metadata: live.metadata,
-          isLive: true,
-        };
-      }
+        if (usableLive) {
+          return {
+            ...integration,
+            status: usableLive.status,
+            lastSync: usableLive.lastSync,
+            connectedAt: usableLive.connectedAt,
+            errorMessage: usableLive.errorMessage,
+            metadata: usableLive.metadata,
+            isLive: true,
+            connectConfigured,
+          };
+        }
 
-      return { ...integration, isLive: false };
-    })
-  );
+        if (isProduction && LIVE_CONNECT_IDS.has(integration.id)) {
+          return {
+            ...integration,
+            status: "disconnected" as const,
+            lastSync: undefined,
+            connectedAt: undefined,
+            errorMessage: connectConfigured
+              ? undefined
+              : `${integration.name} credentials are not configured in this environment`,
+            isLive: false,
+            connectConfigured,
+          };
+        }
 
-  return NextResponse.json({
-    integrations,
-    connections: liveConnections.map(sanitizeConnectionForClient),
-  });
+        return { ...integration, isLive: false, connectConfigured: false };
+      })
+    );
+
+    const visibleConnections = isProduction
+      ? liveConnections.filter((connection) => !isDemoConnection(connection))
+      : liveConnections;
+
+    return NextResponse.json({
+      integrations,
+      connections: visibleConnections.map(sanitizeConnectionForClient),
+      capabilities: {
+        quickbooks: { configured: isQuickBooksConfigured() },
+        plaid: { configured: isPlaidConfigured() },
+      },
+    });
   } catch (error) {
     return authErrorResponse(error);
   }

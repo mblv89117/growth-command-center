@@ -1,7 +1,7 @@
 "use client";
 
 import { PipelineChart } from "@/components/charts";
-import { DataTable, PageHeader } from "@/components/shared";
+import { DataSourceBanner, DataTable, PageHeader } from "@/components/shared";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ const stageLabels: Record<string, string> = {
 };
 
 export default function SalesPipelinePage() {
-  const { data, loading } = useTenantData();
+  const { data, source, loading } = useTenantData();
   const { opportunities } = data;
 
   const totalPipeline = opportunities
@@ -67,6 +67,7 @@ export default function SalesPipelinePage() {
         title="Sales Pipeline"
         description="Opportunities, weighted revenue forecast, and conversion metrics"
       />
+      <DataSourceBanner source={source} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Total Pipeline" value={totalPipeline} />

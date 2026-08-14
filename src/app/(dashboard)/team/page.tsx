@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PageHeader } from "@/components/shared";
+import { DataSourceBanner, PageHeader } from "@/components/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,7 @@ const roleLabels: Record<string, string> = {
 export default function TeamPage() {
   const { organization, user } = useTenant();
   const canManageTeam = hasPermission(user.role, "team:manage");
-  const { data, loading } = useTenantData();
+  const { data, source, loading } = useTenantData();
   const { teamMembers } = data;
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("staff");
@@ -84,6 +84,7 @@ export default function TeamPage() {
           ) : undefined
         }
       />
+      <DataSourceBanner source={source} />
 
       {inviteNotice && (
         <div

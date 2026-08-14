@@ -86,6 +86,19 @@ export async function syncQuickBooks(organizationId: string): Promise<SyncResult
   }
 
   if (
+    isProduction &&
+    (connection.accessToken?.startsWith("demo_") || !isQuickBooksConfigured())
+  ) {
+    return {
+      provider: "quickbooks",
+      success: false,
+      syncedAt: new Date().toISOString(),
+      recordsSynced: 0,
+      message: "Configure QuickBooks credentials for production",
+    };
+  }
+
+  if (
     isQuickBooksConfigured() &&
     connection.accessToken &&
     !connection.accessToken.startsWith("demo_")

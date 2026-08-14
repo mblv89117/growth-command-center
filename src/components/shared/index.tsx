@@ -155,6 +155,19 @@ export function PageHeader({
   );
 }
 
+export function DataSourceBanner({ source }: { source?: "supabase" | "mock" }) {
+  const label = source === "supabase" ? "Seeded demo data" : "Demo / sample data";
+  return (
+    <div className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
+      <p className="font-medium">{label}</p>
+      <p className="text-muted-foreground">
+        These figures are sample tenant data for the current MVP. They are not from live QuickBooks
+        or bank feeds.
+      </p>
+    </div>
+  );
+}
+
 export function KPICard({
   name,
   value,

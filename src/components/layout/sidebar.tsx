@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   BarChart3,
   Building2,
-  ChevronDown,
   FileText,
   GitBranch,
   LayoutDashboard,
@@ -153,25 +152,15 @@ export function MobileNav() {
 }
 
 export function Header() {
-  const { organization, user, organizations, switchOrganization } = useTenant();
+  const { organization, user } = useTenant();
   const { signOut, isDemoMode } = useAuth();
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:px-8">
-      <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-accent">
-          <Building2 className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">{organization.name}</span>
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          {organizations.map((org) => (
-            <DropdownMenuItem key={org.id} onClick={() => switchOrganization(org.id)}>
-              {org.name}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+        <Building2 className="h-4 w-4 text-muted-foreground" />
+        <span className="font-medium">{organization.name}</span>
+      </div>
 
       <div className="flex items-center gap-3">
         {isDemoMode && (

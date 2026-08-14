@@ -2,6 +2,7 @@ import { getTenantData } from "@/lib/mock-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/config";
+import { mapOrganizationRow } from "@/lib/data/organizations";
 import type {
   AlertSeverity,
   APAgingBucket,
@@ -52,6 +53,7 @@ export async function getFullTenantData(organizationId: string): Promise<TenantD
     expenseRes,
     revenueRes,
     agingRes,
+    orgRes,
   ] = await Promise.all([
     db.from("gcc_financial_snapshots").select("*").eq("organization_id", orgId).maybeSingle(),
     db.from("gcc_monthly_trends").select("*").eq("organization_id", orgId).order("sort_order"),
@@ -70,10 +72,15 @@ export async function getFullTenantData(organizationId: string): Promise<TenantD
     db.from("gcc_expense_categories").select("*").eq("organization_id", orgId),
     db.from("gcc_revenue_sources").select("*").eq("organization_id", orgId),
     db.from("gcc_aging_buckets").select("*").eq("organization_id", orgId),
+    db.from("gcc_organizations").select("*").eq("id", orgId).maybeSingle(),
   ]);
 
+  const liveOrganization = orgRes.data
+    ? mapOrganizationRow(orgRes.data as Record<string, unknown>)
+    : mock.organization;
+
   if (snapshotRes.error || !snapshotRes.data) {
-    return { data: mock, source: "mock" };
+    return { data: { ...mock, organization: liveOrganization }, source: "mock" };
   }
 
   const s = snapshotRes.data;
@@ -86,7 +93,7 @@ export async function getFullTenantData(organizationId: string): Promise<TenantD
 
   const data: TenantData = {
     ...mock,
-    organization: mock.organization,
+    organization: liveOrganization,
     financialSnapshot: {
       currentCash: Number(s.current_cash),
       forecastedCash: Number(s.forecasted_cash),

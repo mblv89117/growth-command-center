@@ -2,30 +2,53 @@
 
 import { useState } from "react";
 import { CashForecastChart } from "@/components/charts";
-import { DataTable, PageHeader } from "@/components/shared";
+import { DataSourceBanner, DataTable, PageHeader } from "@/components/shared";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useTenantData } from "@/hooks/use-tenant-data";
+import { getScenarioMultiplier } from "@/lib/forecast-engine";
+import type { CashForecastWeek, ScenarioType } from "@/lib/types";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
-export default function CashForecastPage() {
-  const { data, loading } = useTenantData();
-  const [scenario, setScenario] = useState("base");
+function applyForecastScenario(weeks: CashForecastWeek[], type: ScenarioType): CashForecastWeek[] {
+  const multiplier = getScenarioMultiplier(type);
+  if (multiplier === 1 || weeks.length === 0) return weeks;
 
-  const chartData = data.cashForecastWeeks.map((w) => ({
+  let balance = weeks[0].startingBalance;
+  return weeks.map((week) => {
+    const inflows = Math.round(week.inflows * multiplier);
+    const startingBalance = balance;
+    const endingBalance = startingBalance + inflows - week.outflows;
+    balance = endingBalance;
+    return {
+      ...week,
+      startingBalance,
+      inflows,
+      endingBalance,
+      isRiskPeriod: endingBalance < 150000,
+    };
+  });
+}
+
+export default function CashForecastPage() {
+  const { data, source, loading } = useTenantData();
+  const [scenario, setScenario] = useState<ScenarioType>("base");
+  const forecastWeeks = applyForecastScenario(data.cashForecastWeeks, scenario);
+
+  const chartData = forecastWeeks.map((w) => ({
     week: `W${w.week}`,
     balance: w.endingBalance,
     inflows: w.inflows,
     outflows: w.outflows,
   }));
 
-  const minCash = Math.min(...data.cashForecastWeeks.map((w) => w.endingBalance));
-  const riskWeeks = data.cashForecastWeeks.filter((w) => w.isRiskPeriod);
+  const minCash = Math.min(...forecastWeeks.map((w) => w.endingBalance));
+  const riskWeeks = forecastWeeks.filter((w) => w.isRiskPeriod);
 
-  const tableData = data.cashForecastWeeks.map((w) => ({
+  const tableData = forecastWeeks.map((w) => ({
     week: `Week ${w.week}`,
     period: `${formatShortDate(w.weekStart)} – ${formatShortDate(w.weekEnd)}`,
     starting: w.startingBalance,
@@ -49,12 +72,13 @@ export default function CashForecastPage() {
         title="Cash Forecast"
         description="13-week rolling cash forecast with scenario analysis"
       />
+      <DataSourceBanner source={source} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Starting Cash" value={data.financialSnapshot.currentCash} />
         <MetricCard
           title="Ending Cash (Wk 13)"
-          value={data.cashForecastWeeks[12]?.endingBalance ?? 0}
+          value={forecastWeeks[12]?.endingBalance ?? 0}
           variant={minCash < 150000 ? "warning" : "default"}
         />
         <MetricCard title="Minimum Cash Point" value={minCash} variant="danger" />
@@ -84,7 +108,7 @@ export default function CashForecastPage() {
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  {["base", "best", "worst"].map((s) => (
+                  {(["base", "best", "worst"] as ScenarioType[]).map((s) => (
                     <button
                       key={s}
                       onClick={() => setScenario(s)}

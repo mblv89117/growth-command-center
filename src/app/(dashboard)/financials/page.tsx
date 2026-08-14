@@ -1,7 +1,7 @@
 "use client";
 
 import { ExpensePieChart, TrendChart } from "@/components/charts";
-import { DataTable, PageHeader } from "@/components/shared";
+import { DataSourceBanner, DataTable, PageHeader } from "@/components/shared";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,7 +12,7 @@ import { activeMonthlyTrends } from "@/lib/forecast/validate";
 import { Loader2 } from "lucide-react";
 
 export default function FinancialsPage() {
-  const { data, loading } = useTenantData();
+  const { data, source, loading } = useTenantData();
   const { financialSnapshot, monthlyTrends, expenseCategories, revenueSources, arAging, apAging, transactions, invoices, bills } = data;
   const chartTrends = activeMonthlyTrends(monthlyTrends);
 
@@ -30,6 +30,7 @@ export default function FinancialsPage() {
         title="Financials"
         description="Revenue, expenses, profit, AR/AP, and financial trends"
       />
+      <DataSourceBanner source={source} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Revenue MTD" value={financialSnapshot.revenueMTD} change={12.4} changeLabel="vs last month" />

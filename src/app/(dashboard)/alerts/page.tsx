@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertItem, PageHeader } from "@/components/shared";
+import { AlertItem, DataSourceBanner, PageHeader } from "@/components/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTenantData } from "@/hooks/use-tenant-data";
@@ -8,7 +8,7 @@ import type { AlertSeverity } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 
 export default function AlertsPage() {
-  const { data, loading } = useTenantData();
+  const { data, source, loading } = useTenantData();
 
   const unreadCount = data.alerts.filter((a) => !a.isRead).length;
   const criticalCount = data.alerts.filter((a) => a.severity === "critical").length;
@@ -37,6 +37,7 @@ export default function AlertsPage() {
         title="Alerts & Decision Support"
         description="Financial and operational risk alerts with recommended actions"
       />
+      <DataSourceBanner source={source} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-4">
         <Card>

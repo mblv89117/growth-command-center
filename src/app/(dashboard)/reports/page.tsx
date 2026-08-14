@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/shared";
+import { DataSourceBanner, PageHeader } from "@/components/shared";
 import { KpiScorecardGrid } from "@/components/dashboard/kpi-scorecard-grid";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ function exportReport(organizationId: string, reportId: string, format: "pdf" | 
 
 export default function ReportsPage() {
   const { organization } = useTenant();
-  const { data, loading } = useTenantData();
+  const { data, source, loading } = useTenantData();
   const { reports } = data;
   const [kpis, setKpis] = useState<KPI[]>(data.kpis);
 
@@ -48,6 +48,7 @@ export default function ReportsPage() {
         title="Reports"
         description="CFO-grade reports ready for PDF, Excel, and board review"
       />
+      <DataSourceBanner source={source} />
 
       <Card className="mb-6">
         <CardHeader>

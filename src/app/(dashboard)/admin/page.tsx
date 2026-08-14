@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/shared";
+import { DataSourceBanner, PageHeader } from "@/components/shared";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ export default function AdminPage() {
         title="Platform Admin"
         description="Platform owner view of tenants, users, subscriptions, and usage"
       />
+      <DataSourceBanner source="mock" />
 
       <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4">
         <p className="text-sm font-medium text-primary">Platform Owner Dashboard</p>

@@ -17,17 +17,21 @@ export async function POST(request: Request) {
     const access = await requireApiAccess({ organizationId });
     requirePermission(access, "integrations:manage");
 
-    const useDemo = demo || !isQuickBooksConfigured();
+    const useDemo = isDemoModeAllowed() && (Boolean(demo) || !isQuickBooksConfigured());
     if (useDemo) {
-      if (!isDemoModeAllowed()) {
-        return NextResponse.json({ error: "Configure QuickBooks credentials for production" }, { status: 400 });
-      }
       const connection = await connectQuickBooksDemo(organizationId);
       return NextResponse.json({
         mode: "demo",
         connection: sanitizeConnectionForClient(connection),
         message: "QuickBooks connected",
       });
+    }
+
+    if (!isQuickBooksConfigured()) {
+      return NextResponse.json(
+        { error: "Configure QuickBooks credentials for production" },
+        { status: 400 }
+      );
     }
 
     const state = Buffer.from(JSON.stringify({ organizationId })).toString("base64url");

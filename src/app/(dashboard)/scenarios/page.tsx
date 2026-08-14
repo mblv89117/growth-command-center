@@ -1,7 +1,7 @@
 "use client";
 
 import { ScenarioChart } from "@/components/charts";
-import { PageHeader } from "@/components/shared";
+import { DataSourceBanner, PageHeader } from "@/components/shared";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ const scenarioColors: Record<string, string> = {
 };
 
 export default function ScenariosPage() {
-  const { data, loading } = useTenantData();
+  const { data, source, loading } = useTenantData();
   const { scenarios } = data;
 
   const chartData = scenarios.map((s) => ({
@@ -42,11 +42,12 @@ export default function ScenariosPage() {
         title="Scenario Planning"
         description="Compare forecast outcomes across business scenarios"
         actions={
-          <Button>
+          <Button disabled title="Custom scenarios are not available in this release. Use the saved cases below.">
             <Plus className="mr-2 h-4 w-4" /> New Scenario
           </Button>
         }
       />
+      <DataSourceBanner source={source} />
 
       <Card className="mb-6">
         <CardHeader>

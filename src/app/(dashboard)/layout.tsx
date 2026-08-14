@@ -5,6 +5,7 @@ import { AuthProvider } from "@/lib/auth/context";
 import { TenantProvider } from "@/lib/tenant/context";
 import { getAuthContext } from "@/lib/auth/api";
 import { DEMO_MODE_COOKIE, isDemoModeAllowed, isSupabaseConfigured } from "@/lib/config";
+import { getOrganizationById } from "@/lib/data/organizations";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const authContext = session ? await getAuthContext() : null;
+  const serverOrganization = authContext
+    ? await getOrganizationById(authContext.organizationId)
+    : undefined;
 
   return (
     <AuthProvider initialSession={session} demoMode={demoMode}>
@@ -30,6 +34,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         authUser={session?.user ?? null}
         serverRole={authContext?.role}
         serverOrganizationId={authContext?.organizationId}
+        serverOrganization={serverOrganization}
         demoMode={demoMode}
       >
         <div className="min-h-screen bg-background">

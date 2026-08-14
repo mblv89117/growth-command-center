@@ -24,6 +24,7 @@ interface LiveIntegration extends Integration {
   metadata?: Record<string, string | number>;
   connectedAt?: string;
   errorMessage?: string;
+  connectConfigured?: boolean;
 }
 
 export default function IntegrationsContent() {
@@ -106,7 +107,8 @@ export default function IntegrationsContent() {
             {liveConnectedCount > 0 ? ` (${liveConnectedCount} live)` : ""}
           </p>
           <p className="text-sm text-muted-foreground">
-            QuickBooks and Plaid are live — mock connectors are labeled Demo/Mock
+            QuickBooks and Plaid stay disconnected until live credentials are configured. Other
+            connectors are labeled Mock and are not live.
           </p>
         </div>
         <Button
@@ -140,6 +142,7 @@ export default function IntegrationsContent() {
                   errorMessage={integration.errorMessage}
                   metadata={integration.metadata}
                   organizationId={organization.id}
+                  connectConfigured={integration.connectConfigured}
                   onUpdate={fetchIntegrations}
                 />
               ))}

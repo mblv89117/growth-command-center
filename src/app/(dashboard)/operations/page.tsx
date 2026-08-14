@@ -1,6 +1,6 @@
 "use client";
 
-import { DataTable, PageHeader } from "@/components/shared";
+import { DataSourceBanner, DataTable, PageHeader } from "@/components/shared";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ const statusVariant: Record<string, "default" | "secondary" | "success" | "warni
 };
 
 export default function OperationsPage() {
-  const { data, loading } = useTenantData();
+  const { data, source, loading } = useTenantData();
   const { jobs } = data;
 
   const activeJobs = jobs.filter((j) => j.status === "active");
@@ -43,6 +43,7 @@ export default function OperationsPage() {
         title="Operations"
         description="Active jobs, margins, production status, and billing timing"
       />
+      <DataSourceBanner source={source} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Active Jobs" value={activeJobs.length} format="number" />

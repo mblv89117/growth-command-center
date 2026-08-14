@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import type { IntegrationStatus } from "@/lib/types";
 import { hasPermission } from "@/lib/auth/permissions";
+import { useAuth } from "@/lib/auth/context";
 import { useTenant } from "@/lib/tenant/context";
 import { Loader2, RefreshCw } from "lucide-react";
 
@@ -21,6 +22,7 @@ interface IntegrationCardProps {
   errorMessage?: string;
   metadata?: Record<string, string | number>;
   organizationId: string;
+  connectConfigured?: boolean;
   onUpdate: () => void;
 }
 
@@ -55,27 +57,42 @@ export function IntegrationCard({
   errorMessage,
   metadata,
   organizationId,
+  connectConfigured = false,
   onUpdate,
 }: IntegrationCardProps) {
   const { user } = useTenant();
+  const { isDemoMode } = useAuth();
   const canManage = hasPermission(user.role, "integrations:manage");
   const [loading, setLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const config = statusConfig[status];
   const routes = LIVE_INTEGRATIONS[id];
   const isLiveIntegration = Boolean(routes);
+  const canConnectLive = isLiveIntegration && connectConfigured;
 
   const handleConnect = async () => {
     if (!routes) return;
     setLoading(true);
+    setActionError(null);
     try {
       const res = await fetch(routes.connect, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organizationId, demo: true }),
+        body: JSON.stringify({ organizationId, demo: isDemoMode }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        setActionError(data.error ?? "Connect failed");
+        return;
+      }
       if (data.authUrl) {
         window.location.href = data.authUrl;
+        return;
+      }
+      if (data.mode === "link" || data.linkToken) {
+        setActionError(
+          "Plaid Link is not available in this release. Bank connections stay disconnected until Link is enabled."
+        );
         return;
       }
       onUpdate();
@@ -87,12 +104,21 @@ export function IntegrationCard({
   const handleSync = async () => {
     if (!routes) return;
     setLoading(true);
+    setActionError(null);
     try {
-      await fetch(routes.sync, {
+      const res = await fetch(routes.sync, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ organizationId }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setActionError(data.error ?? data.message ?? "Sync failed");
+        return;
+      }
+      if (data.success === false) {
+        setActionError(data.message ?? "Sync failed");
+      }
       onUpdate();
     } finally {
       setLoading(false);
@@ -156,9 +182,14 @@ export function IntegrationCard({
             {metadata.lastRecordsSynced} records synced
           </p>
         )}
-        {status === "error" && errorMessage && (
+        {(status === "error" && errorMessage) || actionError ? (
           <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
-            {errorMessage}
+            {actionError ?? errorMessage}
+          </p>
+        ) : null}
+        {isLiveIntegration && !connectConfigured && status !== "connected" && !actionError && (
+          <p className="mb-4 text-xs text-muted-foreground">
+            {name} is disconnected. Live connect stays unavailable until credentials are configured.
           </p>
         )}
         <div className="flex gap-2">
@@ -194,14 +225,19 @@ export function IntegrationCard({
                 {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
                 Retry Sync
               </Button>
-              <Button size="sm" className="flex-1" onClick={handleConnect} disabled={loading}>
+              <Button size="sm" className="flex-1" onClick={handleConnect} disabled={loading || !canConnectLive}>
                 Reconnect
               </Button>
             </>
           ) : (
-            <Button size="sm" className="w-full" onClick={handleConnect} disabled={loading || !isLiveIntegration}>
+            <Button
+              size="sm"
+              className="w-full"
+              onClick={handleConnect}
+              disabled={loading || !isLiveIntegration || !canConnectLive}
+            >
               {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
-              {isLiveIntegration ? "Connect" : "Coming Soon"}
+              {!isLiveIntegration ? "Coming Soon" : canConnectLive ? "Connect" : "Not configured"}
             </Button>
           )}
         </div>

@@ -25,6 +25,13 @@ export interface IntegrationConnection {
   metadata?: Record<string, string | number>;
 }
 
+export function isDemoConnection(connection: IntegrationConnection): boolean {
+  return (
+    Boolean(connection.accessToken?.startsWith("demo_")) ||
+    connection.metadata?.mode === "demo"
+  );
+}
+
 export function sanitizeConnectionForClient(
   connection: IntegrationConnection
 ): Omit<IntegrationConnection, "accessToken" | "refreshToken"> {

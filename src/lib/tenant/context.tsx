@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { ORGANIZATIONS, CURRENT_USER } from "@/lib/mock-data";
 import type { Organization, User, UserRole } from "@/lib/types";
@@ -35,25 +35,24 @@ export function TenantProvider({
   authUser,
   serverRole,
   serverOrganizationId,
+  serverOrganization,
   demoMode = false,
 }: {
   children: ReactNode;
   authUser?: SupabaseUser | null;
   serverRole?: UserRole;
   serverOrganizationId?: string;
+  serverOrganization?: Organization;
   demoMode?: boolean;
 }) {
   const mappedUser = authUser
     ? mapAuthUser(authUser, serverRole, serverOrganizationId)
     : { ...CURRENT_USER };
-  const [organization, setOrganization] = useState(
-    ORGANIZATIONS.find((o) => o.id === mappedUser.organizationId) ?? ORGANIZATIONS[0]
-  );
 
-  const switchOrganization = (orgId: string) => {
-    const org = ORGANIZATIONS.find((o) => o.id === orgId);
-    if (org) setOrganization(org);
-  };
+  const organization =
+    serverOrganization ??
+    ORGANIZATIONS.find((org) => org.id === mappedUser.organizationId) ??
+    ORGANIZATIONS[0];
 
   const user: User = {
     ...mappedUser,
@@ -66,8 +65,8 @@ export function TenantProvider({
       value={{
         organization,
         user,
-        organizations: ORGANIZATIONS,
-        switchOrganization,
+        organizations: [organization],
+        switchOrganization: () => undefined,
       }}
     >
       {children}
