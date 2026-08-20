@@ -5,7 +5,7 @@
 | project | GCC Client Value OS |
 | primary repo | growth-command-center |
 | branch | `cursor/gcc-client-value-os` |
-| current SHA | 39458ba |
+| current SHA | 30388fd |
 | baseline | `cursor/gcc-hv-completion-52d1` @ `62f98cc` · main merge-base `fb986cb` |
 | owned domains | Client financial intelligence, cash/forecast/KPIs, executive cockpit, value realization, renewal/value evidence, GCC→Atlas value signals (adapter) |
 | files/domains touched | auth org resolution, `/api/tenant`, `/api/reports/export`, Atlas handoff HMAC, CVOS APIs, Integration SoT adapter |
