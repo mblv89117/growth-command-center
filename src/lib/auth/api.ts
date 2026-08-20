@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserRole } from "@/lib/types";
+import { resolveAuthenticatedOrganizationId } from "@/lib/auth/organization";
 
 export interface AuthContext {
   userId: string;
@@ -19,8 +20,8 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   if (!user) return null;
 
   const metadata = user.user_metadata ?? {};
-  let organizationId = (metadata.organization_id as string) ?? "org-apex";
   let role = (metadata.role as UserRole) ?? "founder";
+  let profileOrganizationId: string | null = null;
 
   const admin = createAdminClient();
   if (admin) {
@@ -30,9 +31,15 @@ export async function getAuthContext(): Promise<AuthContext | null> {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (profile?.organization_id) organizationId = profile.organization_id;
+    if (profile?.organization_id) profileOrganizationId = profile.organization_id;
     if (profile?.role) role = profile.role as UserRole;
   }
+
+  const organizationId =
+    resolveAuthenticatedOrganizationId({
+      profileOrganizationId,
+      metadataOrganizationId: metadata.organization_id as string | undefined,
+    }) ?? "";
 
   return {
     userId: user.id,

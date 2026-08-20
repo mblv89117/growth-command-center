@@ -115,14 +115,12 @@ export function LoginForm() {
             </>
           )}
 
-          {isSupabaseConfigured() && (
-            <p className="text-center text-sm text-muted-foreground">
-              No account?{" "}
-              <Link href="/signup" className="font-medium text-primary hover:underline">
-                Create one
-              </Link>
-            </p>
-          )}
+          <p className="text-center text-sm text-muted-foreground">
+            Access is invite-only after Atlas Active Client mapping.{" "}
+            <Link href="/signup" className="font-medium text-primary hover:underline">
+              Why can&apos;t I create an account?
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>
