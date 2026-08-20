@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const requested = url.searchParams.get("organizationId");
-    const access = await requireApiAccess({ organizationId: requested });
+    const access = await requireApiAccess();
     requirePermission(access, "dashboard:read");
 
     const selected = selectOrganizationId({
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
 
     // CC-006: emit Integration SoT alongside local richer models (adapter, not dual SoT).
     const valueSignals = [
-      ...signals.map(toGccValueSignal).filter((s): s is NonNullable<typeof s> => Boolean(s)),
+      ...signals.map(toGccValueSignal),
       ...capital.map(capitalToGccValueSignal),
     ];
     for (const vs of valueSignals) {

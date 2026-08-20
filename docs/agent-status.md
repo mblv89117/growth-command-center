@@ -5,64 +5,66 @@
 | project | GCC Client Value OS |
 | primary repo | growth-command-center |
 | branch | `cursor/gcc-client-value-os` |
-| current SHA | 3d5384f |
+| current SHA | (pending push) |
 | baseline | `cursor/gcc-hv-completion-52d1` @ `62f98cc` · main merge-base `fb986cb` |
 | owned domains | Client financial intelligence, cash/forecast/KPIs, executive cockpit, value realization, renewal/value evidence, GCC→Atlas value signals (adapter) |
-| files/domains touched | `src/lib/cvos/**`, `src/app/(dashboard)/cockpit|value-creation|executive-brief|signals`, `src/app/api/cvos/**`, `supabase/setup.sql`, QBO OAuth state, Integration adapter |
-| contracts required | `atlas-gcc-client-activation.v1` (consume) · `atlas-gcc-client-context.v1` (consume) · **SoT** `gcc-value-signal.v1` (Integration `8fc711f`) · local source `gcc-atlas-signal.v1` · `gcc-atlas-capital-signal.v1` · `gcc-gtm-feedback.v1` |
-| tests | `npm test` — isolation + handoff + CVOS journey + RT remediation |
+| files/domains touched | auth org resolution, `/api/tenant`, `/api/reports/export`, Atlas handoff HMAC, CVOS APIs, Integration SoT adapter |
+| contracts required | `atlas-gcc-client-activation.v1` · **SoT** `gcc-value-signal.v1` @ Integration `773b510` · local `gcc-atlas-signal.v1` · capital + GTM feedback |
+| tests | `npm test` |
 | build | `npm run typecheck` + `npm run build` |
-| synthetic certification | PASS (SYN01 unit journey + demo UI walkthrough) |
-| security status | P0 remediations landed for GCC-RT-01/02/03 (SQL + signed QBO state); independent RT revalidation pending · P1 remaining (RBAC sales, handoff HMAC) |
-| Premium status | PASS (demo rendered cockpit / value / brief / signals) |
-| integration dependencies | Platform Integration SoT `8fc711f` · Atlas commercial authority · GTM feedback aggregate (non-sensitive) |
-| P0 | 0 claimed closed on tip for GCC-RT-01/02/03 (await independent RT revalidation) |
-| P1 | open — GCC-RT-05..08 (derive tenant from auth-only; sales financial gate; activation HMAC; demo KPI writes) |
-| P2 | open — middleware depth, demo cookie in prod when ALLOW_DEMO_MODE |
-| owner decisions | OD-003 YES (Integration SoT) — adapting · OD-005 N/A for GCC deploy · **no production deploy** |
-| deployment state | `REMOTE-REACHABLE` · not `DEPLOYMENT-READY` · **not authorized for production** |
+| synthetic certification | PASS (prior SYN01 + unit journey retained) |
+| security status | P0 tip closed (RT-01/02/03) · P1 tip remediations RT-05/06/07 this cycle · await independent RT revalidation |
+| Premium status | N/A this cycle (no UI surface changes) |
+| integration dependencies | Platform Integration SoT `773b510` · Red Team revalidation · Atlas commercial authority |
+| P0 | none (claimed on tip; RT Directive 10 closed 01/02/03) |
+| P1 | none claimed on tip after RT-05/06/07 remediations (await independent RT) |
+| P2 | none tracked this cycle |
+| owner decisions | OD-003 YES — consume Integration SoT · **no production deploy** · no live Supabase migrate from agent |
+| deployment state | `REMOTE_REACHABLE` · not `DEPLOYMENT_READY` |
 
 ## LAST ORCHESTRATOR DIRECTIVE VERSION CONSUMED
 
 | Field | Value |
 |-------|-------|
-| Directive source | `360-growth-solution` `cursor/platform-orchestrator-b1fa` |
-| Directive version | `ORCHESTRATOR_REPORT_2026-08-20T0418Z` + train sheet `trains/C-gcc-client-value-os.md` |
-| Orchestrator remote SHA | `795d5159d1ba9257e7607701fd7aacb9c4fa2bff` |
-| Note | `docs/platform-orchestration/directives/` not present; used `trains/` + `reports/` as control plane |
+| LAST ORCHESTRATOR DIRECTIVE VERSION CONSUMED | **11** |
+| Based on SHA | `b02c1322d5e18ef8bc6699b202515e9137cde6a1` |
+| Based on run ID | `run-04914395-b35a-4ed7-920b-76a26565a3ae` |
+| Orchestrator remote (fetched) | `360-growth-solution` `cursor/platform-orchestrator-b1fa` @ `af3081d` |
+| Integration SoT consumed | `hvcg-05` `cursor/platform-integration-contracts` @ `773b510` |
 
-## COMPLETED ACTIONS (this checkpoint)
+## COMPLETED ACTIONS
 
-- Consumed orchestrator control plane without replacing product branch
-- Closed GCC-RT-01: signup trigger → `staff` + `organization_id NULL` (no org-apex COALESCE / metadata trust)
-- Closed GCC-RT-02: RLS WITH CHECK + privilege-escalation trigger on role/org
-- Closed GCC-RT-03: HMAC-signed expiring QBO OAuth state bound to session user
-- CC-006: adapter `toGccValueSignal` → Integration SoT `gcc-value-signal.v1` (local models remain UI source)
-- CC-003 preserved: `autoProvisionAccess=false`
-- Regression tests for RT-01/02/03 + CC-006 adapter
-- Status artifacts updated
+- Acknowledged Directive 11 explicitly
+- GCC-RT-05: session-authoritative org for tenant/dashboard/export/CVOS/secure-access (browser org compared only)
+- GCC-RT-06: `requirePermission(..., "financials:read")` on GET `/api/tenant`; `reports:export` on export; sales lacks both perms
+- GCC-RT-07: HMAC attestation (`X-Atlas-Gcc-Timestamp` + `X-Atlas-Gcc-Signature`) OR platform_admin; unsigned machine POST → 401
+- Kept RT-01/02/03 regression tests; did not reopen P0s
+- Synced adapter + schema to Integration SoT `gcc-value-signal.v1` @ `773b510` (CC-006); `autoProvisionAccess=false` preserved
+- Did **not** apply live Supabase migrations; did **not** deploy; did **not** CRM-ify GCC
 
 ## REMAINING ACTIONS
 
-- Apply `supabase/migration-rt-20260820-profile-isolation.sql` to live Supabase (ops)
-- Independent Red Team revalidation of GCC-RT-01..03 on this tip
-- P1: sales role financial gate; activation handoff HMAC/mTLS; auth-derived org only
-- Persist CVOS payloads beyond synthetic overlay
-- Integration-certified cross-journey with Revenue OS when that tip lands
-- **No production deploy** until separate authorization + P0/P1=0 gate
+- Independent Red Team revalidation of RT-05/06/07 on tip
+- Ops apply profile-isolation SQL when authorized (out of agent deploy boundary)
+- BUILD_COMPLETE / SYNTHETIC / SECURITY / PREMIUM / INTEGRATION / DEPLOYMENT_READY gates still open until independent certification
+- **No production deploy**
 
-## Notes
+## TEST STATUS
 
-- Ignored as already satisfied: CVOS cockpit/value/brief/signals first-run, synthetic journey, app-layer org fail-closed (pre-dated orchestrator 0418Z tip `78cb5d2`)
-- Conflict fail-safe: will not redefine Integration SoT; capital signals never start lender outreach; will not deploy GCC production from this train
+Pending run in this checkpoint — filled after `npm test` / typecheck / build.
 
-## Blockers
+## PREMIUM STATUS
 
-- Independent RT revalidation required before SECURITY-CERTIFIED
-- Live Supabase migration apply is owner/ops (outside agent deploy boundary)
+N/A — no UI changes this directive cycle (API/auth/security/contracts only).
 
-## Next milestone
+## INTEGRATION STATUS
 
-SECURITY-CERTIFIED after RT revalidation of tip · then INTEGRATION-CERTIFIED against Integration `8fc711f` · still not DEPLOYMENT-READY without owner release auth
+Canonical emission via adapter to `gcc-value-signal.v1` (Integration `773b510`). Live Atlas dispatch OFF. Lender outreach forbidden.
 
-**Updated:** 2026-08-20T04:30:00Z
+## OWNER DECISIONS
+
+- Consume Integration SoT (OD-003) — YES
+- Production deploy — NO
+- Live Supabase migration from this agent — NO
+
+**Updated:** 2026-08-20T05:50:00Z

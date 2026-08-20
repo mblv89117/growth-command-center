@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const requested = url.searchParams.get("organizationId");
-    const access = await requireApiAccess({ organizationId: requested });
+    const access = await requireApiAccess();
     requirePermission(access, "reports:read");
 
     const selected = selectOrganizationId({
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       action?: string;
       approvedBy?: string;
     };
-    const access = await requireApiAccess({ organizationId: body.organizationId });
+    const access = await requireApiAccess();
     requirePermission(access, "reports:export");
 
     const selected = selectOrganizationId({

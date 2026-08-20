@@ -69,4 +69,16 @@ describe("GCC organization isolation", () => {
     assert.equal(idor.reason, "organization_mismatch");
     assert.equal(idor.organizationId, "org-syn01");
   });
+
+  it("GCC-RT-05: session org remains authoritative when browser supplies another id", () => {
+    const result = selectOrganizationId({
+      authOrganizationId: "org-summit",
+      requestedOrganizationId: "org-apex",
+      role: "sales",
+    });
+    assert.equal(result.denied, true);
+    // Data layer must keep using auth org, never the browser spoof.
+    assert.equal(result.organizationId, "org-summit");
+    assert.notEqual(result.organizationId, "org-apex");
+  });
 });

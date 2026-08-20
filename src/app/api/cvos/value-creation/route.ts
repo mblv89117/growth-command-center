@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const requested = url.searchParams.get("organizationId");
-    const access = await requireApiAccess({ organizationId: requested });
+    const access = await requireApiAccess();
     requirePermission(access, "financials:read");
 
     const selected = selectOrganizationId({

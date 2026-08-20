@@ -1,24 +1,32 @@
 /**
- * CC-006 reconciliation: adapt GCC local signal models → Integration SoT
- * `gcc-value-signal.v1`. Platform Integration owns canonical meaning.
- * Local `gcc-atlas-signal.v1` remains an internal richer source, not SoT.
+ * CC-006: adapt GCC local signal models → Integration SoT `gcc-value-signal.v1`
+ * Consumed from hvcg-05 `cursor/platform-integration-contracts` @ 773b510.
+ * Mapping table per docs/integrations/schemas/adapters/gcc-atlas-signal-to-value-signal.md
  */
 import type { AtlasOutboundSignal, CapitalSignal, SignalKind } from "./types";
 
 export const GCC_VALUE_SIGNAL_CONTRACT = "gcc-value-signal.v1" as const;
+export const INTEGRATION_SOT_SHA = "773b5101032ccd5218d5563d2177c31722ecf575" as const;
 
 export type GccValueSignalType =
   | "renewal_risk"
   | "expansion_opportunity"
   | "value_realized"
   | "engagement_health"
-  | "ltv_update";
+  | "ltv_update"
+  | "capital_need"
+  | "constraint"
+  | "ai_opportunity"
+  | "process_bottleneck"
+  | "contract_opportunity";
 
 export type GccValueSignal = {
   contractVersion: typeof GCC_VALUE_SIGNAL_CONTRACT;
   signalId: string;
   clientCode: string;
   gccOrganizationId?: string;
+  engagementId?: string;
+  kind?: SignalKind;
   signalType: GccValueSignalType;
   severity?: "low" | "medium" | "high" | "critical";
   summary?: string;
@@ -39,49 +47,51 @@ export type GccValueSignal = {
   };
 };
 
-const KIND_TO_SOT: Partial<Record<SignalKind, GccValueSignalType>> = {
-  high_realized_value: "value_realized",
-  expansion_ready: "expansion_opportunity",
-  contract_opportunity: "expansion_opportunity",
+/** Integration SoT adapter map — do not invent alternate meaning. */
+const KIND_TO_SOT: Record<SignalKind, GccValueSignalType> = {
   renewal_risk: "renewal_risk",
-  financial_deterioration: "renewal_risk",
+  expansion_ready: "expansion_opportunity",
+  high_realized_value: "value_realized",
   low_engagement: "engagement_health",
-  new_constraint: "engagement_health",
-  new_process_bottleneck: "engagement_health",
-  new_ai_opportunity: "expansion_opportunity",
-  new_capital_need: "expansion_opportunity",
+  financial_deterioration: "renewal_risk",
+  new_capital_need: "capital_need",
+  new_constraint: "constraint",
+  new_ai_opportunity: "ai_opportunity",
+  new_process_bottleneck: "process_bottleneck",
+  contract_opportunity: "contract_opportunity",
 };
 
 function mapSeverity(
   severity: AtlasOutboundSignal["severity"],
 ): GccValueSignal["severity"] {
   if (severity === "info") return "low";
-  return severity;
+  if (severity === "critical" || severity === "high" || severity === "medium" || severity === "low") {
+    return severity;
+  }
+  return "medium";
 }
 
-export function toGccValueSignal(signal: AtlasOutboundSignal): GccValueSignal | null {
+export function toGccValueSignal(signal: AtlasOutboundSignal): GccValueSignal {
   const signalType = KIND_TO_SOT[signal.kind];
-  if (!signalType) return null;
-
   return {
     contractVersion: GCC_VALUE_SIGNAL_CONTRACT,
     signalId: signal.signalId,
     clientCode: signal.clientCode,
     gccOrganizationId: signal.gccOrganizationId,
+    engagementId: signal.engagementId,
+    kind: signal.kind,
     signalType,
     severity: mapSeverity(signal.severity),
     summary: signal.summary.slice(0, 2000),
     metrics: {
       ...signal.payload,
-      engagementId: signal.engagementId,
       capitalOpsEligible: signal.capitalOpsEligible,
       requiresAtlasAction: signal.requiresAtlasAction,
-      localContract: "gcc-atlas-signal.v1",
     },
     emittedAt: signal.emittedAt,
     copiesLedger: false,
     envelope: {
-      idempotencyKey: `gcc-signal|${signal.clientCode}|${signal.signalId}`,
+      idempotencyKey: `gcc-signal|${signal.signalId}`,
       sourceSystem: "gcc",
       destinationSystem: "atlas",
       entity: "value_signal",
@@ -95,28 +105,28 @@ export function toGccValueSignal(signal: AtlasOutboundSignal): GccValueSignal | 
   };
 }
 
-/** Capital need is staged separately; map as expansion_opportunity metric only — never lender outreach. */
+/** Capital need → canonical capital_need; never lender outreach. */
 export function capitalToGccValueSignal(capital: CapitalSignal): GccValueSignal {
   return {
     contractVersion: GCC_VALUE_SIGNAL_CONTRACT,
     signalId: capital.signalId,
     clientCode: capital.clientCode,
     gccOrganizationId: capital.gccOrganizationId,
-    signalType: "expansion_opportunity",
+    engagementId: capital.engagementId,
+    kind: "new_capital_need",
+    signalType: "capital_need",
     severity: "medium",
     summary: capital.rationale.slice(0, 2000),
     metrics: {
       estimatedNeed: capital.estimatedNeed ?? null,
       confidence: capital.confidence,
       lenderOutreachAllowed: false,
-      capitalContract: "gcc-atlas-capital-signal.v1",
-      engagementId: capital.engagementId,
       status: capital.status,
     },
     emittedAt: capital.emittedAt,
     copiesLedger: false,
     envelope: {
-      idempotencyKey: `gcc-signal|${capital.clientCode}|${capital.signalId}`,
+      idempotencyKey: `gcc-signal|${capital.signalId}`,
       sourceSystem: "gcc",
       destinationSystem: "atlas",
       entity: "value_signal",
@@ -142,7 +152,10 @@ export function assertGccValueSignal(signal: GccValueSignal): string[] {
     issues.push("envelope systems must be gcc → atlas");
   }
   if (!signal.envelope.idempotencyKey.startsWith("gcc-signal|")) {
-    issues.push("idempotencyKey must use gcc-signal|{ClientCode}|{signalId}");
+    issues.push("idempotencyKey must use gcc-signal|{signalId}");
+  }
+  if (signal.gccOrganizationId && signal.gccOrganizationId === signal.clientCode) {
+    issues.push("gccOrganizationId must never equal ClientCode");
   }
   return issues;
 }

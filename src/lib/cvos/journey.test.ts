@@ -83,15 +83,21 @@ describe("CVOS synthetic client journey", () => {
 
   it("CC-006: adapts local signals to Integration SoT gcc-value-signal.v1", () => {
     const { signals, capital } = detectSignals(SYNTHETIC_ORG_ID);
-    const adapted = signals.map(toGccValueSignal).filter(Boolean);
+    const adapted = signals.map(toGccValueSignal);
     assert.ok(adapted.length >= 3);
     for (const vs of adapted) {
-      assert.deepEqual(assertGccValueSignal(vs!), []);
-      assert.equal(vs!.contractVersion, "gcc-value-signal.v1");
-      assert.equal(vs!.copiesLedger, false);
+      assert.deepEqual(assertGccValueSignal(vs), []);
+      assert.equal(vs.contractVersion, "gcc-value-signal.v1");
+      assert.equal(vs.copiesLedger, false);
+      assert.ok(vs.kind);
     }
+    assert.equal(
+      adapted.find((s) => s.kind === "new_capital_need")?.signalType,
+      "capital_need",
+    );
     const cap = capitalToGccValueSignal(capital[0]);
     assert.deepEqual(assertGccValueSignal(cap), []);
+    assert.equal(cap.signalType, "capital_need");
     assert.equal(cap.metrics?.lenderOutreachAllowed, false);
   });
 

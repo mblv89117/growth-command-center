@@ -15,6 +15,11 @@ export function resolveAuthenticatedOrganizationId(input: {
   return null;
 }
 
+/**
+ * GCC-RT-05: organization is derived from the authenticated session only.
+ * Browser-supplied organizationId may be compared for mismatch detection but is
+ * never authoritative for non-platform_admin roles.
+ */
 export function selectOrganizationId(input: {
   authOrganizationId: string;
   requestedOrganizationId?: string | null;
@@ -29,9 +34,27 @@ export function selectOrganizationId(input: {
     return { organizationId: authOrg, denied: false };
   }
   if (input.role === "platform_admin") {
+    // Platform admin may switch tenant deliberately; session still authenticates the actor.
     return { organizationId: requested, denied: false };
   }
+  // Fail closed: keep session org, deny the request.
   return { organizationId: authOrg, denied: true, reason: "organization_mismatch" };
+}
+
+/**
+ * Resolve the organization id that MUST be used for data access.
+ * Always returns the session org for non-admins (never the browser string).
+ */
+export function resolveDataOrganizationId(input: {
+  authOrganizationId: string;
+  requestedOrganizationId?: string | null;
+  role: string;
+}): string {
+  const selected = selectOrganizationId(input);
+  if (selected.denied) {
+    throw new Error(selected.reason ?? "organization_mismatch");
+  }
+  return selected.organizationId;
 }
 
 export function publicSignupOrganizationId(): null {
