@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://highvaluecapitalgroup.com/contracts/atlas-gcc-client-context.v1.json",
+  "title": "Atlas → GCC client commercial context v1",
+  "description": "Versioned commercial context consumed by GCC after Active Client activation. Canonical ownership: Platform Integration. GCC consumes; does not redefine.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "clientCode",
+    "engagementId",
+    "displayName",
+    "offer",
+    "serviceFamily",
+    "engagementStart",
+    "renewalDate",
+    "targets",
+    "approvedKpis",
+    "ninetyDayPriorities",
+    "commercial",
+    "gccOrganizationId"
+  ],
+  "properties": {
+    "contractVersion": { "const": "atlas-gcc-client-context.v1" },
+    "clientCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{2,15}$" },
+    "engagementId": { "type": "string", "minLength": 1 },
+    "displayName": { "type": "string" },
+    "offer": { "type": "string" },
+    "serviceFamily": { "type": "string" },
+    "engagementStart": { "type": "string" },
+    "renewalDate": { "type": "string" },
+    "targets": { "type": "object" },
+    "approvedKpis": { "type": "array" },
+    "ninetyDayPriorities": { "type": "array" },
+    "commercial": { "type": "object" },
+    "gccOrganizationId": { "type": "string", "minLength": 1 }
+  }
+}

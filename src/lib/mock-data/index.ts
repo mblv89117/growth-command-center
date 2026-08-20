@@ -55,6 +55,20 @@ export const ORGANIZATIONS: Organization[] = [
       currency: "USD",
     },
   },
+  {
+    id: "org-syn01",
+    name: "SYNTHETIC QA — Meridian Industrial Services",
+    slug: "syn01",
+    industry: "Industrial Services",
+    plan: "enterprise",
+    createdAt: "2026-05-01",
+    settings: {
+      cashAlertThreshold: 350000,
+      forecastHorizonWeeks: 13,
+      fiscalYearStart: 1,
+      currency: "USD",
+    },
+  },
 ];
 
 export const CURRENT_USER: User = {

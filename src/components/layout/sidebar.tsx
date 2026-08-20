@@ -7,12 +7,16 @@ import {
   BarChart3,
   Building2,
   FileText,
+  Gauge,
   GitBranch,
   LayoutDashboard,
   Link2,
   LogOut,
+  Radio,
+  ScrollText,
   Settings,
   Shield,
+  Sparkles,
   Target,
   TrendingUp,
   Users,
@@ -35,7 +39,11 @@ import { Menu } from "lucide-react";
 import type { UserRole } from "@/lib/types";
 
 const navigation = [
+  { name: "Executive Cockpit", href: "/cockpit", icon: Gauge },
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Value Creation", href: "/value-creation", icon: Sparkles },
+  { name: "Executive Brief", href: "/executive-brief", icon: ScrollText },
+  { name: "Signals", href: "/signals", icon: Radio },
   { name: "Cash Forecast", href: "/cash-forecast", icon: Wallet },
   { name: "Financials", href: "/financials", icon: BarChart3 },
   { name: "Sales Pipeline", href: "/sales-pipeline", icon: Target },

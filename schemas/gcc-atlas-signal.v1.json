@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://highvaluecapitalgroup.com/contracts/gcc-atlas-signal.v1.json",
+  "title": "GCC → Atlas renewal/expansion signal v1",
+  "description": "Structured commercial signals from GCC to Atlas. Atlas remains commercial authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "signalId",
+    "kind",
+    "clientCode",
+    "engagementId",
+    "gccOrganizationId",
+    "emittedAt",
+    "summary",
+    "severity",
+    "payload",
+    "requiresAtlasAction",
+    "capitalOpsEligible"
+  ],
+  "properties": {
+    "contractVersion": { "const": "gcc-atlas-signal.v1" },
+    "signalId": { "type": "string" },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "high_realized_value",
+        "new_constraint",
+        "new_capital_need",
+        "new_ai_opportunity",
+        "new_process_bottleneck",
+        "contract_opportunity",
+        "financial_deterioration",
+        "low_engagement",
+        "renewal_risk",
+        "expansion_ready"
+      ]
+    },
+    "clientCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{2,15}$" },
+    "engagementId": { "type": "string" },
+    "gccOrganizationId": { "type": "string" },
+    "emittedAt": { "type": "string", "format": "date-time" },
+    "summary": { "type": "string" },
+    "severity": { "type": "string" },
+    "payload": { "type": "object" },
+    "requiresAtlasAction": { "type": "boolean" },
+    "capitalOpsEligible": { "type": "boolean" }
+  }
+}

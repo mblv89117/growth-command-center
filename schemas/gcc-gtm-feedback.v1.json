@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://highvaluecapitalgroup.com/contracts/gcc-gtm-feedback.v1.json",
+  "title": "GCC → GTM aggregated feedback v1",
+  "description": "Aggregated non-sensitive value signals for eventual GTM learning. Excludes raw client financials.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "periodLabel",
+    "serviceLine",
+    "clientRetentionSignal",
+    "expansionSignal",
+    "engagementHealth",
+    "valueRealization",
+    "outcomeCategories",
+    "sensitiveFinancialExcluded"
+  ],
+  "properties": {
+    "contractVersion": { "const": "gcc-gtm-feedback.v1" },
+    "periodLabel": { "type": "string" },
+    "serviceLine": { "type": "string" },
+    "clientRetentionSignal": { "enum": ["strong", "stable", "at_risk"] },
+    "expansionSignal": { "enum": ["ready", "watch", "none"] },
+    "engagementHealth": { "enum": ["healthy", "mixed", "weak"] },
+    "valueRealization": { "enum": ["high", "moderate", "low"] },
+    "outcomeCategories": { "type": "array", "items": { "type": "string" } },
+    "ltvBand": { "enum": ["a", "b", "c", null] },
+    "sensitiveFinancialExcluded": { "const": true }
+  }
+}

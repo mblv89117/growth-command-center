@@ -58,4 +58,15 @@ describe("GCC organization isolation", () => {
     assert.equal(isDemoOrganizationId(DEMO_TENANT_ID), true);
     assert.equal(isDemoOrganizationId("org-summit"), false);
   });
+
+  it("denies cross-org CVOS IDOR for non-admin roles", () => {
+    const idor = selectOrganizationId({
+      authOrganizationId: "org-syn01",
+      requestedOrganizationId: "org-apex",
+      role: "cfo",
+    });
+    assert.equal(idor.denied, true);
+    assert.equal(idor.reason, "organization_mismatch");
+    assert.equal(idor.organizationId, "org-syn01");
+  });
 });
