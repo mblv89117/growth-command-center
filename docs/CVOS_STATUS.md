@@ -1,7 +1,7 @@
 # GCC Client Value OS — Checkpoint Status
 
 **Branch:** `cursor/gcc-client-value-os`  
-**CURRENT SHA:** (set at push)  
+**CURRENT SHA:** fac5641  
 **Lineage:** `origin/cursor/gcc-hv-completion-52d1` @ `62f98cc`  
 **As of:** 2026-08-20  
 

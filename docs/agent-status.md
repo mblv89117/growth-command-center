@@ -5,7 +5,7 @@
 | project | GCC Client Value OS |
 | primary repo | growth-command-center |
 | branch | `cursor/gcc-client-value-os` |
-| current SHA | (see tip after push) |
+| current SHA | fac5641 |
 | baseline | `cursor/gcc-hv-completion-52d1` @ `62f98cc` · main merge-base `fb986cb` |
 | owned domains | Client financial intelligence, cash/forecast/KPIs, executive cockpit, value realization, renewal/value evidence, GCC→Atlas value signals (adapter) |
 | files/domains touched | `src/lib/cvos/**`, `src/app/(dashboard)/cockpit|value-creation|executive-brief|signals`, `src/app/api/cvos/**`, `supabase/setup.sql`, QBO OAuth state, Integration adapter |
