@@ -4,6 +4,7 @@ import { authErrorResponse } from "@/lib/auth/api";
 import { requireApiAccess, requirePermission } from "@/lib/auth/access";
 import { sanitizeConnectionForClient } from "@/lib/integrations/types";
 import { connectQuickBooksDemo, getQuickBooksAuthUrl } from "@/lib/integrations/quickbooks";
+import { createSignedQuickBooksState } from "@/lib/integrations/oauth-state";
 
 export async function POST(request: Request) {
   try {
@@ -34,7 +35,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const state = Buffer.from(JSON.stringify({ organizationId })).toString("base64url");
+    const state = createSignedQuickBooksState({
+      organizationId: access.organizationId,
+      userId: access.userId,
+    });
     return NextResponse.json({ mode: "oauth", authUrl: getQuickBooksAuthUrl(state) });
   } catch (error) {
     return authErrorResponse(error);

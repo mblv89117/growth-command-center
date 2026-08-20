@@ -170,7 +170,7 @@ CREATE POLICY "Org members read alerts" ON alerts
     organization_id IN (SELECT organization_id FROM profiles WHERE id = auth.uid())
   );
 
--- Signup trigger — organization_id is TEXT e.g. org-apex
+-- Signup trigger — invite-only org mapping; never default to org-apex; never trust metadata role/org
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -178,9 +178,10 @@ BEGIN
   VALUES (
     NEW.id,
     NEW.raw_user_meta_data->>'full_name',
-    COALESCE(NEW.raw_user_meta_data->>'role', 'founder'),
-    COALESCE(NEW.raw_user_meta_data->>'organization_id', 'org-apex')
-  );
+    'staff',
+    NULL
+  )
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -3,6 +3,11 @@ import { authErrorResponse } from "@/lib/auth/api";
 import { requireApiAccess, requirePermission } from "@/lib/auth/access";
 import { selectOrganizationId } from "@/lib/auth/organization";
 import { assertCapitalSignalGovernance, detectSignals } from "@/lib/cvos/signals";
+import {
+  assertGccValueSignal,
+  capitalToGccValueSignal,
+  toGccValueSignal,
+} from "@/lib/cvos/value-signal-adapter";
 
 export const runtime = "nodejs";
 
@@ -30,13 +35,30 @@ export async function GET(req: Request) {
       }
     }
 
+    // CC-006: emit Integration SoT alongside local richer models (adapter, not dual SoT).
+    const valueSignals = [
+      ...signals.map(toGccValueSignal).filter((s): s is NonNullable<typeof s> => Boolean(s)),
+      ...capital.map(capitalToGccValueSignal),
+    ];
+    for (const vs of valueSignals) {
+      const issues = assertGccValueSignal(vs);
+      if (issues.length > 0) {
+        return NextResponse.json({ error: "invalid_value_signal", issues }, { status: 500 });
+      }
+    }
+
     return NextResponse.json({
       contractVersions: {
-        signals: "gcc-atlas-signal.v1",
+        canonical: "gcc-value-signal.v1",
+        localSource: "gcc-atlas-signal.v1",
         capital: "gcc-atlas-capital-signal.v1",
       },
       atlasCommercialAuthority: true,
       lenderOutreachStarted: false,
+      copiesLedger: false,
+      /** Integration SoT payloads for Atlas consumption */
+      valueSignals,
+      /** Local richer models retained for cockpit UI */
       signals,
       capital,
     });

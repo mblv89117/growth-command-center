@@ -14,6 +14,11 @@ import {
   detectSignals,
   getGtmFeedback,
 } from "./signals.ts";
+import {
+  assertGccValueSignal,
+  capitalToGccValueSignal,
+  toGccValueSignal,
+} from "./value-signal-adapter.ts";
 import { SYNTHETIC_ORG_ID, SYN01_VALUE_INITIATIVES } from "./synthetic.ts";
 
 describe("CVOS synthetic client journey", () => {
@@ -74,6 +79,20 @@ describe("CVOS synthetic client journey", () => {
     assert.equal(capital.length, 1);
     assert.deepEqual(assertCapitalSignalGovernance(capital[0]), []);
     assert.equal(capital[0].lenderOutreachAllowed, false);
+  });
+
+  it("CC-006: adapts local signals to Integration SoT gcc-value-signal.v1", () => {
+    const { signals, capital } = detectSignals(SYNTHETIC_ORG_ID);
+    const adapted = signals.map(toGccValueSignal).filter(Boolean);
+    assert.ok(adapted.length >= 3);
+    for (const vs of adapted) {
+      assert.deepEqual(assertGccValueSignal(vs!), []);
+      assert.equal(vs!.contractVersion, "gcc-value-signal.v1");
+      assert.equal(vs!.copiesLedger, false);
+    }
+    const cap = capitalToGccValueSignal(capital[0]);
+    assert.deepEqual(assertGccValueSignal(cap), []);
+    assert.equal(cap.metrics?.lenderOutreachAllowed, false);
   });
 
   it("emits aggregated GTM feedback without sensitive financials", () => {
