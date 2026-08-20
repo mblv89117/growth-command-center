@@ -37,6 +37,10 @@ export const PUBLIC_ROUTES = ["/login", "/signup", "/auth/callback"];
 
 export const PROTECTED_PREFIXES = [
   "/dashboard",
+  "/cockpit",
+  "/value-creation",
+  "/executive-brief",
+  "/signals",
   "/cash-forecast",
   "/financials",
   "/sales-pipeline",

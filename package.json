@@ -7,6 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit --incremental false",
+    "test:isolation": "node --experimental-strip-types --test src/lib/auth/organization.test.ts",
+    "test:handoff": "node --experimental-strip-types --test src/lib/handoff/atlas-activation.test.ts",
+    "test:cvos": "tsx --test src/lib/cvos/journey.test.ts",
+    "test:security": "tsx --test src/lib/security/rt-remediation.test.ts",
+    "test": "npm run test:isolation && npm run test:handoff && npm run test:cvos && npm run test:security",
     "smoke:auth": "node scripts/smoke-auth.mjs",
     "db:seed": "node --env-file=.env.local scripts/seed-supabase.mjs",
     "db:setup": "node --env-file=.env.local scripts/run-supabase-sql.mjs setup",
@@ -20,7 +26,8 @@
     "smtp:rate-limit-and-test": "node scripts/smtp-rate-limit-and-test.mjs",
     "smtp:check-resend": "node scripts/check-resend-domain.mjs",
     "smtp:resend-dns": "node scripts/resend-domain-dns.mjs",
-    "smtp:configure-resend": "SMTP_PROVIDER=resend node scripts/configure-supabase-smtp.mjs"
+    "smtp:configure-resend": "SMTP_PROVIDER=resend node scripts/configure-supabase-smtp.mjs",
+    "fixture:cvos": "tsx scripts/fixture-synthetic-cvos-path.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
@@ -64,6 +71,7 @@
     "pg": "^8.16.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.19.3",
     "typescript": "^5"
   }
 }

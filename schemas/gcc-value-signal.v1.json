@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://highvaluecapitalgroup.com/contracts/gcc-value-signal.v1.json",
+  "title": "GCC Value Signal v1",
+  "description": "CANONICAL GCC client-value intelligence signal to Atlas. Producer-local gcc-atlas-signal.v1 MUST adapt into this shape. Not a CRM write of GCC ledgers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "signalId",
+    "clientCode",
+    "signalType",
+    "emittedAt",
+    "envelope"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "gcc-value-signal.v1"
+    },
+    "signalId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "clientCode": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9]{2,15}$"
+    },
+    "gccOrganizationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "signalType": {
+      "type": "string",
+      "enum": [
+        "renewal_risk",
+        "expansion_opportunity",
+        "value_realized",
+        "engagement_health",
+        "ltv_update",
+        "capital_need",
+        "constraint",
+        "ai_opportunity",
+        "process_bottleneck",
+        "contract_opportunity"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "number",
+          "string",
+          "boolean",
+          "null"
+        ]
+      }
+    },
+    "emittedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "copiesLedger": {
+      "const": false
+    },
+    "envelope": {
+      "$ref": "./write-envelope.v1.json"
+    },
+    "kind": {
+      "type": "string",
+      "description": "Optional GCC producer kind preserved after adapter map.",
+      "enum": [
+        "high_realized_value",
+        "new_constraint",
+        "new_capital_need",
+        "new_ai_opportunity",
+        "new_process_bottleneck",
+        "contract_opportunity",
+        "financial_deterioration",
+        "low_engagement",
+        "renewal_risk",
+        "expansion_ready"
+      ]
+    },
+    "engagementId": {
+      "type": "string",
+      "maxLength": 255
+    }
+  }
+}

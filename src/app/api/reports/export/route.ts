@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { ValidationError } from "@/lib/api/errors";
 import { getFullTenantData } from "@/lib/data/tenant";
 import { authErrorResponse } from "@/lib/auth/api";
-import { requireApiAccess } from "@/lib/auth/access";
+import { requireApiAccess, requirePermission } from "@/lib/auth/access";
+import { selectOrganizationId } from "@/lib/auth/organization";
 import {
   buildExportFilename,
   parseExportFormat,
@@ -13,13 +14,10 @@ import { generateExcelReport, generatePdfReport } from "@/lib/reports/generate";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const organizationId = searchParams.get("organizationId");
+    const requested = searchParams.get("organizationId");
     const reportType = parseReportType(searchParams.get("type"));
     const format = parseExportFormat(searchParams.get("format"));
 
-    if (!organizationId) {
-      throw new ValidationError("organizationId is required");
-    }
     if (!reportType) {
       throw new ValidationError("Invalid report type");
     }
@@ -27,8 +25,19 @@ export async function GET(request: Request) {
       throw new ValidationError("Invalid export format");
     }
 
-    await requireApiAccess({ organizationId });
+    const access = await requireApiAccess();
+    requirePermission(access, "reports:export");
 
+    const selected = selectOrganizationId({
+      authOrganizationId: access.organizationId,
+      requestedOrganizationId: requested,
+      role: access.role,
+    });
+    if (selected.denied) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const organizationId = selected.organizationId;
     const { data } = await getFullTenantData(organizationId);
     const filename = buildExportFilename(reportType, organizationId, format);
 

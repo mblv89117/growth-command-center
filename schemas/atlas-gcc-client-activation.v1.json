@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://highvaluecapitalgroup.com/contracts/atlas-gcc-client-activation.v1.json",
+  "title": "Atlas Active Client to GCC tenant mapping v1",
+  "description": "Persist-only handoff after Atlas ClientStage becomes Active Client. Does not provision users, create CRM records, or grant GCC access.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "idempotencyKey", "client", "activation", "gcc", "governance"],
+  "properties": {
+    "contractVersion": { "const": "atlas-gcc-client-activation.v1" },
+    "emittedAt": { "type": "string", "format": "date-time" },
+    "idempotencyKey": { "type": "string", "pattern": "^gcc-activate\\|" },
+    "source": { "type": "object" },
+    "client": {
+      "type": "object",
+      "required": ["clientCode", "displayName", "clientStage"],
+      "properties": {
+        "clientCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{2,15}$" },
+        "displayName": { "type": "string" },
+        "clientStage": { "const": "Active Client" }
+      }
+    },
+    "activation": { "type": "object" },
+    "gcc": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "action": { "const": "prepare_tenant_mapping" }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "required": ["autoProvisionAccess", "duplicateAtlasCrm"],
+      "properties": {
+        "autoProvisionAccess": { "const": false },
+        "duplicateAtlasCrm": { "const": false }
+      }
+    },
+    "attribution": { "type": "object" }
+  }
+}

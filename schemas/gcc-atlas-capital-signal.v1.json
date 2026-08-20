@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://highvaluecapitalgroup.com/contracts/gcc-atlas-capital-signal.v1.json",
+  "title": "GCC → Atlas capital need signal v1",
+  "description": "Governed capital-need signal. Does not start lender outreach. Atlas Capital Operations is authoritative.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "signalId",
+    "clientCode",
+    "engagementId",
+    "gccOrganizationId",
+    "emittedAt",
+    "rationale",
+    "confidence",
+    "lenderOutreachAllowed",
+    "status"
+  ],
+  "properties": {
+    "contractVersion": { "const": "gcc-atlas-capital-signal.v1" },
+    "signalId": { "type": "string" },
+    "clientCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{2,15}$" },
+    "engagementId": { "type": "string" },
+    "gccOrganizationId": { "type": "string" },
+    "emittedAt": { "type": "string", "format": "date-time" },
+    "rationale": { "type": "string" },
+    "estimatedNeed": { "type": "number" },
+    "confidence": { "enum": ["VERIFIED", "ESTIMATED", "INFERRED"] },
+    "lenderOutreachAllowed": { "const": false },
+    "status": { "enum": ["detected", "staged", "acknowledged"] }
+  }
+}
