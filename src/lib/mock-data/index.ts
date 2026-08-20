@@ -302,8 +302,69 @@ export const PLATFORM_TENANTS: PlatformTenant[] = [
   { id: "org-legacy", name: "Legacy Builders Inc", plan: "Starter", users: 2, mrr: 0, status: "churned", createdAt: "2023-11-01" },
 ];
 
+function emptyFinancialSnapshot(): FinancialSnapshot {
+  return {
+    currentCash: 0,
+    forecastedCash: 0,
+    revenueMTD: 0,
+    revenueYTD: 0,
+    grossProfit: 0,
+    netProfit: 0,
+    operatingExpenses: 0,
+    accountsReceivable: 0,
+    accountsPayable: 0,
+    burnRate: 0,
+    runway: 0,
+    debtObligations: 0,
+    payrollObligations: 0,
+    ebitda: 0,
+  };
+}
+
+export function emptyTenantData(organizationId: string): TenantData {
+  return {
+    organization: {
+      id: organizationId || "org-unassigned",
+      name: "Unassigned workspace",
+      slug: "unassigned",
+      industry: "",
+      plan: "starter",
+      createdAt: new Date().toISOString(),
+      settings: {
+        cashAlertThreshold: 0,
+        forecastHorizonWeeks: 13,
+        fiscalYearStart: 1,
+        currency: "USD",
+      },
+    },
+    users: [],
+    financialSnapshot: emptyFinancialSnapshot(),
+    monthlyTrends: [],
+    budgetVsActual: [],
+    forecastAssumptions: [],
+    cashForecastWeeks: [],
+    cashForecastMonths: [],
+    scenarios: [],
+    opportunities: [],
+    jobs: [],
+    invoices: [],
+    bills: [],
+    alerts: [],
+    kpis: [],
+    integrations: [],
+    reports: [],
+    teamMembers: [],
+    transactions: [],
+    expenseCategories: [],
+    revenueSources: [],
+    arAging: [],
+    apAging: [],
+  };
+}
+
 export function getTenantData(organizationId: string): TenantData {
-  const organization = ORGANIZATIONS.find((o) => o.id === organizationId) ?? ORGANIZATIONS[0];
+  const organization = ORGANIZATIONS.find((o) => o.id === organizationId);
+  if (!organization) return emptyTenantData(organizationId);
   return {
     organization,
     users: TEAM_MEMBERS.map((m) => ({

@@ -25,7 +25,7 @@ function mapAuthUser(
     email: authUser.email ?? "",
     name: (metadata.full_name as string) ?? authUser.email?.split("@")[0] ?? "User",
     role: serverRole ?? ((metadata.role as UserRole) ?? "founder"),
-    organizationId: serverOrganizationId ?? ((metadata.organization_id as string) ?? ORGANIZATIONS[0].id),
+    organizationId: serverOrganizationId ?? ((metadata.organization_id as string) ?? ""),
     lastActiveAt: new Date().toISOString(),
   };
 }
@@ -52,11 +52,26 @@ export function TenantProvider({
   const organization =
     serverOrganization ??
     ORGANIZATIONS.find((org) => org.id === mappedUser.organizationId) ??
-    ORGANIZATIONS[0];
+    (demoMode && !authUser
+      ? ORGANIZATIONS[0]
+      : {
+          id: mappedUser.organizationId || "org-unassigned",
+          name: "Unassigned workspace",
+          slug: "unassigned",
+          industry: "",
+          plan: "starter" as const,
+          createdAt: new Date().toISOString(),
+          settings: {
+            cashAlertThreshold: 0,
+            forecastHorizonWeeks: 13,
+            fiscalYearStart: 1,
+            currency: "USD",
+          },
+        });
 
   const user: User = {
     ...mappedUser,
-    organizationId: organization.id,
+    organizationId: mappedUser.organizationId || organization.id,
     name: demoMode && !authUser ? CURRENT_USER.name : mappedUser.name,
   };
 

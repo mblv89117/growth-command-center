@@ -1,4 +1,4 @@
-import { getTenantData } from "@/lib/mock-data";
+import { emptyTenantData, getTenantData } from "@/lib/mock-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/config";
@@ -123,13 +123,14 @@ export async function getDashboardData(organizationId: string): Promise<Dashboar
   const adminScoped = await fetchFromSupabase(organizationId, true);
   if (adminScoped) return adminScoped;
 
-  const mock = getTenantData(organizationId);
+  // Fail closed: do not substitute Apex demo numbers for an unknown tenant.
+  const empty = emptyTenantData(organizationId);
   return {
-    financialSnapshot: mock.financialSnapshot,
-    monthlyTrends: mock.monthlyTrends,
-    budgetVsActual: mock.budgetVsActual,
-    kpis: mock.kpis,
-    alerts: mock.alerts,
+    financialSnapshot: empty.financialSnapshot,
+    monthlyTrends: empty.monthlyTrends,
+    budgetVsActual: empty.budgetVsActual,
+    kpis: empty.kpis,
+    alerts: empty.alerts,
     source: "mock",
   };
 }

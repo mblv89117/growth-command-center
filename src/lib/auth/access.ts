@@ -54,6 +54,7 @@ export async function requireApiAccess(options?: {
 
   const auth = await getAuthContext();
   if (!auth) throw new AuthError("Unauthorized", 401);
+  if (!auth.organizationId) throw new AuthError("Organization mapping required", 403);
 
   if (
     options?.organizationId &&
