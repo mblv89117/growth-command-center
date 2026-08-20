@@ -1,7 +1,7 @@
 # GCC Client Value OS — Checkpoint Status
 
 **Branch:** `cursor/gcc-client-value-os`  
-**SHA:** `2603117`  
+**SHA:** `f1bc2a7`  
 **Lineage:** branched from `origin/cursor/gcc-hv-completion-52d1` @ `62f98cc` (not from main)  
 **As of:** 2026-08-20  
 **Owner:** Cursor Cloud Agent  
