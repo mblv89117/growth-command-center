@@ -5,7 +5,7 @@
 | project | GCC Client Value OS |
 | primary repo | growth-command-center |
 | branch | `cursor/gcc-client-value-os` |
-| current SHA | b88f882 |
+| current SHA | 98043c9 |
 | baseline | `cursor/gcc-hv-completion-52d1` @ `62f98cc` |
 | owned domains | Client financial intelligence, executive cockpit, value creation, signals adapter |
 | contracts required | `atlas-gcc-client-activation.v1` · SoT `gcc-value-signal.v1` @ Integration `773b510` |
