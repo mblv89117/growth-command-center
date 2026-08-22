@@ -34,6 +34,7 @@ export const ORGANIZATIONS: Organization[] = [
     industry: "Commercial Construction",
     plan: "growth",
     createdAt: "2023-06-15",
+    clientCode: "SYNQA01",
     settings: {
       cashAlertThreshold: 150000,
       forecastHorizonWeeks: 13,
@@ -48,6 +49,7 @@ export const ORGANIZATIONS: Organization[] = [
     industry: "Residential Renovation",
     plan: "starter",
     createdAt: "2024-01-10",
+    clientCode: "SYNQB02",
     settings: {
       cashAlertThreshold: 75000,
       forecastHorizonWeeks: 13,

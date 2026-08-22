@@ -38,6 +38,8 @@ export interface Organization {
   industry: string;
   plan: "starter" | "growth" | "enterprise";
   createdAt: string;
+  /** HVCG ClientCode. Logical GCC isolation key. Never a wildcard. */
+  clientCode?: string;
   settings: OrganizationSettings;
 }
 
