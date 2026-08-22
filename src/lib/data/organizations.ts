@@ -15,6 +15,7 @@ function isPlan(value: unknown): value is Organization["plan"] {
 
 export function mapOrganizationRow(row: Record<string, unknown>): Organization {
   const settings = (row.settings as Record<string, unknown> | null) ?? {};
+  const clientCodeRaw = String(row.client_code ?? settings.clientCode ?? "").trim();
   return {
     id: String(row.id),
     name: String(row.name ?? "Organization"),
@@ -22,6 +23,7 @@ export function mapOrganizationRow(row: Record<string, unknown>): Organization {
     industry: String(row.industry ?? ""),
     plan: isPlan(row.plan) ? row.plan : "starter",
     createdAt: String(row.created_at ?? new Date().toISOString()).slice(0, 10),
+    clientCode: clientCodeRaw || undefined,
     settings: {
       cashAlertThreshold: Number(settings.cashAlertThreshold ?? DEFAULT_SETTINGS.cashAlertThreshold),
       forecastHorizonWeeks: Number(settings.forecastHorizonWeeks ?? DEFAULT_SETTINGS.forecastHorizonWeeks),
