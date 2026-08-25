@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export function SignupForm() {
   const [name, setName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -30,15 +31,16 @@ export function SignupForm() {
       return;
     }
 
-    const { error: authError } = await supabase.auth.signUp({
+    const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           full_name: name,
+          company_name: companyName.trim(),
           role: "founder",
-          organization_id: "org-apex",
         },
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
       },
     });
 
@@ -48,7 +50,17 @@ export function SignupForm() {
       return;
     }
 
-    setMessage("Check your email to confirm your account, then sign in.");
+    if (data.session) {
+      await fetch("/api/tenants/provision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyName: companyName.trim() }),
+      });
+      window.location.href = "/onboarding";
+      return;
+    }
+
+    setMessage("Check your email to confirm your account, then sign in to complete setup.");
     setLoading(false);
   };
 
@@ -71,6 +83,16 @@ export function SignupForm() {
                 placeholder="Sarah Chen"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="company">Company Name</Label>
+              <Input
+                id="company"
+                placeholder="Acme Services LLC"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
                 required
               />
             </div>

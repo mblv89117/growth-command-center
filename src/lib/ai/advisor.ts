@@ -6,6 +6,7 @@ import {
   getPriorityAlerts,
 } from "@/lib/ai/kpi-risk";
 import type { DashboardData } from "@/lib/data/dashboard";
+import { computeWorkingCapital } from "@/lib/financial/deltas";
 import { ServiceUnavailableError } from "@/lib/api/errors";
 
 const ADVISOR_MODEL = "claude-sonnet-4-6";
@@ -14,19 +15,20 @@ export interface AdvisorRequestContext {
   organizationName: string;
   department?: string;
   dashboard: DashboardData;
+  userMessage?: string;
+  conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
 }
 
-function buildAdvisorPrompt(context: AdvisorRequestContext): string {
-  const { dashboard, organizationName, department } = context;
+function buildDataContext(context: AdvisorRequestContext): string {
+  const { dashboard, organizationName } = context;
   const atRiskKpis = getAtRiskKpis(dashboard.kpis);
   const financialSignals = getFinancialRiskSignals(dashboard.financialSnapshot);
   const priorityAlerts = getPriorityAlerts(dashboard.alerts);
+  const workingCapital = computeWorkingCapital(dashboard.financialSnapshot);
 
   const kpiLines =
     atRiskKpis.length > 0
-      ? atRiskKpis
-          .map((item) => `- [${item.level.toUpperCase()}] ${item.reason}`)
-          .join("\n")
+      ? atRiskKpis.map((item) => `- [${item.level.toUpperCase()}] ${item.reason}`).join("\n")
       : "- No KPI targets flagged as red/yellow";
 
   const alertLines =
@@ -42,26 +44,36 @@ function buildAdvisorPrompt(context: AdvisorRequestContext): string {
       ? financialSignals.map((signal) => `- ${signal}`).join("\n")
       : "- No major cash/margin/revenue risk signals from snapshot";
 
-  return `You are an executive CFO advisor for ${organizationName}.
-Department focus: ${department ?? "executive"}.
+  const trendLines =
+    dashboard.monthlyTrends.length > 0
+      ? dashboard.monthlyTrends
+          .slice(-3)
+          .map((t) => `- ${t.month}: revenue $${t.revenue}, expenses $${t.expenses}, cash $${t.cash}`)
+          .join("\n")
+      : "- No monthly trend data imported yet";
 
-Use ONLY the tenant metrics below. Provide 4-5 concise executive insights under 200 words total.
-Prioritize red/yellow KPI risk, cash risk, revenue risk, margin risk, and immediate next actions.
-Use short bullet points. Do not mention API keys, internal systems, or that you are an AI.
+  return `Organization: ${organizationName}
+Data source: ${dashboard.source}
 
-Financial snapshot:
-- Current cash: ${dashboard.financialSnapshot.currentCash}
-- Forecasted cash (13wk): ${dashboard.financialSnapshot.forecastedCash}
-- Revenue MTD: ${dashboard.financialSnapshot.revenueMTD}
-- Revenue YTD: ${dashboard.financialSnapshot.revenueYTD}
-- Gross profit: ${dashboard.financialSnapshot.grossProfit}
-- Net profit: ${dashboard.financialSnapshot.netProfit}
+CALCULATED financial snapshot:
+- Current cash: $${dashboard.financialSnapshot.currentCash.toLocaleString()}
+- Forecasted cash (13wk): $${dashboard.financialSnapshot.forecastedCash.toLocaleString()}
+- Revenue MTD: $${dashboard.financialSnapshot.revenueMTD.toLocaleString()}
+- Revenue YTD: $${dashboard.financialSnapshot.revenueYTD.toLocaleString()}
+- Gross profit: $${dashboard.financialSnapshot.grossProfit.toLocaleString()}
+- Net profit: $${dashboard.financialSnapshot.netProfit.toLocaleString()}
+- Operating expenses: $${dashboard.financialSnapshot.operatingExpenses.toLocaleString()}
+- EBITDA: $${dashboard.financialSnapshot.ebitda.toLocaleString()}
 - Runway (months): ${dashboard.financialSnapshot.runway}
-- AR: ${dashboard.financialSnapshot.accountsReceivable}
-- AP: ${dashboard.financialSnapshot.accountsPayable}
-- Burn rate: ${dashboard.financialSnapshot.burnRate}
+- AR: $${dashboard.financialSnapshot.accountsReceivable.toLocaleString()}
+- AP: $${dashboard.financialSnapshot.accountsPayable.toLocaleString()}
+- Working capital: $${workingCapital.toLocaleString()}
+- Burn rate: $${dashboard.financialSnapshot.burnRate.toLocaleString()}/mo
 
-KPI risks:
+Monthly trends (SOURCE-DERIVED):
+${trendLines}
+
+KPI risks (CALCULATED):
 ${kpiLines}
 
 Financial risk signals:
@@ -69,6 +81,34 @@ ${financialLines}
 
 Priority alerts:
 ${alertLines}`;
+}
+
+function buildAdvisorPrompt(context: AdvisorRequestContext): string {
+  const dataContext = buildDataContext(context);
+  const userQuestion = context.userMessage?.trim();
+
+  if (userQuestion) {
+    return `You are an AI CFO advisor. Answer the founder's question using ONLY the tenant data below.
+
+Rules:
+- Use CALCULATED and SOURCE-DERIVED numbers only — never invent financial facts
+- If data is insufficient, say what is missing and what to import/connect
+- Label any inference as AI-INFERRED
+- Be concise, plain-language, actionable (under 250 words)
+- Do not mention you are an AI or reference internal systems
+
+${dataContext}
+
+Founder question: ${userQuestion}`;
+  }
+
+  return `You are an executive CFO advisor.
+
+Use ONLY the tenant metrics below. Provide 4-5 concise executive insights under 200 words total.
+Prioritize red/yellow KPI risk, cash risk, revenue risk, margin risk, and immediate next actions.
+Use short bullet points. Do not mention API keys, internal systems, or that you are an AI.
+
+${dataContext}`;
 }
 
 export async function generateAdvisorInsights(context: AdvisorRequestContext): Promise<string> {
@@ -79,13 +119,21 @@ export async function generateAdvisorInsights(context: AdvisorRequestContext): P
   }
 
   const client = new Anthropic({ apiKey: getAnthropicApiKey() });
-  const prompt = buildAdvisorPrompt(context);
+  const systemPrompt = buildAdvisorPrompt(context);
+
+  const messages: Anthropic.MessageParam[] = [];
+  if (context.conversationHistory) {
+    for (const msg of context.conversationHistory.slice(-6)) {
+      messages.push({ role: msg.role, content: msg.content });
+    }
+  }
+  messages.push({ role: "user", content: systemPrompt });
 
   try {
     const response = await client.messages.create({
       model: ADVISOR_MODEL,
-      max_tokens: 500,
-      messages: [{ role: "user", content: prompt }],
+      max_tokens: 600,
+      messages,
     });
 
     const text = response.content

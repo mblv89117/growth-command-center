@@ -33,7 +33,7 @@ export const DEMO_ROLE_COOKIE = "gcc_demo_role";
 /** Demo sessions are pinned to this organization only */
 export const DEMO_ORGANIZATION_ID = "org-apex";
 
-export const PUBLIC_ROUTES = ["/login", "/signup", "/auth/callback"];
+export const PUBLIC_ROUTES = ["/login", "/signup", "/auth/callback", "/"];
 
 export const PROTECTED_PREFIXES = [
   "/dashboard",
@@ -49,6 +49,7 @@ export const PROTECTED_PREFIXES = [
   "/settings",
   "/onboarding",
   "/admin",
+  "/value-creation",
 ];
 
 export const ADMIN_ROUTES = ["/admin"];
