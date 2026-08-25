@@ -63,7 +63,7 @@ export async function GET(request: Request) {
           };
         }
 
-        if (isProduction && LIVE_CONNECT_IDS.has(integration.id)) {
+        if (LIVE_CONNECT_IDS.has(integration.id)) {
           return {
             ...integration,
             status: "disconnected" as const,
