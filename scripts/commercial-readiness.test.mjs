@@ -9,6 +9,12 @@ import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financ
 import { buildImportPreview } from "../src/lib/imports/commit";
 import { analyzeValueCreation } from "../src/lib/value-creation/analyze";
 import { slugifyCompanyName, organizationIdFromSlug } from "../src/lib/tenant/slug";
+import {
+  APEX_DEMO_ORGANIZATION_ID,
+  EMPTY_FINANCIAL_SNAPSHOT,
+  FINANCIAL_SNAPSHOT,
+  getTenantData,
+} from "../src/lib/mock-data";
 
 describe("forecast compute", () => {
   it("maintains balance continuity across weeks", () => {
@@ -92,6 +98,32 @@ describe("financial deltas", () => {
     });
     assert.equal(wc, 140000);
   });
+
+  it("does not invent percent changes without a prior period", () => {
+    const snapshot = {
+      currentCash: 100000,
+      forecastedCash: 120000,
+      revenueMTD: 50000,
+      revenueYTD: 200000,
+      grossProfit: 30000,
+      netProfit: 15000,
+      operatingExpenses: 20000,
+      accountsReceivable: 80000,
+      accountsPayable: 40000,
+      burnRate: 10000,
+      runway: 10,
+      debtObligations: 0,
+      payrollObligations: 15000,
+      ebitda: 20000,
+    };
+    const deltas = computeDashboardDeltas(snapshot, []);
+    assert.equal(deltas.currentCash.change, 0);
+    assert.equal(deltas.accountsReceivable.change, 0);
+    assert.equal(deltas.accountsPayable.change, 0);
+    assert.equal(deltas.runway.change, 0);
+    assert.equal(deltas.ebitda.change, 0);
+    assert.equal(deltas.currentCash.direction, "flat");
+  });
 });
 
 describe("import preview", () => {
@@ -157,5 +189,29 @@ describe("tenant isolation contract", () => {
   it("demo org id is pinned constant", () => {
     assert.equal(organizationIdFromSlug("apex"), "org-apex");
     assert.notEqual(organizationIdFromSlug("summit"), organizationIdFromSlug("apex"));
+  });
+
+  it("does not leak Apex financials to other organizations", () => {
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(summit.invoices.length, 0);
+    assert.equal(provisioned.jobs.length, 0);
+    assert.notEqual(summit.financialSnapshot.currentCash, apex.financialSnapshot.currentCash);
+    assert.notDeepEqual(summit.financialSnapshot, apex.financialSnapshot);
+  });
+
+  it("keeps QBO and Plaid disconnected in the catalog", () => {
+    const catalog = getTenantData("org-acme-services").integrations;
+    const qbo = catalog.find((item) => item.id === "int-1");
+    const plaid = catalog.find((item) => item.id === "int-4");
+    assert.ok(qbo);
+    assert.ok(plaid);
+    assert.equal(qbo.status, "disconnected");
+    assert.equal(plaid.status, "disconnected");
   });
 });
