@@ -13,6 +13,7 @@ interface MetricCardProps {
   variant?: "default" | "success" | "warning" | "danger";
   className?: string;
   format?: "currency" | "percent" | "number" | "months";
+  tooltip?: string;
 }
 
 export function MetricCard({
@@ -24,6 +25,7 @@ export function MetricCard({
   variant = "default",
   className,
   format = "currency",
+  tooltip,
 }: MetricCardProps) {
   const formattedValue =
     typeof value === "number"
@@ -46,7 +48,9 @@ export function MetricCard({
   return (
     <Card className={cn(variantStyles[variant], className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground" title={tooltip}>
+          {title}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold tracking-tight">{formattedValue}</div>

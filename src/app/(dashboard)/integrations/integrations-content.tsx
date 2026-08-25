@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { useTenant } from "@/lib/tenant/context";
 import { hasPermission } from "@/lib/auth/permissions";
 import type { Integration, IntegrationStatus } from "@/lib/types";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Upload } from "lucide-react";
+import Link from "next/link";
 
 const categoryLabels: Record<string, string> = {
   accounting: "Accounting",
@@ -99,6 +100,21 @@ export default function IntegrationsContent() {
       {notice && (
         <div className="mb-6 rounded-xl border bg-primary/5 p-4 text-sm">{notice}</div>
       )}
+
+      <div className="mb-6 flex items-center gap-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <div>
+          <p className="font-medium">Import financial data (CSV / XLSX)</p>
+          <p className="text-sm text-muted-foreground">
+            Upload a spreadsheet to populate your dashboard, forecast, and KPIs — no accounting connector required.
+          </p>
+        </div>
+        <Button asChild className="ml-auto">
+          <Link href="/integrations/import">
+            <Upload className="mr-2 h-4 w-4" />
+            Import data
+          </Link>
+        </Button>
+      </div>
 
       <div className="mb-6 flex items-center gap-4 rounded-xl border bg-muted/30 p-4">
         <div>

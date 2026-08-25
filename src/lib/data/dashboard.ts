@@ -2,6 +2,7 @@ import { getTenantData } from "@/lib/mock-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/config";
+import { computeDashboardDeltas, computeWorkingCapital, type DashboardDeltas } from "@/lib/financial/deltas";
 import type {
   Alert,
   AlertSeverity,
@@ -19,6 +20,9 @@ export interface DashboardData {
   kpis: KPI[];
   alerts: Alert[];
   source: "supabase" | "mock";
+  deltas?: DashboardDeltas;
+  workingCapital?: number;
+  forecastVariancePercent?: number;
 }
 
 function mapFinancialSnapshot(row: Record<string, unknown>): FinancialSnapshot {
@@ -57,15 +61,18 @@ async function fetchFromSupabase(
 
   if (snapshotRes.error || !snapshotRes.data) return null;
 
+  const monthlyTrends = (trendsRes.data ?? []).map((r) => ({
+    month: r.month,
+    revenue: Number(r.revenue),
+    expenses: Number(r.expenses),
+    profit: Number(r.profit),
+    cash: Number(r.cash),
+  }));
+  const financialSnapshot = mapFinancialSnapshot(snapshotRes.data);
+
   return {
-    financialSnapshot: mapFinancialSnapshot(snapshotRes.data),
-    monthlyTrends: (trendsRes.data ?? []).map((r) => ({
-      month: r.month,
-      revenue: Number(r.revenue),
-      expenses: Number(r.expenses),
-      profit: Number(r.profit),
-      cash: Number(r.cash),
-    })),
+    financialSnapshot,
+    monthlyTrends,
     budgetVsActual: (budgetRes.data ?? []).map((r) => ({
       category: r.category,
       budget: Number(r.budget),
@@ -99,13 +106,24 @@ async function fetchFromSupabase(
       isRead: r.is_read,
       createdAt: r.created_at,
     })),
-    source: "supabase",
+    source: "supabase" as const,
+    deltas: computeDashboardDeltas(financialSnapshot, monthlyTrends),
+    workingCapital: computeWorkingCapital(financialSnapshot),
+    forecastVariancePercent:
+      financialSnapshot.currentCash > 0
+        ? Math.round(
+            ((financialSnapshot.forecastedCash - financialSnapshot.currentCash) /
+              financialSnapshot.currentCash) *
+              1000
+          ) / 10
+        : 0,
   };
 }
 
 export async function getDashboardData(organizationId: string): Promise<DashboardData> {
   if (!isSupabaseConfigured()) {
     const mock = getTenantData(organizationId);
+    const deltas = computeDashboardDeltas(mock.financialSnapshot, mock.monthlyTrends);
     return {
       financialSnapshot: mock.financialSnapshot,
       monthlyTrends: mock.monthlyTrends,
@@ -113,6 +131,16 @@ export async function getDashboardData(organizationId: string): Promise<Dashboar
       kpis: mock.kpis,
       alerts: mock.alerts,
       source: "mock",
+      deltas,
+      workingCapital: computeWorkingCapital(mock.financialSnapshot),
+      forecastVariancePercent:
+        mock.financialSnapshot.currentCash > 0
+          ? Math.round(
+              ((mock.financialSnapshot.forecastedCash - mock.financialSnapshot.currentCash) /
+                mock.financialSnapshot.currentCash) *
+                1000
+            ) / 10
+          : 0,
     };
   }
 
@@ -124,6 +152,7 @@ export async function getDashboardData(organizationId: string): Promise<Dashboar
   if (adminScoped) return adminScoped;
 
   const mock = getTenantData(organizationId);
+  const deltas = computeDashboardDeltas(mock.financialSnapshot, mock.monthlyTrends);
   return {
     financialSnapshot: mock.financialSnapshot,
     monthlyTrends: mock.monthlyTrends,
@@ -131,6 +160,16 @@ export async function getDashboardData(organizationId: string): Promise<Dashboar
     kpis: mock.kpis,
     alerts: mock.alerts,
     source: "mock",
+    deltas,
+    workingCapital: computeWorkingCapital(mock.financialSnapshot),
+    forecastVariancePercent:
+      mock.financialSnapshot.currentCash > 0
+        ? Math.round(
+            ((mock.financialSnapshot.forecastedCash - mock.financialSnapshot.currentCash) /
+              mock.financialSnapshot.currentCash) *
+              1000
+          ) / 10
+        : 0,
   };
 }
 

@@ -13,6 +13,7 @@ import { getTenantData } from "@/lib/mock-data";
 import type { DashboardData } from "@/lib/data/dashboard";
 import { formatCurrency } from "@/lib/utils";
 import { activeMonthlyTrends, latestTrendMonthLabel } from "@/lib/forecast/validate";
+import { computeDashboardDeltas } from "@/lib/financial/deltas";
 import { AiAdvisorPanel } from "@/components/dashboard/ai-advisor-panel";
 import { OnboardingCta } from "@/components/dashboard/onboarding-cta";
 import { KpiList } from "@/components/dashboard/kpi-list";
@@ -33,6 +34,7 @@ export default function DashboardPage() {
       .then((json) => setData(json))
       .catch(() => {
         const mock = getTenantData(organization.id);
+        const deltas = computeDashboardDeltas(mock.financialSnapshot, mock.monthlyTrends);
         setData({
           financialSnapshot: mock.financialSnapshot,
           monthlyTrends: mock.monthlyTrends,
@@ -40,6 +42,11 @@ export default function DashboardPage() {
           kpis: mock.kpis,
           alerts: mock.alerts,
           source: "mock",
+          deltas,
+          workingCapital: mock.financialSnapshot.currentCash + mock.financialSnapshot.accountsReceivable - mock.financialSnapshot.accountsPayable,
+          forecastVariancePercent: mock.financialSnapshot.currentCash > 0
+            ? Math.round(((mock.financialSnapshot.forecastedCash - mock.financialSnapshot.currentCash) / mock.financialSnapshot.currentCash) * 1000) / 10
+            : 0,
         });
       })
       .finally(() => setLoading(false));
@@ -53,7 +60,7 @@ export default function DashboardPage() {
     );
   }
 
-  const { financialSnapshot, monthlyTrends, alerts, kpis, budgetVsActual, source } = data;
+  const { financialSnapshot, monthlyTrends, alerts, kpis, budgetVsActual, source, deltas, workingCapital, forecastVariancePercent } = data;
   const chartTrends = activeMonthlyTrends(monthlyTrends);
   const budgetPeriodLabel = latestTrendMonthLabel(monthlyTrends);
   const criticalAlerts = alerts.filter((a) => !a.isRead && (a.severity === "critical" || a.severity === "high"));
@@ -108,35 +115,58 @@ export default function DashboardPage() {
         <MetricCard
           title="Current Cash"
           value={financialSnapshot.currentCash}
-          change={3.2}
-          changeLabel="vs last month"
-          variant="success"
+          change={deltas?.currentCash.change}
+          changeLabel={deltas?.currentCash.changeLabel ?? "vs prior month"}
+          variant={deltas?.currentCash.direction === "up" ? "success" : "default"}
+          tooltip="Your available cash right now. This is the foundation of your runway."
         />
         <MetricCard
           title="Forecasted Cash (13wk)"
           value={financialSnapshot.forecastedCash}
-          change={-2.8}
-          changeLabel="end of period"
-          variant="warning"
+          change={forecastVariancePercent}
+          changeLabel="vs current cash"
+          variant={forecastVariancePercent && forecastVariancePercent < 0 ? "warning" : "default"}
+          tooltip="Projected cash at the end of your 13-week forecast based on your assumptions."
         />
         <MetricCard
           title="Revenue MTD"
           value={financialSnapshot.revenueMTD}
-          change={12.4}
-          changeLabel="vs last month"
+          change={deltas?.revenueMTD.change}
+          changeLabel={deltas?.revenueMTD.changeLabel ?? "vs prior month"}
+          tooltip="Total revenue recognized this month so far."
         />
         <MetricCard
-          title="Revenue YTD"
-          value={financialSnapshot.revenueYTD}
-          change={8.6}
-          changeLabel="vs plan"
+          title="Working Capital"
+          value={workingCapital ?? 0}
+          change={deltas?.workingCapital.change}
+          changeLabel="cash + AR − AP"
+          tooltip="Cash plus receivables minus payables — your short-term financial cushion."
         />
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Gross Profit" value={financialSnapshot.grossProfit} format="currency" />
-        <MetricCard title="Net Profit" value={financialSnapshot.netProfit} format="currency" />
-        <MetricCard title="Operating Expenses" value={financialSnapshot.operatingExpenses} format="currency" />
+        <MetricCard
+          title="Gross Profit"
+          value={financialSnapshot.grossProfit}
+          change={deltas?.grossProfit.change}
+          changeLabel={deltas?.grossProfit.changeLabel}
+          format="currency"
+          tooltip="Revenue minus direct costs. Higher gross profit means more room for growth."
+        />
+        <MetricCard
+          title="Net Profit"
+          value={financialSnapshot.netProfit}
+          change={deltas?.netProfit.change}
+          changeLabel={deltas?.netProfit.changeLabel}
+          format="currency"
+        />
+        <MetricCard
+          title="Operating Expenses"
+          value={financialSnapshot.operatingExpenses}
+          change={deltas?.operatingExpenses.change}
+          changeLabel={deltas?.operatingExpenses.changeLabel}
+          format="currency"
+        />
         <MetricCard title="EBITDA" value={financialSnapshot.ebitda} format="currency" />
       </div>
 
@@ -152,8 +182,11 @@ export default function DashboardPage() {
         <MetricCard
           title="Runway"
           value={financialSnapshot.runway}
+          change={deltas?.runway.change}
+          changeLabel="months"
           format="months"
-          variant="warning"
+          variant={financialSnapshot.runway < 6 ? "warning" : "default"}
+          tooltip="How many months you can operate at current burn before running out of cash."
         />
       </div>
 
@@ -230,12 +263,20 @@ export default function DashboardPage() {
         <MetricCard title="Debt Obligations" value={financialSnapshot.debtObligations} format="currency" />
         <MetricCard title="Payroll Due" value={financialSnapshot.payrollObligations} format="currency" variant="warning" />
         <MetricCard
-          title="Forecast vs Actual"
-          value="-4.2%"
+          title="Forecast Variance"
+          value={forecastVariancePercent ?? 0}
           format="number"
-          subtitle="Revenue variance this month"
-          variant="warning"
+          subtitle="% change vs current cash"
+          variant={(forecastVariancePercent ?? 0) < 0 ? "warning" : "default"}
         />
+      </div>
+
+      <div className="mt-6 flex justify-end">
+        <Button variant="outline" asChild>
+          <Link href="/value-creation">
+            View value-creation opportunities <ArrowRight className="ml-1 h-4 w-4" />
+          </Link>
+        </Button>
       </div>
     </div>
   );

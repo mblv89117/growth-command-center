@@ -43,6 +43,7 @@ const navigation = [
   { name: "Reports", href: "/reports", icon: FileText },
   { name: "Scenarios", href: "/scenarios", icon: GitBranch },
   { name: "Alerts", href: "/alerts", icon: AlertTriangle },
+  { name: "Value Creation", href: "/value-creation", icon: TrendingUp },
   { name: "Integrations", href: "/integrations", icon: Link2 },
   { name: "Team", href: "/team", icon: Users },
   { name: "Settings", href: "/settings", icon: Settings },
