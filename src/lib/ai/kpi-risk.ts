@@ -79,16 +79,12 @@ export function getFinancialRiskSignals(
 
   const signals: string[] = [];
 
-  // Do not invent runway<6, forecastedCash<currentCash*0.85, or burn>revenue*0.9.
-  // Owner KPI targets are assessed separately via assessKpiRisk / getAtRiskKpis.
+  // Do not invent runway<6, forecastedCash<currentCash*0.85, burn>revenue*0.9,
+  // netProfit/grossProfit<0.25, or AR>revenueMTD*1.5.
+  // Sign-based netProfit<0 is SOURCE-DERIVED. Owner KPI targets use assessKpiRisk.
 
   if (snapshot.netProfit < 0) {
     signals.push("Net profit is negative — margin risk");
-  } else if (snapshot.grossProfit > 0 && snapshot.netProfit / snapshot.grossProfit < 0.25) {
-    signals.push("Net margin is thin relative to gross profit");
-  }
-  if (snapshot.revenueMTD > 0 && snapshot.accountsReceivable > snapshot.revenueMTD * 1.5) {
-    signals.push("Accounts receivable is elevated vs monthly revenue");
   }
 
   return signals;

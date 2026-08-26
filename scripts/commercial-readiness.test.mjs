@@ -933,6 +933,45 @@ describe("AI CFO leftover kpi-risk honesty", () => {
     assert.equal(atRisk.length, 1);
     assert.equal(atRisk[0].kpi.id, "cash_runway");
   });
+
+  it("does not invent netProfit/grossProfit<0.25 or AR>revenueMTD*1.5 signals", () => {
+    const thinMargin = { ...populated, netProfit: 4000, grossProfit: 20000 };
+    const elevatedAr = { ...populated, accountsReceivable: 80000, revenueMTD: 50000 };
+    assert.equal(thinMargin.netProfit / thinMargin.grossProfit < 0.25, true);
+    assert.equal(elevatedAr.accountsReceivable > elevatedAr.revenueMTD * 1.5, true);
+
+    const thinSignals = getFinancialRiskSignals(thinMargin);
+    const arSignals = getFinancialRiskSignals(elevatedAr);
+    const joined = `${thinSignals.join(" | ")} || ${arSignals.join(" | ")}`;
+
+    assert.equal(thinSignals.some((s) => /thin relative to gross profit/i.test(s)), false);
+    assert.equal(arSignals.some((s) => /elevated vs monthly revenue/i.test(s)), false);
+    assert.doesNotMatch(joined, /0\.25/);
+    assert.doesNotMatch(joined, /1\.5/);
+    assert.equal(JSON.stringify(thinSignals).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(arSignals).includes("Apex Construction"), false);
+  });
+
+  it("keeps SOURCE-DERIVED negative net profit and owner-target paths", () => {
+    const loss = { ...populated, netProfit: -2500, grossProfit: 20000 };
+    const lossSignals = getFinancialRiskSignals(loss);
+    assert.equal(lossSignals.some((s) => /Net profit is negative/i.test(s)), true);
+    assert.equal(lossSignals.some((s) => /thin relative to gross profit/i.test(s)), false);
+
+    const assessment = assessKpiRisk({
+      id: "gross_margin",
+      name: "Gross Margin",
+      value: 20,
+      unit: "percent",
+      change: 0,
+      changeLabel: "vs owner target",
+      target: 40,
+    });
+    assert.ok(assessment);
+    assert.equal(assessment.level, "red");
+    assert.match(assessment.reason, /20 vs 40/);
+    assert.doesNotMatch(assessment.reason, /0\.25|1\.5|thin relative/);
+  });
 });
 
 describe("tenant slug", () => {
