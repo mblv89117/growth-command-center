@@ -58,13 +58,22 @@ Verifies:
 
 | Level | Item |
 |-------|------|
-| **BLOCKER** | Email confirmation required — cannot automate Gmail inbox access |
+| **BLOCKER** | Email confirmation — cannot automate Gmail inbox access |
 | **BLOCKER** | Authorized HVCG financial snapshot not in execution environment |
-| **HIGH FRICTION** | `manny.barela2026@gmail.com` may already exist with different password — use `+hvcg-pilot` alias for clean tenant |
-| **HIGH FRICTION** | Disposable email (Mailinator) does not receive Supabase confirmation emails |
-| **HIGH FRICTION** | No "Forgot password?" link on login (fixed in this PR) |
-| **LOW FRICTION** | Post-signup message could mention spam folder |
+| **HIGH FRICTION** | Duplicate signup shows "check email" but Supabase does **not** resend (enumeration protection) — fixed with resend UX in PR |
+| **HIGH FRICTION** | Base Gmail account already registered with different password |
+| **HIGH FRICTION** | Mailinator/disposable emails do not receive Supabase confirmations |
+| **HIGH FRICTION** | No forgot-password link → **fixed** in PR #8 |
+| **LOW FRICTION** | Post-signup could mention spam folder → **fixed** with confirmation screen |
 | **COSMETIC** | — |
+
+### Auth recovery root cause (2026-08-26)
+
+- Pilot auth user **exists** and is **unconfirmed** (`Email not confirmed` on sign-in probe).
+- Initial signup UI said "check your email" but **repeat signup does not resend** (Supabase `identities=[]` / enumeration-safe behavior).
+- **Resend via `auth.resend({ type: 'signup' })`** is the correct recovery path — accepted by API when not rate-limited.
+- Expected sender: `connect@highvaluecapitalgroup.com` (Resend SMTP).
+- Run: `npm run pilot:auth-recovery` to resend without service role.
 
 ---
 
