@@ -144,7 +144,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Organization Profile</CardTitle>
-              <CardDescription>Basic information about your company</CardDescription>
+              <CardDescription>{`Organization profile for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
