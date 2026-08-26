@@ -5,6 +5,13 @@ import {
   buildForecastInputFromSnapshot,
   hasExplicitWeeklyDrivers,
 } from "../src/lib/forecast/compute";
+import {
+  applyForecastScenario,
+  INSUFFICIENT_DATA,
+  metricOrInsufficient,
+  summarizeWeeklyForecastDisplay,
+} from "../src/lib/forecast/display";
+import { calculateMinimumCash } from "../src/lib/forecast-engine";
 import { computeKpis } from "../src/lib/kpi/catalog";
 import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financial/deltas";
 import { buildImportPreview } from "../src/lib/imports/commit";
@@ -116,6 +123,107 @@ describe("forecast compute", () => {
     const b = generateDeterministicWeeklyForecast(input);
     assert.deepEqual(a, b);
     assert.equal(a.length, 13);
+  });
+});
+
+describe("cash forecast empty-state honesty", () => {
+  it("empty weeks are INSUFFICIENT_DATA without invented $0 week-13 or -Infinity min cash", () => {
+    const empty = summarizeWeeklyForecastDisplay([]);
+    const missing = summarizeWeeklyForecastDisplay(undefined);
+    const fromSnapshot = generateDeterministicWeeklyForecast(
+      buildForecastInputFromSnapshot({
+        currentCash: 90000,
+        accountsReceivable: 0,
+        revenueMTD: 40000,
+        operatingExpenses: 0,
+        payrollObligations: 0,
+        accountsPayable: 0,
+      })
+    );
+
+    assert.deepEqual(fromSnapshot, []);
+    assert.equal(empty.provenance, INSUFFICIENT_DATA);
+    assert.equal(missing.provenance, INSUFFICIENT_DATA);
+    assert.equal(empty.scenariosEnabled, false);
+    assert.deepEqual(empty.weeks, []);
+    assert.equal(empty.endingWeek13, null);
+    assert.equal(empty.minCash, null);
+    assert.equal(empty.riskWeekCount, 0);
+    assert.equal(metricOrInsufficient(empty.endingWeek13), INSUFFICIENT_DATA);
+    assert.equal(metricOrInsufficient(empty.minCash), INSUFFICIENT_DATA);
+    assert.equal(calculateMinimumCash([]), null);
+    assert.notEqual(empty.minCash, Number.NEGATIVE_INFINITY);
+    assert.notEqual(empty.endingWeek13, 0);
+    assert.match(empty.riskCopy, /INSUFFICIENT_DATA/);
+    assert.doesNotMatch(empty.riskCopy, /risk periods identified/i);
+    assert.match(empty.emptyStateCopy, /will not invent a 13-week series/);
+  });
+
+  it("keeps scenario buttons inert and does not invent weeks from empty SOURCE-DERIVED series", () => {
+    assert.deepEqual(applyForecastScenario([], "best"), []);
+    assert.deepEqual(applyForecastScenario([], "worst"), []);
+    const empty = summarizeWeeklyForecastDisplay(applyForecastScenario([], "best"));
+    assert.equal(empty.scenariosEnabled, false);
+    assert.equal(empty.provenance, INSUFFICIENT_DATA);
+    assert.equal(empty.weeks.length, 0);
+  });
+
+  it("summarizes SOURCE-DERIVED weeks without padding a missing week 13", () => {
+    const weeks = [
+      {
+        week: 1,
+        weekStart: "2026-01-05",
+        weekEnd: "2026-01-11",
+        startingBalance: 200000,
+        inflows: 10000,
+        outflows: 80000,
+        endingBalance: 130000,
+        isRiskPeriod: true,
+      },
+      {
+        week: 2,
+        weekStart: "2026-01-12",
+        weekEnd: "2026-01-18",
+        startingBalance: 130000,
+        inflows: 20000,
+        outflows: 10000,
+        endingBalance: 140000,
+        isRiskPeriod: true,
+      },
+    ];
+    const display = summarizeWeeklyForecastDisplay(weeks);
+    assert.equal(display.provenance, "CALCULATED");
+    assert.equal(display.scenariosEnabled, true);
+    assert.equal(display.weeks.length, 2);
+    assert.equal(display.endingWeek13, null);
+    assert.equal(display.minCash, 130000);
+    assert.equal(display.riskWeekCount, 2);
+    assert.equal(metricOrInsufficient(display.endingWeek13), INSUFFICIENT_DATA);
+    assert.equal(metricOrInsufficient(display.minCash), 130000);
+    assert.match(display.riskCopy, /2 risk periods identified/);
+    assert.equal(calculateMinimumCash(weeks), 130000);
+
+    const best = applyForecastScenario(weeks, "best");
+    assert.equal(best.length, 2);
+    assert.notEqual(best[0].inflows, weeks[0].inflows);
+  });
+
+  it("imported cash+burn still has no invented weekly series for the page helper", () => {
+    const snapshot = snapshotFromImportRow({
+      current_cash: 90000,
+      burn_rate: 15000,
+      revenue_mtd: 40000,
+    });
+    const imported = applyImportedFinancials("org-summit", snapshot);
+    const display = summarizeWeeklyForecastDisplay(imported.cashForecastWeeks);
+
+    assert.deepEqual(imported.cashForecastWeeks, []);
+    assert.equal(display.provenance, INSUFFICIENT_DATA);
+    assert.equal(display.endingWeek13, null);
+    assert.equal(display.minCash, null);
+    assert.equal(display.scenariosEnabled, false);
+    assert.equal(imported.fieldProvenance.runway, "CALCULATED");
+    assert.equal(imported.financialSnapshot.runway, 6);
   });
 });
 
