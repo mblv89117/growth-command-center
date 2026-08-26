@@ -16,6 +16,7 @@ import {
   APEX_DEMO_ORGANIZATION_ID,
   EMPTY_FINANCIAL_SNAPSHOT,
   FINANCIAL_SNAPSHOT,
+  ORGANIZATIONS,
   getTenantData,
 } from "../src/lib/mock-data";
 import {
@@ -421,5 +422,51 @@ describe("leftover schema.sql DEFAULT cashAlertThreshold honesty", () => {
       assert.equal(JSON.stringify(empty).includes("Harbor View"), false, orgId);
       assert.equal(JSON.stringify(empty).includes("Apex Construction"), false, orgId);
     }
+  });
+});
+
+describe("leftover org-summit listed mock cashAlertThreshold honesty", () => {
+  it("does not invent leftover listed org-summit cashAlertThreshold 75000", () => {
+    const listed = ORGANIZATIONS.find((org) => org.id === "org-summit");
+    assert.ok(listed);
+    assert.equal(listed.settings.cashAlertThreshold, 0);
+    assert.notEqual(listed.settings.cashAlertThreshold, 75000);
+
+    const summit = getTenantData("org-summit");
+    assert.equal(summit.organization.settings.cashAlertThreshold, 0);
+    assert.notEqual(summit.organization.settings.cashAlertThreshold, 75000);
+    assert.doesNotMatch(JSON.stringify(listed), /75000/);
+    assert.doesNotMatch(JSON.stringify(summit.organization), /75000/);
+  });
+
+  it("keeps owner-set 75000 and pinned org-apex 150000 SOURCE-DERIVED", () => {
+    assert.equal(resolveCashAlertThreshold(75000), 75000);
+    assert.equal(resolveCashAlertThreshold("75000"), 75000);
+
+    const owner = mapOrganizationRow({
+      id: "org-summit-owner-set",
+      name: "Summit Owner Set",
+      slug: "summit-owner-set",
+      settings: { cashAlertThreshold: 75000 },
+    });
+    assert.equal(owner.settings.cashAlertThreshold, 75000);
+
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+  });
+
+  it("empty tenant still has no Apex leak after org-summit listed honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.notEqual(summit.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.notDeepEqual(summit.financialSnapshot, getTenantData(APEX_DEMO_ORGANIZATION_ID).financialSnapshot);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Harbor View"), false);
   });
 });

@@ -49,7 +49,8 @@ export const ORGANIZATIONS: Organization[] = [
     plan: "starter",
     createdAt: "2024-01-10",
     settings: {
-      cashAlertThreshold: 75000,
+      // Listed empty tenant. Do not invent cashAlertThreshold = 75000.
+      cashAlertThreshold: 0,
       forecastHorizonWeeks: 13,
       fiscalYearStart: 1,
       currency: "USD",
