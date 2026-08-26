@@ -1540,6 +1540,32 @@ describe("leftover Apex demo cashAlertThreshold honesty", () => {
   });
 });
 
+describe("leftover Apex demo alert-7 covenant honesty", () => {
+  it("does not invent leftover Apex demo 1.5x covenant threshold", () => {
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    const alert = apex.alerts.find((row) => row.id === "alert-7");
+    assert.ok(alert);
+    assert.doesNotMatch(alert.description, /1\.5x/);
+    assert.doesNotMatch(alert.description, /covenant threshold/);
+    assert.doesNotMatch(JSON.stringify(apex.alerts), /1\.5x covenant/);
+  });
+
+  it("empty tenants do not inherit leftover Apex demo 1.5x covenant alert", () => {
+    for (const orgId of ["org-summit", "org-iron-ridge", "org-unknown-alert7-26"]) {
+      const empty = getTenantData(orgId);
+      assert.equal(empty.alerts.length, 0, orgId);
+      assert.equal(
+        empty.alerts.some((row) => row.id === "alert-7"),
+        false,
+        orgId
+      );
+      assert.doesNotMatch(JSON.stringify(empty), /1\.5x covenant/);
+      assert.equal(JSON.stringify(empty).includes("Harbor View"), false, orgId);
+      assert.equal(JSON.stringify(empty).includes("Apex Construction"), false, orgId);
+    }
+  });
+});
+
 describe("tenant slug", () => {
   it("slugifies company names", () => {
     assert.equal(slugifyCompanyName("Acme Services LLC"), "acme-services-llc");
