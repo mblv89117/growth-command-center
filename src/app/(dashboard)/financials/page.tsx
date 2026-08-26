@@ -2,6 +2,7 @@
 
 import { ExpensePieChart, TrendChart } from "@/components/charts";
 import { DataSourceBanner, DataTable, PageHeader } from "@/components/shared";
+import { FinancialsInsightBanner } from "@/components/financials/financials-insight-banner";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,10 +31,11 @@ export default function FinancialsPage() {
         title="Financials"
         description="Revenue, expenses, profit, AR/AP, and financial trends"
       />
+      <FinancialsInsightBanner />
       <DataSourceBanner source={source} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Revenue MTD" value={financialSnapshot.revenueMTD} change={12.4} changeLabel="vs last month" />
+        <MetricCard title="Revenue MTD" value={financialSnapshot.revenueMTD} />
         <MetricCard title="Gross Profit" value={financialSnapshot.grossProfit} />
         <MetricCard title="Net Profit" value={financialSnapshot.netProfit} />
         <MetricCard title="Operating Expenses" value={financialSnapshot.operatingExpenses} />
@@ -210,7 +212,7 @@ export default function FinancialsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Recent Transactions</CardTitle>
-              <CardDescription>Synced from QuickBooks Online and Plaid</CardDescription>
+              <CardDescription>Recent tenant transactions</CardDescription>
             </CardHeader>
             <CardContent>
               <DataTable
