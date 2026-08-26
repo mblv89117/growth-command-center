@@ -6,6 +6,8 @@ import {
   getPriorityAlerts,
 } from "@/lib/ai/kpi-risk";
 import type { DashboardData } from "@/lib/data/dashboard";
+import type { FieldProvenance } from "@/lib/imports/honesty";
+import { isEmptyFinancialSnapshot } from "@/lib/imports/honesty";
 import { computeWorkingCapital } from "@/lib/financial/deltas";
 import { ServiceUnavailableError } from "@/lib/api/errors";
 
@@ -19,12 +21,55 @@ export interface AdvisorRequestContext {
   conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
 }
 
-function buildDataContext(context: AdvisorRequestContext): string {
+function amountLine(
+  label: string,
+  amount: number,
+  provenance: FieldProvenance | undefined,
+  suffix = ""
+): string {
+  if (!provenance || provenance === "INSUFFICIENT_DATA") {
+    return `- ${label}: INSUFFICIENT_DATA`;
+  }
+  return `- ${label}: $${amount.toLocaleString()}${suffix} (${provenance})`;
+}
+
+function numberLine(
+  label: string,
+  value: number,
+  provenance: FieldProvenance | undefined
+): string {
+  if (!provenance || provenance === "INSUFFICIENT_DATA") {
+    return `- ${label}: INSUFFICIENT_DATA`;
+  }
+  return `- ${label}: ${value} (${provenance})`;
+}
+
+export function buildAdvisorDataContext(context: AdvisorRequestContext): string {
   const { dashboard, organizationName } = context;
+  const snap = dashboard.financialSnapshot;
+  const provenance = dashboard.fieldProvenance;
   const atRiskKpis = getAtRiskKpis(dashboard.kpis);
-  const financialSignals = getFinancialRiskSignals(dashboard.financialSnapshot);
+  const financialSignals = getFinancialRiskSignals(snap, provenance);
   const priorityAlerts = getPriorityAlerts(dashboard.alerts);
-  const workingCapital = computeWorkingCapital(dashboard.financialSnapshot);
+  const workingCapital = computeWorkingCapital(snap);
+  const cashUsable = provenance?.currentCash && provenance.currentCash !== "INSUFFICIENT_DATA";
+
+  if (isEmptyFinancialSnapshot(snap) && dashboard.monthlyTrends.length === 0 && dashboard.kpis.length === 0) {
+    return `Organization: ${organizationName}
+Data source: ${dashboard.source}
+
+Financial snapshot: INSUFFICIENT_DATA
+No SOURCE-DERIVED cash, burn, revenue, or forecast has been imported for this tenant.
+Do not invent financial values. Do not use another organization's numbers.
+Do not treat $0 as CALCULATED cash, runway, profit, or burn.
+
+Ask the founder to import a financial snapshot (current_cash, burn_rate, revenue_mtd) or connect a live source.
+
+Monthly trends: none imported
+KPI risks: none
+Financial risk signals: none
+Priority alerts: none`;
+  }
 
   const kpiLines =
     atRiskKpis.length > 0
@@ -48,32 +93,32 @@ function buildDataContext(context: AdvisorRequestContext): string {
     dashboard.monthlyTrends.length > 0
       ? dashboard.monthlyTrends
           .slice(-3)
-          .map((t) => `- ${t.month}: revenue $${t.revenue}, expenses $${t.expenses}, cash $${t.cash}`)
+          .map((t) => `- ${t.month}: revenue $${t.revenue}, expenses $${t.expenses}, cash $${t.cash} (SOURCE-DERIVED)`)
           .join("\n")
       : "- No monthly trend data imported yet";
 
   return `Organization: ${organizationName}
 Data source: ${dashboard.source}
 
-CALCULATED financial snapshot:
-- Current cash: $${dashboard.financialSnapshot.currentCash.toLocaleString()}
-- Forecasted cash (13wk): $${dashboard.financialSnapshot.forecastedCash.toLocaleString()}
-- Revenue MTD: $${dashboard.financialSnapshot.revenueMTD.toLocaleString()}
-- Revenue YTD: $${dashboard.financialSnapshot.revenueYTD.toLocaleString()}
-- Gross profit: $${dashboard.financialSnapshot.grossProfit.toLocaleString()}
-- Net profit: $${dashboard.financialSnapshot.netProfit.toLocaleString()}
-- Operating expenses: $${dashboard.financialSnapshot.operatingExpenses.toLocaleString()}
-- EBITDA: $${dashboard.financialSnapshot.ebitda.toLocaleString()}
-- Runway (months): ${dashboard.financialSnapshot.runway}
-- AR: $${dashboard.financialSnapshot.accountsReceivable.toLocaleString()}
-- AP: $${dashboard.financialSnapshot.accountsPayable.toLocaleString()}
-- Working capital: $${workingCapital.toLocaleString()}
-- Burn rate: $${dashboard.financialSnapshot.burnRate.toLocaleString()}/mo
+Financial snapshot (use labeled provenance only — never invent missing fields):
+${amountLine("Current cash", snap.currentCash, provenance?.currentCash)}
+${amountLine("Forecasted cash (13wk)", snap.forecastedCash, provenance?.forecastedCash)}
+${amountLine("Revenue MTD", snap.revenueMTD, snap.revenueMTD === 0 ? "INSUFFICIENT_DATA" : "SOURCE-DERIVED")}
+${amountLine("Revenue YTD", snap.revenueYTD, snap.revenueYTD === 0 ? "INSUFFICIENT_DATA" : "SOURCE-DERIVED")}
+${amountLine("Gross profit", snap.grossProfit, snap.grossProfit === 0 ? "INSUFFICIENT_DATA" : "SOURCE-DERIVED")}
+${amountLine("Net profit", snap.netProfit, snap.netProfit === 0 ? "INSUFFICIENT_DATA" : "SOURCE-DERIVED")}
+${amountLine("Operating expenses", snap.operatingExpenses, snap.operatingExpenses === 0 ? "INSUFFICIENT_DATA" : "SOURCE-DERIVED")}
+${amountLine("EBITDA", snap.ebitda, provenance?.ebitda)}
+${numberLine("Runway (months)", snap.runway, provenance?.runway)}
+${amountLine("AR", snap.accountsReceivable, snap.accountsReceivable === 0 ? "INSUFFICIENT_DATA" : "SOURCE-DERIVED")}
+${amountLine("AP", snap.accountsPayable, snap.accountsPayable === 0 ? "INSUFFICIENT_DATA" : "SOURCE-DERIVED")}
+${cashUsable ? `- Working capital: $${workingCapital.toLocaleString()} (CALCULATED)` : "- Working capital: INSUFFICIENT_DATA"}
+${amountLine("Burn rate", snap.burnRate, provenance?.burnRate, "/mo")}
 
 Monthly trends (SOURCE-DERIVED):
 ${trendLines}
 
-KPI risks (CALCULATED):
+KPI risks (CALCULATED from imported KPIs only):
 ${kpiLines}
 
 Financial risk signals:
@@ -84,7 +129,7 @@ ${alertLines}`;
 }
 
 function buildAdvisorPrompt(context: AdvisorRequestContext): string {
-  const dataContext = buildDataContext(context);
+  const dataContext = buildAdvisorDataContext(context);
   const userQuestion = context.userMessage?.trim();
 
   if (userQuestion) {
