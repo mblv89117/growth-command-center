@@ -35,7 +35,8 @@ export const ORGANIZATIONS: Organization[] = [
     plan: "growth",
     createdAt: "2023-06-15",
     settings: {
-      cashAlertThreshold: 150000,
+      // Do not invent leftover Apex demo cashAlertThreshold = 150000. Owner-set thresholds remain SOURCE-DERIVED.
+      cashAlertThreshold: 0,
       forecastHorizonWeeks: 13,
       fiscalYearStart: 1,
       currency: "USD",

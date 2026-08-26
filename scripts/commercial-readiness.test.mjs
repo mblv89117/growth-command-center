@@ -1162,7 +1162,8 @@ describe("leftover settings seed and runway UI honesty", () => {
 
     assert.equal(unknown.organization.settings.cashAlertThreshold, 0);
     assert.equal(empty.organization.settings.cashAlertThreshold, 0);
-    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(apex.organization.settings.cashAlertThreshold, 0);
+    assert.notEqual(apex.organization.settings.cashAlertThreshold, 150000);
     assert.equal(JSON.stringify(unknown).includes("Harbor View"), false);
     assert.equal(JSON.stringify(empty).includes("Apex Construction"), false);
   });
@@ -1259,7 +1260,8 @@ describe("leftover KPI catalog cash_runway honesty", () => {
     const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
     assert.equal(summit.organization.settings.cashAlertThreshold, 0);
     assert.notEqual(summit.organization.settings.cashAlertThreshold, 75000);
-    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(apex.organization.settings.cashAlertThreshold, 0);
+    assert.notEqual(apex.organization.settings.cashAlertThreshold, 150000);
     assert.equal(JSON.stringify(summit).includes("Harbor View"), false);
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
@@ -1501,6 +1503,37 @@ describe("leftover Apex demo KPI target honesty", () => {
         false,
         orgId
       );
+      assert.equal(JSON.stringify(empty).includes("Harbor View"), false, orgId);
+      assert.equal(JSON.stringify(empty).includes("Apex Construction"), false, orgId);
+    }
+  });
+});
+
+describe("leftover Apex demo cashAlertThreshold honesty", () => {
+  it("does not invent leftover Apex demo cashAlertThreshold 150000", () => {
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.organization.settings.cashAlertThreshold, 0);
+    assert.notEqual(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(resolveCashAlertThreshold(apex.organization.settings.cashAlertThreshold), 0);
+  });
+
+  it("applies an owner leftover Apex cashAlertThreshold only", () => {
+    const owner = mapOrganizationRow({
+      id: "org-owner-cashalert-25",
+      name: "Owner Threshold Co",
+      settings: { cashAlertThreshold: 175000 },
+    });
+    assert.equal(owner.settings.cashAlertThreshold, 175000);
+    assert.notEqual(owner.settings.cashAlertThreshold, 150000);
+    assert.equal(resolveCashAlertThreshold(175000), 175000);
+    assert.equal(resolveCashAlertThreshold("150000"), 150000);
+  });
+
+  it("empty tenants do not inherit leftover Apex demo cashAlertThreshold 150000", () => {
+    for (const orgId of ["org-summit", "org-cedar-falls", "org-unknown-cashalert-25"]) {
+      const empty = getTenantData(orgId);
+      assert.equal(empty.organization.settings.cashAlertThreshold, 0, orgId);
+      assert.notEqual(empty.organization.settings.cashAlertThreshold, 150000, orgId);
       assert.equal(JSON.stringify(empty).includes("Harbor View"), false, orgId);
       assert.equal(JSON.stringify(empty).includes("Apex Construction"), false, orgId);
     }
