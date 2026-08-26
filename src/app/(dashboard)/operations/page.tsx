@@ -5,6 +5,7 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { useTenant } from "@/lib/tenant/context";
 import { useTenantData } from "@/hooks/use-tenant-data";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
@@ -18,6 +19,7 @@ const statusVariant: Record<string, "default" | "secondary" | "success" | "warni
 };
 
 export default function OperationsPage() {
+  const { organization } = useTenant();
   const { data, source, loading } = useTenantData();
   const { jobs } = data;
 
@@ -41,7 +43,7 @@ export default function OperationsPage() {
     <div>
       <PageHeader
         title="Operations"
-        description="Active jobs, margins, production status, and billing timing"
+        description={`Operations for ${organization.name}`}
       />
       <DataSourceBanner source={source} />
 
