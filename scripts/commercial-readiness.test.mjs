@@ -1418,6 +1418,75 @@ describe("leftover Apex demo KPI target honesty", () => {
     assert.equal(resolveKpiTarget(undefined), undefined);
   });
 
+  it("does not invent leftover Apex demo KPI targets 32/12/45/40/35/30/28/24/1.5", () => {
+    const leftover = [
+      ["kpi-2", 32],
+      ["kpi-3", 12],
+      ["kpi-4", 45],
+      ["kpi-5", 40],
+      ["kpi-6", 35],
+      ["kpi-7", 30],
+      ["kpi-9", 28],
+      ["kpi-10", 24],
+      ["kpi-11", 1.5],
+    ];
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    for (const [id, invented] of leftover) {
+      const card = KPIS.find((kpi) => kpi.id === id);
+      const live = apex.kpis.find((kpi) => kpi.id === id);
+      assert.ok(card, id);
+      assert.ok(live, id);
+      assert.equal(card.target, undefined, id);
+      assert.equal(live.target, undefined, id);
+      assert.notEqual(card.target, invented, id);
+      assert.notEqual(live.target, invented, id);
+    }
+
+    const seed = fs.readFileSync(new URL("./seed-supabase.mjs", import.meta.url), "utf8");
+    assert.match(seed, /\["gross_margin", "Gross Margin", 35\.9, "percent", -1\.2, "vs last month", null\]/);
+    assert.match(seed, /\["net_margin", "Net Margin", 13\.0, "percent", 0\.8, "vs last month", null\]/);
+    assert.doesNotMatch(seed, /\["gross_margin", "Gross Margin", 35\.9, "percent", -1\.2, "vs last month", 32\]/);
+    assert.doesNotMatch(seed, /\["net_margin", "Net Margin", 13\.0, "percent", 0\.8, "vs last month", 12\]/);
+  });
+
+  it("applies owner leftover remaining Apex demo KPI targets only", () => {
+    const ownerTargets = { gross_margin: 29, net_margin: 11 };
+    const kpis = computeKpis(
+      {
+        snapshot: {
+          currentCash: 100000,
+          forecastedCash: 80000,
+          revenueMTD: 200000,
+          revenueYTD: 500000,
+          grossProfit: 80000,
+          netProfit: 40000,
+          operatingExpenses: 50000,
+          accountsReceivable: 60000,
+          accountsPayable: 20000,
+          burnRate: 20000,
+          runway: 5,
+          debtObligations: 0,
+          payrollObligations: 30000,
+          ebitda: 45000,
+        },
+        trends: [
+          { month: "Jan", revenue: 180000, expenses: 120000, profit: 60000, cash: 90000 },
+          { month: "Feb", revenue: 200000, expenses: 130000, profit: 70000, cash: 100000 },
+        ],
+      },
+      ["gross_margin", "net_margin"],
+      ownerTargets
+    );
+    const gross = kpis.find((row) => row.key === "gross_margin");
+    const net = kpis.find((row) => row.key === "net_margin");
+    assert.ok(gross);
+    assert.ok(net);
+    assert.equal(gross.target, 29);
+    assert.equal(net.target, 11);
+    assert.notEqual(gross.target, 32);
+    assert.notEqual(net.target, 12);
+  });
+
   it("empty tenants do not inherit leftover Apex demo KPI targets", () => {
     for (const orgId of ["org-summit", "org-acme-services", "org-mesa-works", "org-unknown-apex-demo"]) {
       const empty = getTenantData(orgId);
