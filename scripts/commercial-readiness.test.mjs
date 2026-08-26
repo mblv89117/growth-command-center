@@ -3515,3 +3515,77 @@ describe("leftover settings invented Active-subscription Badge honesty", () => {
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover settings invented catalog-price-as-subscription honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/settings/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover catalog price/users as current subscription on the settings page", () => {
+    assert.equal(page.includes("currentPlan.price / 100"), false);
+    assert.equal(page.includes("currentPlan.users"), false);
+    assert.equal(page.includes("/month"), false);
+    assert.equal(page.includes("Up to {currentPlan.users} users"), false);
+    assert.equal(page.includes("${currentPlan.price / 100}/month"), false);
+    assert.match(
+      page,
+      /Selected plan catalog entry for \$\{organization\.name\}/
+    );
+    assert.match(
+      page,
+      /<Badge>\{\`Selected plan for \$\{organization\.name\}\`\}<\/Badge>/
+    );
+    assert.match(
+      page,
+      /<CardDescription>\{\`Billing settings for \$\{organization\.name\}\`\}<\/CardDescription>/
+    );
+    assert.match(
+      page,
+      /Margin variance alert setting for \$\{organization\.name\}/
+    );
+    assert.match(
+      page,
+      /AR aging alert setting for \$\{organization\.name\}/
+    );
+    assert.match(
+      page,
+      /Job billing schedule setting for \$\{organization\.name\}/
+    );
+    assert.match(
+      page,
+      /Sales pipeline forecast setting for \$\{organization\.name\}/
+    );
+    assert.match(
+      page,
+      /<CardDescription>\{\`Forecast settings for \$\{organization\.name\}\`\}<\/CardDescription>/
+    );
+    assert.match(
+      page,
+      /<CardDescription>\{\`Organization profile for \$\{organization\.name\}\`\}<\/CardDescription>/
+    );
+    assert.match(page, /description=\{`Settings for \$\{organization\.name\}`\}/);
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover settings catalog-price-as-subscription honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+  });
+
+  it("empty tenant still has no Apex leak after leftover settings catalog-price-as-subscription honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});

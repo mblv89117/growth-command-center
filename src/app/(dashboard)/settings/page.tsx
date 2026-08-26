@@ -45,7 +45,6 @@ export default function SettingsPage() {
     message: string;
     variant: "success" | "preview" | "error";
   } | null>(null);
-  const currentPlan = STRIPE_PLANS[organization.plan as PlanKey] ?? STRIPE_PLANS.growth;
   const [billingNotice, setBillingNotice] = useState<string | null>(() => {
     if (searchParams.get("success")) return "Subscription updated successfully.";
     if (searchParams.get("cancelled")) return "Checkout was cancelled.";
@@ -301,8 +300,7 @@ export default function SettingsPage() {
                     <Badge>{`Selected plan for ${organization.name}`}</Badge>
                   </div>
                   <p className="mt-1 text-muted-foreground">
-                    ${currentPlan.price / 100}/month
-                    · Up to {currentPlan.users} users
+                    {`Selected plan catalog entry for ${organization.name}`}
                   </p>
                 </div>
                 <Button variant="outline" onClick={openPortal} disabled={billingLoading === "portal"}>
