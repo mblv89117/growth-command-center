@@ -86,7 +86,7 @@ export default function CashForecastPage() {
     <div>
       <PageHeader
         title="Cash Forecast"
-        description="13-week rolling cash forecast with scenario analysis"
+        description={`Cash forecast for ${organization.name}`}
       />
       <ForecastInsightBanner />
       <DataSourceBanner source={source} />
