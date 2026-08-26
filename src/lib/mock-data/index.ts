@@ -239,7 +239,7 @@ export const REPORTS: Report[] = [
   { id: "rpt-3", name: "Profit & Loss Summary", description: "Profit and loss report", category: "Financials", lastGenerated: "2025-05-23", format: ["pdf", "excel"] },
   { id: "rpt-4", name: "Balance Sheet Summary", description: "Balance sheet report", category: "Financials", lastGenerated: "2025-05-23", format: ["pdf", "excel"] },
   { id: "rpt-5", name: "AR Aging Report", description: "AR aging report", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
-  { id: "rpt-6", name: "AP Aging Report", description: "Accounts payable aging by vendor and due date", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
+  { id: "rpt-6", name: "AP Aging Report", description: "AP aging report", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-7", name: "Sales Pipeline Forecast", description: "Sales pipeline forecast report", category: "Sales", lastGenerated: "2025-05-22", format: ["pdf", "excel"] },
   { id: "rpt-8", name: "Job Profitability Report", description: "Job profitability report", category: "Operations", lastGenerated: "2025-05-21", format: ["pdf", "excel"] },
   { id: "rpt-9", name: "Budget vs Actual", description: "Budget versus actual report", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
