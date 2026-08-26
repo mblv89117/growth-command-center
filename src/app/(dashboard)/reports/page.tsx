@@ -46,14 +46,14 @@ export default function ReportsPage() {
     <div>
       <PageHeader
         title="Reports"
-        description="CFO-grade reports ready for PDF, Excel, and board review"
+        description={`Reports for ${organization.name}`}
       />
       <DataSourceBanner source={source} />
 
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>KPI Scorecard</CardTitle>
-          <CardDescription>Key performance indicators snapshot — click edit to update KPIs</CardDescription>
+          <CardDescription>{`KPI scorecard for ${organization.name}`}</CardDescription>
         </CardHeader>
         <CardContent>
           <KpiScorecardGrid

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/shared";
+import { ValueCreationInsightBanner } from "@/components/value-creation/value-creation-insight-banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +42,7 @@ export default function ValueCreationPage() {
     <div>
       <PageHeader
         title="Value Creation"
-        description="Evidence-backed opportunities to improve margin, cash, and enterprise value"
+        description={`Value-creation opportunities for ${organization.name}`}
         actions={
           <Button variant="outline" asChild>
             <Link href="/integrations/import">
@@ -50,6 +51,8 @@ export default function ValueCreationPage() {
           </Button>
         }
       />
+
+      <ValueCreationInsightBanner />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Card>
