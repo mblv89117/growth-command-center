@@ -14,10 +14,14 @@ import { analyzeValueCreation } from "../src/lib/value-creation/analyze";
 import { slugifyCompanyName, organizationIdFromSlug } from "../src/lib/tenant/slug";
 import {
   APEX_DEMO_ORGANIZATION_ID,
+  DISCONNECTED_INTEGRATIONS,
   EMPTY_FINANCIAL_SNAPSHOT,
+  EMPTY_TENANT_REPORTS,
   FINANCIAL_SNAPSHOT,
+  INTEGRATIONS,
   KPIS,
   ORGANIZATIONS,
+  REPORTS,
   getTenantData,
 } from "../src/lib/mock-data";
 import {
@@ -894,5 +898,88 @@ describe("leftover seed.sql org-apex KPI target honesty", () => {
     assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
     assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
+
+describe("leftover empty-tenant catalog lastSync / lastGenerated honesty", () => {
+  const emptyOrgs = ["org-summit", "org-acme-services", "org-unknown-tenant", "org-hvcg"];
+  const namedConnectors = ["Stripe", "Gusto", "HubSpot", "Google Sheets"];
+
+  it("does not invent leftover connected Stripe/Gusto/HubSpot/Sheets lastSync for empty tenants", () => {
+    for (const orgId of emptyOrgs) {
+      const catalog = getTenantData(orgId).integrations;
+      const connected = catalog.filter((item) => item.status === "connected");
+      assert.equal(connected.length, 0, `${orgId} must not have connected catalog items`);
+      for (const name of namedConnectors) {
+        const item = catalog.find((entry) => entry.name === name);
+        assert.ok(item, `${orgId} catalog must include ${name}`);
+        assert.equal(item.status, "disconnected", `${orgId} ${name}`);
+        assert.equal(item.lastSync, undefined, `${orgId} ${name} lastSync`);
+      }
+    }
+    assert.equal(
+      DISCONNECTED_INTEGRATIONS.every((item) => item.status === "disconnected" && item.lastSync === undefined),
+      true
+    );
+    assert.equal(
+      INTEGRATIONS.some((item) => namedConnectors.includes(item.name) && item.status === "connected"),
+      true
+    );
+  });
+
+  it("does not advertise leftover lastGenerated demo dates on empty-tenant reports", () => {
+    for (const orgId of emptyOrgs) {
+      const reports = getTenantData(orgId).reports;
+      assert.equal(reports.length, EMPTY_TENANT_REPORTS.length);
+      for (const report of reports) {
+        assert.equal(
+          report.lastGenerated,
+          undefined,
+          `${orgId} ${report.id} must not advertise lastGenerated`
+        );
+      }
+    }
+    assert.equal(
+      EMPTY_TENANT_REPORTS.every((report) => report.lastGenerated === undefined),
+      true
+    );
+    assert.equal(
+      REPORTS.every((report) => typeof report.lastGenerated === "string"),
+      true
+    );
+  });
+
+  it("keeps live/owner-set catalog lastSync and Apex demo report dates SOURCE-DERIVED", () => {
+    const live = {
+      status: "connected",
+      lastSync: "2026-08-01T12:00:00Z",
+    };
+    assert.equal(live.status, "connected");
+    assert.equal(live.lastSync, "2026-08-01T12:00:00Z");
+
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.integrations.every((item) => item.status === "disconnected"), true);
+    assert.equal(apex.integrations.every((item) => item.lastSync === undefined), true);
+    assert.equal(apex.reports.every((report) => typeof report.lastGenerated === "string"), true);
+    assert.equal(apex.reports.length, REPORTS.length);
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+  });
+
+  it("empty tenant still has no Apex leak after leftover catalog lastSync honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.kpis.length, 0);
+    assert.equal(provisioned.kpis.length, 0);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("2025-05-24T05:30:00Z"), false);
+    assert.equal(JSON.stringify(provisioned).includes("2025-05-24T05:30:00Z"), false);
   });
 });

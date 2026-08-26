@@ -226,6 +226,13 @@ export const INTEGRATIONS: Integration[] = [
   { id: "int-10", name: "Google Sheets", category: "other", status: "connected", lastSync: "2025-05-24T03:00:00Z", description: "Import custom spreadsheets and forecasts", logo: "GS" },
 ];
 
+/** Catalog templates with invented connected lastSync must not be served as live connections. */
+export const DISCONNECTED_INTEGRATIONS: Integration[] = INTEGRATIONS.map((item) => ({
+  ...item,
+  status: "disconnected",
+  lastSync: undefined,
+}));
+
 export const REPORTS: Report[] = [
   { id: "rpt-1", name: "Executive Summary", description: "High-level financial overview for leadership and board review", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-2", name: "Cash Forecast Report", description: "13-week rolling cash forecast with scenario analysis", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
@@ -239,6 +246,15 @@ export const REPORTS: Report[] = [
   { id: "rpt-10", name: "Forecast vs Actual", description: "Forecast accuracy and variance tracking", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-11", name: "KPI Scorecard", description: "Key performance indicators dashboard export", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
 ];
+
+/** Report templates with no lastGenerated date — empty tenants must not advertise demo exports. */
+export const EMPTY_TENANT_REPORTS: Report[] = REPORTS.map((item) => ({
+  id: item.id,
+  name: item.name,
+  description: item.description,
+  category: item.category,
+  format: item.format,
+}));
 
 export const TEAM_MEMBERS: TeamMember[] = [
   { id: "tm-1", name: "Sarah Chen", email: "sarah.chen@apexconstruction.com", role: "founder", status: "active", joinedAt: "2023-06-15" },
@@ -372,7 +388,7 @@ export function getTenantData(organizationId: string): TenantData {
       bills: BILLS,
       alerts: ALERTS,
       kpis: KPIS,
-      integrations: INTEGRATIONS,
+      integrations: DISCONNECTED_INTEGRATIONS,
       reports: REPORTS,
       teamMembers: TEAM_MEMBERS,
       transactions: TRANSACTIONS,
@@ -399,8 +415,8 @@ export function getTenantData(organizationId: string): TenantData {
     bills: [],
     alerts: [],
     kpis: [],
-    integrations: INTEGRATIONS,
-    reports: REPORTS,
+    integrations: DISCONNECTED_INTEGRATIONS,
+    reports: EMPTY_TENANT_REPORTS,
     teamMembers: [],
     transactions: [],
     expenseCategories: [],
