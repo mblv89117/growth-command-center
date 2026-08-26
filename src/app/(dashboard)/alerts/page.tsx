@@ -3,11 +3,13 @@
 import { AlertItem, DataSourceBanner, PageHeader } from "@/components/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTenant } from "@/lib/tenant/context";
 import { useTenantData } from "@/hooks/use-tenant-data";
 import type { AlertSeverity } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 
 export default function AlertsPage() {
+  const { organization } = useTenant();
   const { data, source, loading } = useTenantData();
 
   const unreadCount = data.alerts.filter((a) => !a.isRead).length;
@@ -35,7 +37,7 @@ export default function AlertsPage() {
     <div>
       <PageHeader
         title="Alerts & Decision Support"
-        description="Financial and operational risk alerts with recommended actions"
+        description={`Alerts for ${organization.name}`}
       />
       <DataSourceBanner source={source} />
 
