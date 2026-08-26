@@ -1908,3 +1908,75 @@ describe("leftover reports-catalog invented leadership/board-review claim honest
     );
   });
 });
+
+describe("leftover reports-catalog invented P&L variance-analysis claim honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/reports/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Monthly and YTD P&L with variance analysis in reports catalog", () => {
+    const profitAndLoss = REPORTS.find((report) => report.id === "rpt-3");
+    assert.ok(profitAndLoss);
+    assert.equal(
+      profitAndLoss.description.includes("Monthly and YTD P&L with variance analysis"),
+      false
+    );
+    assert.equal(profitAndLoss.description.includes("Monthly and YTD P&L"), false);
+    assert.equal(profitAndLoss.description.includes("YTD P&L with variance"), false);
+    assert.equal(profitAndLoss.description, "Profit and loss report");
+    assert.equal(
+      REPORTS.some((report) =>
+        report.description.includes("Monthly and YTD P&L with variance analysis")
+      ),
+      false
+    );
+    assert.equal(
+      EMPTY_TENANT_REPORTS.some((report) =>
+        report.description.includes("Monthly and YTD P&L with variance analysis")
+      ),
+      false
+    );
+    assert.match(page, /<CardDescription>\{report\.description\}<\/CardDescription>/);
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover reports-catalog P&L honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+    const profitAndLoss = apex.reports.find((report) => report.id === "rpt-3");
+    assert.ok(profitAndLoss);
+    assert.equal(
+      profitAndLoss.description.includes("Monthly and YTD P&L with variance analysis"),
+      false
+    );
+    const executiveSummary = apex.reports.find((report) => report.id === "rpt-1");
+    assert.ok(executiveSummary);
+    assert.equal(executiveSummary.description.includes("leadership and board review"), false);
+    const cashForecast = apex.reports.find((report) => report.id === "rpt-2");
+    assert.ok(cashForecast);
+    assert.equal(cashForecast.description.includes("scenario analysis"), false);
+  });
+
+  it("empty tenant still has no Apex leak after leftover reports-catalog P&L honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+    assert.equal(
+      summit.reports.some((report) =>
+        report.description.includes("Monthly and YTD P&L with variance analysis")
+      ),
+      false
+    );
+  });
+});
