@@ -21,7 +21,7 @@ export const KPI_CATALOG: KpiDefinition[] = [
     name: "Revenue Growth",
     unit: "percent",
     category: "growth",
-    defaultTarget: 10,
+    // Do not invent revenue_growth defaultTarget = 10. Owner-set targets remain SOURCE-DERIVED.
     compute: (ctx) => {
       if (ctx.trends.length < 2) return null;
       const latest = ctx.trends[ctx.trends.length - 1];
@@ -35,7 +35,7 @@ export const KPI_CATALOG: KpiDefinition[] = [
     name: "Gross Margin",
     unit: "percent",
     category: "profitability",
-    defaultTarget: 35,
+    // Do not invent gross_margin defaultTarget = 35. Owner-set targets remain SOURCE-DERIVED.
     compute: (ctx) => {
       if (ctx.snapshot.revenueMTD === 0) return null;
       return Math.round((ctx.snapshot.grossProfit / ctx.snapshot.revenueMTD) * 1000) / 10;
@@ -46,7 +46,7 @@ export const KPI_CATALOG: KpiDefinition[] = [
     name: "Net Margin",
     unit: "percent",
     category: "profitability",
-    defaultTarget: 15,
+    // Do not invent net_margin defaultTarget = 15. Owner-set targets remain SOURCE-DERIVED.
     compute: (ctx) => {
       if (ctx.snapshot.revenueMTD === 0) return null;
       return Math.round((ctx.snapshot.netProfit / ctx.snapshot.revenueMTD) * 1000) / 10;
@@ -57,7 +57,7 @@ export const KPI_CATALOG: KpiDefinition[] = [
     name: "EBITDA Margin",
     unit: "percent",
     category: "profitability",
-    defaultTarget: 20,
+    // Do not invent ebitda_margin defaultTarget = 20. Owner-set targets remain SOURCE-DERIVED.
     compute: (ctx) => {
       if (ctx.snapshot.revenueMTD === 0) return null;
       return Math.round((ctx.snapshot.ebitda / ctx.snapshot.revenueMTD) * 1000) / 10;
@@ -68,7 +68,7 @@ export const KPI_CATALOG: KpiDefinition[] = [
     name: "AR Days",
     unit: "days",
     category: "cash",
-    defaultTarget: 45,
+    // Do not invent ar_days defaultTarget = 45. Owner-set targets remain SOURCE-DERIVED.
     compute: (ctx) => {
       if (ctx.snapshot.revenueMTD === 0) return null;
       const dailyRevenue = ctx.snapshot.revenueMTD / 30;
@@ -80,7 +80,7 @@ export const KPI_CATALOG: KpiDefinition[] = [
     name: "AP Days",
     unit: "days",
     category: "cash",
-    defaultTarget: 30,
+    // Do not invent ap_days defaultTarget = 30. Owner-set targets remain SOURCE-DERIVED.
     compute: (ctx) => {
       if (ctx.snapshot.operatingExpenses === 0) return null;
       const dailyExpense = ctx.snapshot.operatingExpenses / 30;
@@ -100,7 +100,7 @@ export const KPI_CATALOG: KpiDefinition[] = [
     name: "OpEx Ratio",
     unit: "percent",
     category: "efficiency",
-    defaultTarget: 25,
+    // Do not invent opex_ratio defaultTarget = 25. Owner-set targets remain SOURCE-DERIVED.
     compute: (ctx) => {
       if (ctx.snapshot.revenueMTD === 0) return null;
       return Math.round((ctx.snapshot.operatingExpenses / ctx.snapshot.revenueMTD) * 1000) / 10;
@@ -111,7 +111,7 @@ export const KPI_CATALOG: KpiDefinition[] = [
     name: "Labor %",
     unit: "percent",
     category: "efficiency",
-    defaultTarget: 35,
+    // Do not invent labor_pct defaultTarget = 35. Owner-set targets remain SOURCE-DERIVED.
     compute: (ctx) => {
       if (ctx.snapshot.revenueMTD === 0) return null;
       return Math.round((ctx.snapshot.payrollObligations / ctx.snapshot.revenueMTD) * 1000) / 10;
@@ -130,7 +130,8 @@ export const KPI_CATALOG: KpiDefinition[] = [
 /**
  * Owner-set finite targets > 0 are SOURCE-DERIVED.
  * Catalog defaults apply only when the definition still publishes one.
- * Do not invent cash_runway defaultTarget = 6.
+ * Do not invent cash_runway defaultTarget = 6 or leftover catalog
+ * defaultTargets 10 / 35 / 15 / 20 / 45 / 30 / 25 / 35.
  */
 export function resolveKpiTarget(ownerTarget: unknown, catalogDefault?: number): number | undefined {
   const parsed = Number(ownerTarget);
