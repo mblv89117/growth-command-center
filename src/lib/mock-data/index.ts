@@ -244,7 +244,7 @@ export const REPORTS: Report[] = [
   { id: "rpt-8", name: "Job Profitability Report", description: "Job profitability report", category: "Operations", lastGenerated: "2025-05-21", format: ["pdf", "excel"] },
   { id: "rpt-9", name: "Budget vs Actual", description: "Budget versus actual report", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-10", name: "Forecast vs Actual", description: "Forecast versus actual report", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
-  { id: "rpt-11", name: "KPI Scorecard", description: "Key performance indicators dashboard export", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
+  { id: "rpt-11", name: "KPI Scorecard", description: "KPI scorecard report", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
 ];
 
 /** Report templates with no lastGenerated date — empty tenants must not advertise demo exports. */
