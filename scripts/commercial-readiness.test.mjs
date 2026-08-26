@@ -1030,3 +1030,42 @@ describe("leftover unused INTEGRATIONS template connected lastSync honesty", () 
     assert.equal(JSON.stringify(INTEGRATIONS).includes("2025-05-24T05:30:00Z"), false);
   });
 });
+
+describe("leftover unused INTEGRATIONS Buildertrend pending honesty", () => {
+  it("does not invent leftover pending Buildertrend on unused INTEGRATIONS template", () => {
+    const item = INTEGRATIONS.find((entry) => entry.name === "Buildertrend");
+    assert.ok(item, "INTEGRATIONS must include Buildertrend");
+    assert.equal(item.status, "disconnected", "Buildertrend template");
+    assert.equal(item.lastSync, undefined, "Buildertrend template lastSync");
+    assert.equal(INTEGRATIONS.some((entry) => entry.status === "pending"), false);
+    assert.equal(INTEGRATIONS.some((entry) => entry.status === "connected"), false);
+    assert.equal(
+      DISCONNECTED_INTEGRATIONS.every((entry) => entry.status === "disconnected" && entry.lastSync === undefined),
+      true
+    );
+  });
+
+  it("keeps live/owner-set catalog lastSync SOURCE-DERIVED", () => {
+    const live = { status: "connected", lastSync: "2026-08-01T12:00:00Z" };
+    assert.equal(live.status, "connected");
+    assert.equal(live.lastSync, "2026-08-01T12:00:00Z");
+  });
+
+  it("empty tenant still has no Apex leak after leftover Buildertrend pending honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(apex.alerts.length, 7);
+    assert.equal(summit.kpis.length, 0);
+    assert.equal(provisioned.kpis.length, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+    assert.equal(
+      getTenantData("org-summit").integrations.find((entry) => entry.name === "Buildertrend")?.status,
+      "disconnected"
+    );
+  });
+});

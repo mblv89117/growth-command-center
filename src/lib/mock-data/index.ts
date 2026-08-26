@@ -219,7 +219,7 @@ export const INTEGRATIONS: Integration[] = [
   { id: "int-3", name: "Stripe", category: "payments", status: "disconnected", description: "Payment processing and revenue tracking", logo: "ST" }, // Do not invent leftover Stripe connected lastSync.
   { id: "int-4", name: "Plaid", category: "payments", status: "disconnected", description: "Bank account connections and cash balance sync", logo: "PL" },
   { id: "int-5", name: "Gusto", category: "payroll", status: "disconnected", description: "Payroll, benefits, and contractor payments", logo: "GU" }, // Do not invent leftover Gusto connected lastSync.
-  { id: "int-6", name: "Buildertrend", category: "operations", status: "pending", description: "Job costing, scheduling, and production tracking", logo: "BT" },
+  { id: "int-6", name: "Buildertrend", category: "operations", status: "disconnected", description: "Job costing, scheduling, and production tracking", logo: "BT" }, // Do not invent leftover Buildertrend pending.
   { id: "int-7", name: "HubSpot", category: "sales", status: "disconnected", description: "CRM, deals pipeline, and sales forecasting", logo: "HS" }, // Do not invent leftover HubSpot connected lastSync.
   { id: "int-8", name: "Salesforce", category: "sales", status: "disconnected", description: "Enterprise CRM and opportunity management", logo: "SF" },
   { id: "int-9", name: "Jobber", category: "operations", status: "disconnected", description: "Field service and job management", logo: "JB" },
