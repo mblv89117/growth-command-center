@@ -29,6 +29,10 @@ import {
   mapOrganizationRow,
   resolveCashAlertThreshold,
 } from "../src/lib/data/organizations";
+import {
+  founderJourneyDoesNotInventFinancials,
+  resolveFounderJourney,
+} from "../src/lib/journey/founder";
 
 describe("forecast compute", () => {
   it("maintains balance continuity across weeks", () => {
@@ -1069,3 +1073,74 @@ describe("leftover unused INTEGRATIONS Buildertrend pending honesty", () => {
     );
   });
 });
+
+describe("founder journey commercial packaging", () => {
+  it("routes empty tenant with incomplete onboarding to /onboarding", () => {
+    const journey = resolveFounderJourney({
+      organizationId: "org-acme-services",
+      onboardingComplete: false,
+      dataProvenance: "empty",
+    });
+    assert.equal(journey.status, "needs_onboarding");
+    assert.equal(journey.nextAction.href, "/onboarding");
+    assert.equal(journey.inventedFinancialValues, false);
+    assert.equal(founderJourneyDoesNotInventFinancials(journey), true);
+    assert.equal("currentCash" in journey, false);
+  });
+
+  it("routes empty tenant with completed onboarding to CSV/XLSX import", () => {
+    const journey = resolveFounderJourney({
+      organizationId: "org-summit",
+      onboardingComplete: true,
+      dataProvenance: "empty",
+    });
+    assert.equal(journey.status, "needs_import");
+    assert.equal(journey.nextAction.href, "/integrations/import");
+    assert.deepEqual(journey.completedSteps, ["onboard"]);
+    assert.equal(founderJourneyDoesNotInventFinancials(journey), true);
+  });
+
+  it("routes imported SOURCE-DERIVED workspace to forecast insight", () => {
+    const journey = resolveFounderJourney({
+      organizationId: "org-hvcg",
+      onboardingComplete: true,
+      dataProvenance: "imported",
+    });
+    assert.equal(journey.status, "ready_for_insight");
+    assert.equal(journey.nextAction.href, "/cash-forecast");
+    assert.deepEqual(journey.completedSteps, ["onboard", "import"]);
+    assert.equal(founderJourneyDoesNotInventFinancials(journey), true);
+  });
+
+  it("labels Apex demo as demo_seeded and does not claim commercial founder complete", () => {
+    const journey = resolveFounderJourney({
+      organizationId: APEX_DEMO_ORGANIZATION_ID,
+      onboardingComplete: true,
+      dataProvenance: "seeded",
+    });
+    assert.equal(journey.status, "demo_seeded");
+    assert.equal(journey.currentStep, "demo");
+    assert.deepEqual(journey.completedSteps, []);
+    assert.equal(JSON.stringify(journey).includes("487250"), false);
+    assert.equal(apexPinnedCashUnchanged(), true);
+  });
+
+  it("empty-tenant journey does not invent Apex cash or leak Apex names", () => {
+    const journey = resolveFounderJourney({
+      organizationId: "org-acme-services",
+      onboardingComplete: null,
+      dataProvenance: "empty",
+    });
+    const empty = getTenantData("org-acme-services");
+    assert.equal(journey.status, "needs_onboarding");
+    assert.equal(empty.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(journey).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(journey).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(journey).includes("487250"), false);
+    assert.equal(empty.financialSnapshot.currentCash === FINANCIAL_SNAPSHOT.currentCash, false);
+  });
+});
+
+function apexPinnedCashUnchanged() {
+  return getTenantData(APEX_DEMO_ORGANIZATION_ID).financialSnapshot.currentCash === FINANCIAL_SNAPSHOT.currentCash;
+}
