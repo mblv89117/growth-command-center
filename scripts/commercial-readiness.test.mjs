@@ -1653,6 +1653,57 @@ describe("leftover schema.sql DEFAULT cashAlertThreshold honesty", () => {
   });
 });
 
+describe("leftover Apex demo seed.sql dscr KPI target honesty", () => {
+  const seedSql = fs.readFileSync(new URL("../supabase/seed.sql", import.meta.url), "utf8");
+
+  it("does not invent leftover Apex demo seed.sql dscr KPI target 1.5", () => {
+    const executable = seedSql
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
+    assert.match(
+      executable,
+      /'org-apex', 'dscr', 'Debt Service Coverage', 1\.8, 'number', -0\.2, 'vs last quarter', NULL/
+    );
+    assert.doesNotMatch(
+      executable,
+      /'org-apex', 'dscr', 'Debt Service Coverage', 1\.8, 'number', -0\.2, 'vs last quarter', 1\.5/
+    );
+    const dscrRows = executable
+      .split("\n")
+      .filter((line) => line.includes("'dscr'"));
+    assert.equal(dscrRows.length, 1);
+    assert.match(dscrRows[0], /'org-apex'/);
+    assert.doesNotMatch(dscrRows[0], /,\s*1\.5\s*\)/);
+  });
+
+  it("owner-set DSCR target remains SOURCE-DERIVED", () => {
+    assert.equal(resolveKpiTarget(1.5), 1.5);
+    assert.equal(resolveKpiTarget("1.5"), 1.5);
+    assert.equal(resolveKpiTarget(2.0), 2);
+    assert.equal(resolveKpiTarget(undefined), undefined);
+    assert.equal(resolveKpiTarget(null), undefined);
+    assert.equal(resolveKpiTarget(0), undefined);
+  });
+
+  it("empty tenants do not inherit leftover Apex demo seed.sql dscr target 1.5", () => {
+    for (const orgId of ["org-summit", "org-mesa-verde", "org-unknown-dscr-29"]) {
+      const empty = getTenantData(orgId);
+      const dscr = empty.kpis.filter(
+        (row) => row.key === "dscr" || row.name === "Debt Service Coverage"
+      );
+      assert.equal(dscr.length, 0, orgId);
+      assert.equal(
+        empty.kpis.some((row) => row.target === 1.5),
+        false,
+        orgId
+      );
+      assert.equal(JSON.stringify(empty).includes("Harbor View"), false, orgId);
+      assert.equal(JSON.stringify(empty).includes("Apex Construction"), false, orgId);
+    }
+  });
+});
+
 describe("tenant slug", () => {
   it("slugifies company names", () => {
     assert.equal(slugifyCompanyName("Acme Services LLC"), "acme-services-llc");

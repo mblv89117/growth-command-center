@@ -52,7 +52,8 @@ INSERT INTO kpis (organization_id, kpi_key, name, value, unit, change, change_la
   ('org-apex', 'avg_deal', 'Average Deal Size', 1420000, 'currency', 8.5, 'vs last quarter', NULL),
   ('org-apex', 'job_profit', 'Job Profitability', 26.8, 'percent', -2.4, 'vs estimate', 28),
   ('org-apex', 'opex_ratio', 'Operating Expense Ratio', 22.9, 'percent', -0.5, 'vs last month', 24),
-  ('org-apex', 'dscr', 'Debt Service Coverage', 1.8, 'number', -0.2, 'vs last quarter', 1.5),
+  -- Do not invent leftover Apex demo DSCR KPI target 1.5. Owner-set covenants remain SOURCE-DERIVED.
+  ('org-apex', 'dscr', 'Debt Service Coverage', 1.8, 'number', -0.2, 'vs last quarter', NULL),
   ('org-apex', 'runway', 'Runway', 3.4, 'number', -0.3, 'months', 6),
   ('org-apex', 'ebitda', 'EBITDA', 1125600, 'currency', 15.2, 'vs last month', NULL)
 ON CONFLICT (organization_id, kpi_key) DO NOTHING;
