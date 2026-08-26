@@ -210,7 +210,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">Include job billing schedule</p>
-                  <p className="text-sm text-muted-foreground">Project cash from active job milestones</p>
+                  <p className="text-sm text-muted-foreground">{`Job billing schedule setting for ${organization.name}`}</p>
                 </div>
                 <Switch defaultChecked />
               </div>
