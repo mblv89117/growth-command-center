@@ -1,6 +1,7 @@
 import { GtmHomepage } from "@/components/marketing/gtm-homepage";
 import type { Metadata } from "next";
 import { getPrimaryPublicUrl } from "@/lib/domains";
+import { attributionFromSearchParams } from "@/lib/gtm/attribution";
 
 export const metadata: Metadata = {
   title: "Growth Command Center — See your business clearly",
@@ -18,6 +19,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function Home() {
-  return <GtmHomepage />;
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const attribution = attributionFromSearchParams(params);
+
+  return <GtmHomepage attribution={attribution} />;
 }

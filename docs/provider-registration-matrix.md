@@ -71,6 +71,6 @@
 | `www.growthcommandcenter.com` | Marketing www | CNAME → `cname.vercel-dns.com` |
 | `app.growthcommandcenter.com` | Authenticated app | CNAME → `cname.vercel-dns.com` |
 
-Add all three domains in Vercel project → Domains. Set `NEXT_PUBLIC_MARKETING_URL=https://www.growthcommandcenter.com` and `NEXT_PUBLIC_APP_URL=https://app.growthcommandcenter.com`.
+Add all three domains in Vercel project → Domains. Set `NEXT_PUBLIC_MARKETING_URL=https://growthcommandcenter.com` and `NEXT_PUBLIC_APP_URL=https://app.growthcommandcenter.com`.
 
 **Do not guess DNS** — verify in Vercel dashboard after owner adds domains.

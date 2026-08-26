@@ -87,6 +87,7 @@ export function validateProductionEnv(): string[] {
   if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
   if (!process.env.NEXT_PUBLIC_APP_URL) missing.push("NEXT_PUBLIC_APP_URL");
+  if (!process.env.NEXT_PUBLIC_MARKETING_URL) missing.push("NEXT_PUBLIC_MARKETING_URL");
 
   return missing;
 }

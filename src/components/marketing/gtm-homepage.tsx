@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CONNECTOR_REGISTRY } from "@/lib/connectors/registry";
 import { STANDALONE_PRICE_MONTHLY } from "@/lib/entitlements";
+import { appLoginUrl, appSignupUrl } from "@/lib/domains/links";
+import type { GtmAttribution } from "@/lib/gtm/attribution";
 
 const connectorEcosystem = [
   { name: "QuickBooks", status: "Coming Soon", category: "Accounting" },
@@ -27,8 +29,10 @@ const connectorEcosystem = [
   { name: "PDF Reports", status: "Live", category: "Upload" },
 ];
 
-export function GtmHomepage() {
+export function GtmHomepage({ attribution = {} }: { attribution?: GtmAttribution }) {
   const liveUploads = CONNECTOR_REGISTRY.filter((c) => c.isProductionLive && c.category === "uploads");
+  const signupUrl = appSignupUrl(attribution);
+  const loginUrl = appLoginUrl();
 
   return (
     <div className="min-h-screen bg-background">
@@ -53,10 +57,10 @@ export function GtmHomepage() {
           </nav>
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild>
-              <Link href="/login">Sign in</Link>
+              <Link href={loginUrl}>Sign in</Link>
             </Button>
             <Button asChild>
-              <Link href="/signup">Start your command center</Link>
+              <Link href={signupUrl}>Start your command center</Link>
             </Button>
           </div>
         </div>
@@ -79,7 +83,7 @@ export function GtmHomepage() {
           </p>
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Button size="lg" asChild>
-              <Link href="/signup">
+              <Link href={signupUrl}>
                 Start your command center <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
@@ -207,7 +211,7 @@ export function GtmHomepage() {
               14-day free trial · No credit card required to explore
             </p>
             <Button size="lg" variant="secondary" asChild>
-              <Link href="/signup">
+              <Link href={signupUrl}>
                 Start your command center <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>

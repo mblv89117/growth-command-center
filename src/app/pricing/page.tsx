@@ -3,6 +3,8 @@ import { ArrowRight, Building2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { STANDALONE_PRICE_MONTHLY } from "@/lib/entitlements";
+import { appLoginUrl, appSignupUrl } from "@/lib/domains/links";
+import { attributionFromSearchParams } from "@/lib/gtm/attribution";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -19,7 +21,16 @@ const starterFeatures = [
   "Native connector access as certified (QuickBooks, Plaid, Stripe, and more)",
 ];
 
-export default function PricingPage() {
+export default async function PricingPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const attribution = attributionFromSearchParams(params);
+  const signupUrl = appSignupUrl(attribution);
+  const loginUrl = appLoginUrl();
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
@@ -29,10 +40,10 @@ export default function PricingPage() {
           </Link>
           <div className="flex gap-3">
             <Button variant="ghost" asChild>
-              <Link href="/login">Sign in</Link>
+              <Link href={loginUrl}>Sign in</Link>
             </Button>
             <Button asChild>
-              <Link href="/signup">Start free trial</Link>
+              <Link href={signupUrl}>Start free trial</Link>
             </Button>
           </div>
         </div>
@@ -47,7 +58,6 @@ export default function PricingPage() {
         </div>
 
         <div className="grid gap-8 md:grid-cols-2">
-          {/* Standalone */}
           <Card className="border-2 border-primary">
             <CardHeader>
               <CardTitle>Standalone Subscription</CardTitle>
@@ -67,7 +77,7 @@ export default function PricingPage() {
                 ))}
               </ul>
               <Button className="w-full" asChild>
-                <Link href="/signup">
+                <Link href={signupUrl}>
                   Start 14-day free trial <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -77,7 +87,6 @@ export default function PricingPage() {
             </CardContent>
           </Card>
 
-          {/* HVCG included */}
           <Card>
             <CardHeader>
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-muted">

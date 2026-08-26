@@ -28,7 +28,7 @@ export function isAppHost(host: string): boolean {
 }
 
 export function getPrimaryPublicUrl(): string {
-  return process.env.NEXT_PUBLIC_MARKETING_URL ?? `https://${COMMERCIAL_WWW}`;
+  return process.env.NEXT_PUBLIC_MARKETING_URL ?? `https://${COMMERCIAL_DOMAIN}`;
 }
 
 export function getAppUrl(): string {
