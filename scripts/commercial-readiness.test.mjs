@@ -463,7 +463,7 @@ describe("forecast KPI honesty", () => {
 });
 
 describe("value creation", () => {
-  it("surfaces runway risk when below threshold", () => {
+  it("does not invent runway-risk from a hardcoded 6-month threshold", () => {
     const board = analyzeValueCreation({
       organizationId: "org-test",
       snapshot: {
@@ -486,12 +486,134 @@ describe("value creation", () => {
       kpis: [],
       alerts: [],
     });
-    assert.ok(board.opportunities.some((o) => o.id === "runway-risk"));
+    assert.equal(
+      board.opportunities.some((o) => o.id === "runway-risk"),
+      false,
+      "runway 4 without an owner target must not invent a 6-month safety threshold"
+    );
     assert.equal(
       board.opportunities.some((o) => o.id === "opex-efficiency"),
       false,
       "runway-only input must not invent a 35% OpEx industry threshold"
     );
+    assert.equal(JSON.stringify(board).includes("6-month"), false);
+  });
+
+  it("surfaces runway-risk only against an owner KPI target", () => {
+    const board = analyzeValueCreation({
+      organizationId: "org-summit",
+      snapshot: {
+        currentCash: 100000,
+        forecastedCash: 80000,
+        revenueMTD: 50000,
+        revenueYTD: 200000,
+        grossProfit: 20000,
+        netProfit: 10000,
+        operatingExpenses: 30000,
+        accountsReceivable: 40000,
+        accountsPayable: 20000,
+        burnRate: 25000,
+        runway: 4,
+        debtObligations: 0,
+        payrollObligations: 15000,
+        ebitda: 12000,
+      },
+      trends: [],
+      kpis: [
+        {
+          id: "cash_runway",
+          name: "Cash Runway",
+          value: 4,
+          unit: "number",
+          change: 0,
+          changeLabel: "vs owner target",
+          target: 8,
+        },
+      ],
+      alerts: [],
+    });
+    const runway = board.opportunities.find((o) => o.id === "runway-risk");
+    assert.ok(runway);
+    assert.match(runway.finding, /4 months vs 8-month owner target/);
+    assert.match(runway.evidence, /^CALCULATED: current cash \$100,000, burn \$25,000\/mo = 4 vs owner target 8/);
+    assert.doesNotMatch(runway.finding, /6-month safety threshold/);
+    assert.doesNotMatch(runway.evidence, /6-month/);
+    assert.equal(runway.confidence, "VERIFIED");
+  });
+
+  it("does not invent ap-optimization from AP > AR * 0.8", () => {
+    const board = analyzeValueCreation({
+      organizationId: "org-summit",
+      snapshot: {
+        currentCash: 90000,
+        forecastedCash: 0,
+        revenueMTD: 100000,
+        revenueYTD: 400000,
+        grossProfit: 40000,
+        netProfit: 10000,
+        operatingExpenses: 30000,
+        accountsReceivable: 20000,
+        accountsPayable: 18000,
+        burnRate: 15000,
+        runway: 6,
+        debtObligations: 0,
+        payrollObligations: 20000,
+        ebitda: 12000,
+      },
+      trends: [],
+      kpis: [],
+      alerts: [],
+    });
+    assert.equal(18000 > 20000 * 0.8, true, "fixture would have triggered the invented 0.8 rule");
+    assert.equal(
+      board.opportunities.some((o) => o.id === "ap-optimization"),
+      false
+    );
+    assert.equal(JSON.stringify(board).includes("AP/AR"), false);
+    assert.equal(JSON.stringify(board).includes("0.8"), false);
+  });
+
+  it("surfaces ap-optimization only against an owner AP-days target", () => {
+    const board = analyzeValueCreation({
+      organizationId: "org-summit",
+      snapshot: {
+        currentCash: 90000,
+        forecastedCash: 0,
+        revenueMTD: 100000,
+        revenueYTD: 400000,
+        grossProfit: 40000,
+        netProfit: 10000,
+        operatingExpenses: 30000,
+        accountsReceivable: 20000,
+        accountsPayable: 40000,
+        burnRate: 15000,
+        runway: 6,
+        debtObligations: 0,
+        payrollObligations: 20000,
+        ebitda: 12000,
+      },
+      trends: [],
+      kpis: [
+        {
+          id: "ap_days",
+          name: "AP Days",
+          value: 40,
+          unit: "days",
+          change: 0,
+          changeLabel: "vs owner target",
+          target: 30,
+        },
+      ],
+      alerts: [],
+    });
+    const ap = board.opportunities.find((o) => o.id === "ap-optimization");
+    assert.ok(ap);
+    assert.match(ap.finding, /40 vs 30-day owner target/);
+    assert.match(ap.evidence, /^CALCULATED: AP \$40,000 vs owner AP-days target 30/);
+    assert.doesNotMatch(ap.finding, /0\.8|80%/);
+    assert.doesNotMatch(ap.evidence, /0\.8/);
+    assert.equal(ap.financialImpact, 10000);
+    assert.equal(ap.confidence, "VERIFIED");
   });
 
   it("does not invent an opex-efficiency opportunity from revenueMTD * 0.35", () => {
@@ -568,7 +690,7 @@ describe("value creation", () => {
     assert.equal(opex.confidence, "VERIFIED");
   });
 
-  it("labels revenue-decline threshold math as CALCULATED on real trends", () => {
+  it("does not invent revenue-decline from latest < 90% of first of last 3", () => {
     const board = analyzeValueCreation({
       organizationId: "org-summit",
       snapshot: {
@@ -595,10 +717,57 @@ describe("value creation", () => {
       kpis: [],
       alerts: [],
     });
+    assert.equal(80000 < 100000 * 0.9, true, "fixture would have triggered the invented 90% rule");
+    const decline = board.opportunities.find((o) => o.id === "revenue-decline");
+    assert.equal(decline, undefined);
+    assert.equal(JSON.stringify(board).includes("90%"), false);
+  });
+
+  it("surfaces revenue-decline only against an owner growth target", () => {
+    const board = analyzeValueCreation({
+      organizationId: "org-summit",
+      snapshot: {
+        currentCash: 100000,
+        forecastedCash: 0,
+        revenueMTD: 40000,
+        revenueYTD: 180000,
+        grossProfit: 12000,
+        netProfit: 4000,
+        operatingExpenses: 20000,
+        accountsReceivable: 10000,
+        accountsPayable: 8000,
+        burnRate: 15000,
+        runway: 6.7,
+        debtObligations: 0,
+        payrollObligations: 10000,
+        ebitda: 0,
+      },
+      trends: [
+        { month: "Jan", revenue: 100000, expenses: 60000, profit: 40000, cash: 120000 },
+        { month: "Feb", revenue: 95000, expenses: 62000, profit: 33000, cash: 110000 },
+        { month: "Mar", revenue: 80000, expenses: 61000, profit: 19000, cash: 100000 },
+      ],
+      kpis: [
+        {
+          id: "revenue_growth",
+          name: "Revenue Growth",
+          value: -15.8,
+          unit: "percent",
+          change: 0,
+          changeLabel: "vs owner target",
+          target: 10,
+        },
+      ],
+      alerts: [],
+    });
     const decline = board.opportunities.find((o) => o.id === "revenue-decline");
     assert.ok(decline);
-    assert.match(decline.evidence, /^CALCULATED/);
-    assert.doesNotMatch(decline.evidence, /^SOURCE-DERIVED/);
+    assert.match(decline.finding, /-15\.8% vs 10% owner target/);
+    assert.match(decline.evidence, /^CALCULATED from SOURCE-DERIVED monthly trends vs owner target 10%/);
+    assert.doesNotMatch(decline.evidence, /90%/);
+    assert.doesNotMatch(decline.finding, /90%/);
+    assert.equal(decline.financialImpact, 15000);
+    assert.equal(decline.confidence, "VERIFIED");
   });
 
   it("empty tenant has no invented value-creation opportunities", () => {
