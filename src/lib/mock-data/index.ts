@@ -237,7 +237,7 @@ export const REPORTS: Report[] = [
   { id: "rpt-1", name: "Executive Summary", description: "Executive summary report", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-2", name: "Cash Forecast Report", description: "Cash forecast report", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-3", name: "Profit & Loss Summary", description: "Profit and loss report", category: "Financials", lastGenerated: "2025-05-23", format: ["pdf", "excel"] },
-  { id: "rpt-4", name: "Balance Sheet Summary", description: "Assets, liabilities, and equity snapshot", category: "Financials", lastGenerated: "2025-05-23", format: ["pdf", "excel"] },
+  { id: "rpt-4", name: "Balance Sheet Summary", description: "Balance sheet report", category: "Financials", lastGenerated: "2025-05-23", format: ["pdf", "excel"] },
   { id: "rpt-5", name: "AR Aging Report", description: "Accounts receivable aging by customer and bucket", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-6", name: "AP Aging Report", description: "Accounts payable aging by vendor and due date", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-7", name: "Sales Pipeline Forecast", description: "Sales pipeline forecast report", category: "Sales", lastGenerated: "2025-05-22", format: ["pdf", "excel"] },
