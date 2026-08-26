@@ -3329,3 +3329,60 @@ describe("leftover settings invented Project-cash-from-active-job-milestones hel
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover settings invented Alert-when-invoices-exceed-30-days helper-text honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/settings/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Alert when invoices exceed 30 days on the settings page", () => {
+    assert.equal(page.includes("Alert when invoices exceed 30 days"), false);
+    assert.equal(page.includes("invoices exceed 30 days"), false);
+    assert.equal(page.includes("exceed 30 days"), false);
+    assert.match(
+      page,
+      /AR aging alert setting for \$\{organization\.name\}/
+    );
+    assert.match(page, /AR aging alerts/);
+    assert.match(
+      page,
+      /Job billing schedule setting for \$\{organization\.name\}/
+    );
+    assert.match(
+      page,
+      /Sales pipeline forecast setting for \$\{organization\.name\}/
+    );
+    assert.match(
+      page,
+      /<CardDescription>\{\`Forecast settings for \$\{organization\.name\}\`\}<\/CardDescription>/
+    );
+    assert.match(
+      page,
+      /<CardDescription>\{\`Organization profile for \$\{organization\.name\}\`\}<\/CardDescription>/
+    );
+    assert.match(page, /description=\{`Settings for \$\{organization\.name\}`\}/);
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover settings invoices-exceed-30-days honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+  });
+
+  it("empty tenant still has no Apex leak after leftover settings invoices-exceed-30-days honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
