@@ -42,7 +42,13 @@ export async function recomputeTenantFinancials(
     }
 
     const settings = (orgRow?.settings as Record<string, unknown>) ?? {};
-    const cashAlertThreshold = options?.cashAlertThreshold ?? Number(settings.cashAlertThreshold ?? 150000);
+    const ownerThresholdRaw = options?.cashAlertThreshold ?? settings.cashAlertThreshold;
+    const cashAlertThreshold =
+      typeof ownerThresholdRaw === "number" && Number.isFinite(ownerThresholdRaw) && ownerThresholdRaw > 0
+        ? ownerThresholdRaw
+        : typeof ownerThresholdRaw === "string" && Number.isFinite(Number(ownerThresholdRaw)) && Number(ownerThresholdRaw) > 0
+          ? Number(ownerThresholdRaw)
+          : null;
 
     const snapshot = mapSnapshot(snapshotRow);
     const trends: MonthlyTrend[] = (trendsRows ?? []).map((r) => ({
@@ -55,7 +61,7 @@ export async function recomputeTenantFinancials(
 
     const input = buildForecastInputFromSnapshot(snapshot);
     const weeks = generateDeterministicWeeklyForecast(input, 13, 1, cashAlertThreshold);
-    const months = aggregateMonthlyForecast(weeks);
+    const months = aggregateMonthlyForecast(weeks, cashAlertThreshold);
     const weeklyBurn = calculateWeeklyBurn(weeks);
     const runwayWeeks = calculateRunwayWeeks(snapshot.currentCash, weeklyBurn);
     const runwayMonths = Math.round((runwayWeeks / 4.33) * 10) / 10;

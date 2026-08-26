@@ -31,11 +31,31 @@ export function buildForecastInputFromSnapshot(snapshot: {
   };
 }
 
+/**
+ * Cash-risk flags require SOURCE-DERIVED insolvency or an owner cash-alert target.
+ * Do not invent endingBalance < 150000.
+ */
+export function isCashRiskPeriod(
+  endingBalance: number,
+  ownerCashAlertThreshold?: number | null
+): boolean {
+  if (!Number.isFinite(endingBalance)) return false;
+  if (endingBalance < 0) return true;
+  if (
+    typeof ownerCashAlertThreshold === "number" &&
+    Number.isFinite(ownerCashAlertThreshold) &&
+    ownerCashAlertThreshold > 0
+  ) {
+    return endingBalance < ownerCashAlertThreshold;
+  }
+  return false;
+}
+
 export function generateDeterministicWeeklyForecast(
   input: ForecastInput,
   weeks = 13,
   scenarioMultiplier = 1,
-  cashAlertThreshold = 150000
+  ownerCashAlertThreshold?: number | null
 ): CashForecastWeek[] {
   const weeklyInflow =
     (input.receivables / weeks +
@@ -81,14 +101,17 @@ export function generateDeterministicWeeklyForecast(
       inflows,
       outflows,
       endingBalance: Math.round(balance),
-      isRiskPeriod: balance < cashAlertThreshold,
+      isRiskPeriod: isCashRiskPeriod(balance, ownerCashAlertThreshold),
     });
   }
 
   return forecast;
 }
 
-export function aggregateMonthlyForecast(weeks: CashForecastWeek[]): CashForecastMonth[] {
+export function aggregateMonthlyForecast(
+  weeks: CashForecastWeek[],
+  ownerCashAlertThreshold?: number | null
+): CashForecastMonth[] {
   const months: CashForecastMonth[] = [];
   const buckets = new Map<string, { inflows: number; outflows: number; ending: number }>();
 
@@ -107,7 +130,7 @@ export function aggregateMonthlyForecast(weeks: CashForecastWeek[]): CashForecas
       inflows: data.inflows,
       outflows: data.outflows,
       endingBalance: data.ending,
-      isRiskPeriod: data.ending < 150000,
+      isRiskPeriod: isCashRiskPeriod(data.ending, ownerCashAlertThreshold),
     });
   }
 
