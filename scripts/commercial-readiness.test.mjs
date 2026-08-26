@@ -7,7 +7,7 @@ import {
   aggregateMonthlyForecast,
   isCashRiskPeriod,
 } from "../src/lib/forecast/compute";
-import { computeKpis } from "../src/lib/kpi/catalog";
+import { KPI_CATALOG, computeKpis, resolveKpiTarget } from "../src/lib/kpi/catalog";
 import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financial/deltas";
 import { buildImportPreview } from "../src/lib/imports/commit";
 import { analyzeValueCreation } from "../src/lib/value-creation/analyze";
@@ -468,5 +468,88 @@ describe("leftover org-summit listed mock cashAlertThreshold honesty", () => {
     assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
     assert.equal(JSON.stringify(summit).includes("Harbor View"), false);
+  });
+});
+
+describe("leftover KPI catalog cash_runway defaultTarget honesty", () => {
+  const cashRunway = KPI_CATALOG.find((def) => def.key === "cash_runway");
+
+  it("does not invent leftover cash_runway defaultTarget 6", () => {
+    assert.ok(cashRunway);
+    assert.equal(cashRunway.defaultTarget, undefined);
+    assert.notEqual(cashRunway.defaultTarget, 6);
+
+    const kpis = computeKpis({
+      snapshot: {
+        currentCash: 50000,
+        forecastedCash: 40000,
+        revenueMTD: 20000,
+        revenueYTD: 80000,
+        grossProfit: 8000,
+        netProfit: 2000,
+        operatingExpenses: 18000,
+        accountsReceivable: 10000,
+        accountsPayable: 8000,
+        burnRate: 18000,
+        runway: 2.8,
+        debtObligations: 0,
+        payrollObligations: 9000,
+        ebitda: 3000,
+      },
+      trends: [],
+    });
+    const runway = kpis.find((kpi) => kpi.key === "cash_runway");
+    assert.ok(runway);
+    assert.equal(runway.target, undefined);
+    assert.notEqual(runway.target, 6);
+  });
+
+  it("keeps owner-set cash_runway target SOURCE-DERIVED", () => {
+    assert.equal(resolveKpiTarget(undefined), undefined);
+    assert.equal(resolveKpiTarget(null), undefined);
+    assert.equal(resolveKpiTarget(0), undefined);
+    assert.equal(resolveKpiTarget(11), 11);
+
+    const owner = computeKpis(
+      {
+        snapshot: {
+          currentCash: 50000,
+          forecastedCash: 40000,
+          revenueMTD: 20000,
+          revenueYTD: 80000,
+          grossProfit: 8000,
+          netProfit: 2000,
+          operatingExpenses: 18000,
+          accountsReceivable: 10000,
+          accountsPayable: 8000,
+          burnRate: 18000,
+          runway: 2.8,
+          debtObligations: 0,
+          payrollObligations: 9000,
+          ebitda: 3000,
+        },
+        trends: [],
+      },
+      undefined,
+      { cash_runway: 11 }
+    );
+    const runway = owner.find((kpi) => kpi.key === "cash_runway");
+    assert.ok(runway);
+    assert.equal(runway.target, 11);
+    assert.notEqual(runway.target, 6);
+  });
+
+  it("empty tenant still has no Apex leak after cash_runway catalog honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
