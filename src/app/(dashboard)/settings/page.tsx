@@ -203,7 +203,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">Include sales pipeline in forecast</p>
-                  <p className="text-sm text-muted-foreground">Weight open deals into revenue projections</p>
+                  <p className="text-sm text-muted-foreground">{`Sales pipeline forecast setting for ${organization.name}`}</p>
                 </div>
                 <Switch defaultChecked />
               </div>
