@@ -69,7 +69,7 @@ export default function DashboardPage() {
     <div>
       <PageHeader
         title="Executive Dashboard"
-        description={`Real-time financial overview for ${organization.name}`}
+        description={`Financial overview for ${organization.name}`}
         actions={
           <div className="flex items-center gap-2">
             <Badge variant="secondary">

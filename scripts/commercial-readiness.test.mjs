@@ -1493,3 +1493,41 @@ describe("leftover financials-page invented QBO/Plaid sync claim honesty", () =>
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover dashboard invented Real-time financial overview honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/dashboard/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Real-time financial overview on the dashboard page", () => {
+    assert.equal(page.includes("Real-time financial overview"), false);
+    assert.equal(page.includes("Real-time"), false);
+    assert.match(
+      page,
+      /description=\{`Financial overview for \$\{organization\.name\}`\}/
+    );
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover realtime honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+  });
+
+  it("empty tenant still has no Apex leak after leftover dashboard realtime honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
