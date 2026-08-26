@@ -42,7 +42,7 @@ export default function ValueCreationPage() {
     <div>
       <PageHeader
         title="Value Creation"
-        description="Evidence-backed opportunities to improve margin, cash, and enterprise value"
+        description={`Value-creation opportunities for ${organization.name}`}
         actions={
           <Button variant="outline" asChild>
             <Link href="/integrations/import">

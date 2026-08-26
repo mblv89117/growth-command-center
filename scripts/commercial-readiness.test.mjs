@@ -1571,3 +1571,45 @@ describe("leftover reports-page invented CFO-grade PDF/Excel/board-review claim 
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover value-creation-page invented Evidence-backed claim honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/value-creation/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Evidence-backed opportunities on the value-creation page", () => {
+    assert.equal(
+      page.includes("Evidence-backed opportunities to improve margin, cash, and enterprise value"),
+      false
+    );
+    assert.equal(page.includes("Evidence-backed"), false);
+    assert.equal(page.includes("enterprise value"), false);
+    assert.match(
+      page,
+      /description=\{`Value-creation opportunities for \$\{organization\.name\}`\}/
+    );
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover value-creation honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+  });
+
+  it("empty tenant still has no Apex leak after leftover value-creation honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
