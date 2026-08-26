@@ -73,10 +73,11 @@ async function seed() {
   if (budgetErr) throw budgetErr;
 
   const kpis = [
-    ["revenue_growth", "Revenue Growth", 12.4, "percent", 2.1, "vs last month", 10],
+    // Do not invent leftover Apex demo Revenue Growth target = 10 or Runway target = 6.
+    ["revenue_growth", "Revenue Growth", 12.4, "percent", 2.1, "vs last month", null],
     ["gross_margin", "Gross Margin", 35.9, "percent", -1.2, "vs last month", 32],
     ["net_margin", "Net Margin", 13.0, "percent", 0.8, "vs last month", 12],
-    ["runway", "Runway", 3.4, "number", -0.3, "months", 6],
+    ["runway", "Runway", 3.4, "number", -0.3, "months", null],
     ["ebitda", "EBITDA", 1125600, "currency", 15.2, "vs last month", null],
   ].map(([kpi_key, name, value, unit, change, change_label, target]) => ({
     organization_id: "org-apex", kpi_key, name, value, unit, change, change_label, target,
