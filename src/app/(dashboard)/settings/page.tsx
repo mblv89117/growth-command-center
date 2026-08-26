@@ -187,7 +187,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Forecast Settings</CardTitle>
-              <CardDescription>Default assumptions for cash forecasting</CardDescription>
+              <CardDescription>{`Forecast settings for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
