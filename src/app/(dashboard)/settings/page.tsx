@@ -109,7 +109,7 @@ export default function SettingsPage() {
     <div>
       <PageHeader
         title="Settings"
-        description="Organization settings, forecast assumptions, thresholds, and billing"
+        description={`Settings for ${organization.name}`}
       />
 
       {!canManageSettings && (

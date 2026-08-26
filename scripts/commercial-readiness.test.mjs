@@ -3039,3 +3039,44 @@ describe("leftover settings invented Default-assumptions-for-cash-forecasting Ca
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover settings invented Organization-settings-forecast-assumptions-thresholds-and-billing PageHeader honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/settings/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Organization settings, forecast assumptions, thresholds, and billing on the settings page", () => {
+    assert.equal(page.includes("Organization settings, forecast assumptions, thresholds, and billing"), false);
+    assert.equal(page.includes("forecast assumptions"), false);
+    assert.equal(page.includes("thresholds, and billing"), false);
+    assert.match(page, /description=\{`Settings for \$\{organization\.name\}`\}/);
+    assert.match(
+      page,
+      /<CardDescription>\{\`Forecast settings for \$\{organization\.name\}\`\}<\/CardDescription>/
+    );
+    assert.match(page, /<CardTitle>Forecast Settings<\/CardTitle>/);
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover settings PageHeader honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+  });
+
+  it("empty tenant still has no Apex leak after leftover settings PageHeader honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
