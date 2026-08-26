@@ -32,10 +32,11 @@ export function ImportSuccessHandoffCard({
       <div className="mb-3 flex items-start gap-3">
         <Compass className="mt-0.5 h-5 w-5 text-green-700 dark:text-green-400" />
         <div>
-          <p className="font-medium">Import landed — review forecast and dashboard</p>
+          <p className="font-medium">Import landed — review forecast, dashboard, and value-creation</p>
           <p className="text-sm text-muted-foreground">
-            SOURCE-DERIVED rows are committed. Next: understand forecast and the executive dashboard
-            from those numbers. This card does not invent cash, forecast, or KPI values.
+            SOURCE-DERIVED rows are committed. Next: understand forecast, the executive dashboard,
+            and value-creation opportunities from those numbers. This card does not invent cash,
+            forecast, or KPI values.
           </p>
         </div>
       </div>

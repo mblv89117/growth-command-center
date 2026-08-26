@@ -1153,7 +1153,7 @@ describe("import-success forecast/dashboard insight handoff", () => {
     assert.equal(handoff.status, "import_success");
     assert.deepEqual(
       handoff.destinations.map((d) => d.href),
-      ["/cash-forecast", "/dashboard"],
+      ["/cash-forecast", "/dashboard", "/value-creation"],
     );
     assert.equal(handoff.inventedFinancialValues, false);
     assert.equal(importHandoffDoesNotInventFinancials(handoff), true);
@@ -1168,9 +1168,10 @@ describe("import-success forecast/dashboard insight handoff", () => {
       dataProvenance: "computed",
     });
     assert.equal(handoff.status, "import_success");
-    assert.equal(handoff.destinations.length, 2);
+    assert.equal(handoff.destinations.length, 3);
     assert.equal(handoff.destinations[0].href, "/cash-forecast");
     assert.equal(handoff.destinations[1].href, "/dashboard");
+    assert.equal(handoff.destinations[2].href, "/value-creation");
     assert.equal(importHandoffDoesNotInventFinancials(handoff), true);
   });
 
@@ -1198,6 +1199,19 @@ describe("import-success forecast/dashboard insight handoff", () => {
     assert.deepEqual(handoff.destinations, []);
     assert.equal(JSON.stringify(handoff).includes("487250"), false);
     assert.equal(apexPinnedCashUnchanged(), true);
+  });
+
+  it("does not invent financial values on the value-creation insight destination", () => {
+    const handoff = resolveImportSuccessHandoff({
+      organizationId: "org-hvcg",
+      onboardingComplete: true,
+      dataProvenance: "imported",
+    });
+    const valueCreation = handoff.destinations.find((d) => d.href === "/value-creation");
+    assert.equal(Boolean(valueCreation), true);
+    assert.equal(JSON.stringify(valueCreation).includes("487250"), false);
+    assert.equal("currentCash" in (valueCreation ?? {}), false);
+    assert.equal(importHandoffDoesNotInventFinancials(handoff), true);
   });
 });
 

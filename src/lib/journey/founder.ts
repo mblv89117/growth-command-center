@@ -146,6 +146,12 @@ export function resolveImportSuccessHandoff(input: FounderJourneyInput): ImportS
         label: "Open executive dashboard",
         rationale: "See KPIs, risks, and next actions from the same imported numbers.",
       },
+      {
+        href: "/value-creation",
+        label: "Review value-creation opportunities",
+        rationale:
+          "See owner-gated recommendations derived from imported SOURCE-DERIVED numbers. AI may explain; it must not invent values.",
+      },
     ],
     inventedFinancialValues: false,
   };
