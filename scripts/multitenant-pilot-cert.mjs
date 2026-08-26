@@ -97,7 +97,7 @@ async function getTenantContext(supabase, userId) {
     .eq("id", profile.organization_id)
     .single();
 
-  return { orgId: profile.organization_id as string, org, fullName: profile.full_name as string };
+  return { orgId: profile.organization_id, org, fullName: profile.full_name };
 }
 
 async function importCsv(token, orgId, templateType, filePath) {
