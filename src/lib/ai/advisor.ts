@@ -8,6 +8,8 @@ import {
 import type { DashboardData } from "@/lib/data/dashboard";
 import { computeWorkingCapital } from "@/lib/financial/deltas";
 import type { OnboardingProfile } from "@/lib/onboarding/types";
+import type { ProvenanceRecord } from "@/lib/connectors/types";
+import { formatProvenanceForDisplay, isVerifiedProvenance } from "@/lib/connectors/provenance";
 import { ServiceUnavailableError } from "@/lib/api/errors";
 
 const ADVISOR_MODEL = "claude-sonnet-4-6";
@@ -17,12 +19,14 @@ export interface AdvisorRequestContext {
   department?: string;
   dashboard: DashboardData;
   onboardingProfile?: OnboardingProfile;
+  provenanceRecords?: ProvenanceRecord[];
+  connectedSources?: string[];
   userMessage?: string;
   conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
 }
 
 function buildDataContext(context: AdvisorRequestContext): string {
-  const { dashboard, organizationName, onboardingProfile } = context;
+  const { dashboard, organizationName, onboardingProfile, provenanceRecords, connectedSources } = context;
   const atRiskKpis = getAtRiskKpis(dashboard.kpis);
   const financialSignals = getFinancialRiskSignals(dashboard.financialSnapshot);
   const priorityAlerts = getPriorityAlerts(dashboard.alerts);
@@ -54,8 +58,28 @@ function buildDataContext(context: AdvisorRequestContext): string {
           .join("\n")
       : "- No monthly trend data imported yet";
 
+  const provenanceLines =
+    provenanceRecords && provenanceRecords.length > 0
+      ? provenanceRecords
+          .slice(0, 8)
+          .map((p) => `- ${formatProvenanceForDisplay(p)}${isVerifiedProvenance(p.category) ? "" : " [NOT VERIFIED]"}`)
+          .join("\n")
+      : "- No per-field provenance records yet — data may be from import or empty tenant";
+
+  const sourceLines =
+    connectedSources && connectedSources.length > 0
+      ? connectedSources.map((s) => `- ${s}`).join("\n")
+      : "- No live connector syncs — recommend CSV/XLSX/PDF upload if data is missing";
+
   return `Organization: ${organizationName}
 Data source: ${dashboard.source}
+Data provenance status: ${dashboard.dataProvenance ?? "unknown"}
+
+Connected systems:
+${sourceLines}
+
+Field-level provenance:
+${provenanceLines}
 ${onboardingProfile ? `
 Onboarding profile (SOURCE-DERIVED from AI onboarding):
 - Industry: ${onboardingProfile.industry ?? "not set"}
@@ -102,6 +126,8 @@ Rules:
 - Use CALCULATED and SOURCE-DERIVED numbers only — never invent financial facts
 - If data is insufficient, say what is missing and what to import/connect
 - Label any inference as AI-INFERRED
+- Cite data source when answering (e.g. "based on your QuickBooks sync" or "from uploaded P&L")
+- If provenance shows AI_EXTRACTED_PENDING_CONFIRMATION or NOT VERIFIED, do not treat as verified truth
 - Be concise, plain-language, actionable (under 250 words)
 - Do not mention you are an AI or reference internal systems
 
