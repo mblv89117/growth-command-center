@@ -13,6 +13,19 @@ import type {
   TenantData,
 } from "@/lib/types";
 
+const DEMO_ORG_IDS = new Set(["org-apex", "org-summit"]);
+
+function resolveDataProvenance(
+  organizationId: string,
+  dataSource: string | null | undefined
+): DashboardData["dataProvenance"] {
+  if (DEMO_ORG_IDS.has(organizationId)) return "seeded";
+  if (dataSource === "imported") return "imported";
+  if (dataSource === "computed") return "computed";
+  if (!dataSource || dataSource === "empty") return "empty";
+  return "imported";
+}
+
 export interface DashboardData {
   financialSnapshot: FinancialSnapshot;
   monthlyTrends: MonthlyTrend[];
@@ -20,6 +33,8 @@ export interface DashboardData {
   kpis: KPI[];
   alerts: Alert[];
   source: "supabase" | "mock";
+  /** Tenant data provenance for UI labels */
+  dataProvenance?: "empty" | "imported" | "computed" | "seeded" | "mock";
   deltas?: DashboardDeltas;
   workingCapital?: number;
   forecastVariancePercent?: number;
@@ -51,7 +66,8 @@ async function fetchFromSupabase(
   const supabase = useAdmin ? createAdminClient() : await createClient();
   if (!supabase) return null;
 
-  const [snapshotRes, trendsRes, budgetRes, kpisRes, alertsRes] = await Promise.all([
+  const [orgRes, snapshotRes, trendsRes, budgetRes, kpisRes, alertsRes] = await Promise.all([
+    supabase.from("gcc_organizations").select("data_source").eq("id", organizationId).maybeSingle(),
     supabase.from("gcc_financial_snapshots").select("*").eq("organization_id", organizationId).maybeSingle(),
     supabase.from("gcc_monthly_trends").select("*").eq("organization_id", organizationId).order("sort_order"),
     supabase.from("gcc_budget_vs_actual").select("*").eq("organization_id", organizationId),
@@ -107,6 +123,7 @@ async function fetchFromSupabase(
       createdAt: r.created_at,
     })),
     source: "supabase" as const,
+    dataProvenance: resolveDataProvenance(organizationId, orgRes.data?.data_source as string | undefined),
     deltas: computeDashboardDeltas(financialSnapshot, monthlyTrends),
     workingCapital: computeWorkingCapital(financialSnapshot),
     forecastVariancePercent:
@@ -131,6 +148,7 @@ export async function getDashboardData(organizationId: string): Promise<Dashboar
       kpis: mock.kpis,
       alerts: mock.alerts,
       source: "mock",
+      dataProvenance: "mock",
       deltas,
       workingCapital: computeWorkingCapital(mock.financialSnapshot),
       forecastVariancePercent:
@@ -160,6 +178,7 @@ export async function getDashboardData(organizationId: string): Promise<Dashboar
     kpis: mock.kpis,
     alerts: mock.alerts,
     source: "mock",
+    dataProvenance: "mock",
     deltas,
     workingCapital: computeWorkingCapital(mock.financialSnapshot),
     forecastVariancePercent:
