@@ -242,7 +242,7 @@ export const REPORTS: Report[] = [
   { id: "rpt-6", name: "AP Aging Report", description: "Accounts payable aging by vendor and due date", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-7", name: "Sales Pipeline Forecast", description: "Weighted pipeline revenue projection by stage and rep", category: "Sales", lastGenerated: "2025-05-22", format: ["pdf", "excel"] },
   { id: "rpt-8", name: "Job Profitability Report", description: "Margin analysis by active and completed jobs", category: "Operations", lastGenerated: "2025-05-21", format: ["pdf", "excel"] },
-  { id: "rpt-9", name: "Budget vs Actual", description: "Category-level budget variance analysis", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
+  { id: "rpt-9", name: "Budget vs Actual", description: "Budget versus actual report", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-10", name: "Forecast vs Actual", description: "Forecast accuracy and variance tracking", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-11", name: "KPI Scorecard", description: "Key performance indicators dashboard export", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
 ];
