@@ -5,6 +5,7 @@ import { DataSourceBanner, DataTable, PageHeader } from "@/components/shared";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useTenant } from "@/lib/tenant/context";
 import { useTenantData } from "@/hooks/use-tenant-data";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
@@ -19,6 +20,7 @@ const stageLabels: Record<string, string> = {
 };
 
 export default function SalesPipelinePage() {
+  const { organization } = useTenant();
   const { data, source, loading } = useTenantData();
   const { opportunities } = data;
 
@@ -65,7 +67,7 @@ export default function SalesPipelinePage() {
     <div>
       <PageHeader
         title="Sales Pipeline"
-        description="Opportunities, weighted revenue forecast, and conversion metrics"
+        description={`Sales pipeline for ${organization.name}`}
       />
       <DataSourceBanner source={source} />
 

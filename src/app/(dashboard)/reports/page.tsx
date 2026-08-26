@@ -46,7 +46,7 @@ export default function ReportsPage() {
     <div>
       <PageHeader
         title="Reports"
-        description="CFO-grade reports ready for PDF, Excel, and board review"
+        description={`Reports for ${organization.name}`}
       />
       <DataSourceBanner source={source} />
 
