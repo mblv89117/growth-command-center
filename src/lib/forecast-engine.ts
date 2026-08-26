@@ -10,12 +10,17 @@ export function generateWeeklyForecast(
 }
 
 export function calculateRunway(currentCash: number, weeklyBurn: number): number {
-  if (weeklyBurn <= 0) return 999;
+  if (weeklyBurn <= 0) return 0;
   return Math.round((currentCash / weeklyBurn) * 10) / 10;
 }
 
-export function calculateMinimumCash(weeks: CashForecastWeek[]): number {
-  return Math.min(...weeks.map((w) => w.endingBalance));
+export function calculateMinimumCash(weeks: CashForecastWeek[]): number | null {
+  if (!Array.isArray(weeks) || weeks.length === 0) return null;
+  const balances = weeks
+    .map((w) => w.endingBalance)
+    .filter((value): value is number => Number.isFinite(value));
+  if (balances.length === 0) return null;
+  return Math.min(...balances);
 }
 
 export function applyScenarioMultiplier(

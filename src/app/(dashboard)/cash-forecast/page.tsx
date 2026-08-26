@@ -8,47 +8,41 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useTenantData } from "@/hooks/use-tenant-data";
-import { getScenarioMultiplier } from "@/lib/forecast-engine";
-import type { CashForecastWeek, ScenarioType } from "@/lib/types";
+import {
+  applyForecastScenario,
+  INSUFFICIENT_DATA,
+  metricOrInsufficient,
+  summarizeWeeklyForecastDisplay,
+} from "@/lib/forecast/display";
+import type { ScenarioType } from "@/lib/types";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
-function applyForecastScenario(weeks: CashForecastWeek[], type: ScenarioType): CashForecastWeek[] {
-  const multiplier = getScenarioMultiplier(type);
-  if (multiplier === 1 || weeks.length === 0) return weeks;
-
-  let balance = weeks[0].startingBalance;
-  return weeks.map((week) => {
-    const inflows = Math.round(week.inflows * multiplier);
-    const startingBalance = balance;
-    const endingBalance = startingBalance + inflows - week.outflows;
-    balance = endingBalance;
-    return {
-      ...week,
-      startingBalance,
-      inflows,
-      endingBalance,
-      isRiskPeriod: endingBalance < 150000,
-    };
-  });
+function ForecastEmptyState({ copy }: { copy: string }) {
+  return (
+    <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
+      <p className="font-medium text-foreground">{INSUFFICIENT_DATA}</p>
+      <p className="mt-2">{copy}</p>
+    </div>
+  );
 }
 
 export default function CashForecastPage() {
   const { data, source, loading } = useTenantData();
   const [scenario, setScenario] = useState<ScenarioType>("base");
-  const forecastWeeks = applyForecastScenario(data.cashForecastWeeks, scenario);
+  const display = summarizeWeeklyForecastDisplay(
+    applyForecastScenario(data.cashForecastWeeks, scenario)
+  );
+  const hasWeeklyForecast = display.provenance !== INSUFFICIENT_DATA;
 
-  const chartData = forecastWeeks.map((w) => ({
+  const chartData = display.weeks.map((w) => ({
     week: `W${w.week}`,
     balance: w.endingBalance,
     inflows: w.inflows,
     outflows: w.outflows,
   }));
 
-  const minCash = Math.min(...forecastWeeks.map((w) => w.endingBalance));
-  const riskWeeks = forecastWeeks.filter((w) => w.isRiskPeriod);
-
-  const tableData = forecastWeeks.map((w) => ({
+  const tableData = display.weeks.map((w) => ({
     week: `Week ${w.week}`,
     period: `${formatShortDate(w.weekStart)} – ${formatShortDate(w.weekEnd)}`,
     starting: w.startingBalance,
@@ -57,6 +51,15 @@ export default function CashForecastPage() {
     ending: w.endingBalance,
     status: w.isRiskPeriod ? "Risk" : "OK",
   }));
+
+  const startingCash =
+    data.financialSnapshot.currentCash !== 0
+      ? data.financialSnapshot.currentCash
+      : INSUFFICIENT_DATA;
+  const endingWeek13 = metricOrInsufficient(display.endingWeek13);
+  const minCash = metricOrInsufficient(display.minCash);
+  const runway =
+    data.financialSnapshot.runway > 0 ? data.financialSnapshot.runway : INSUFFICIENT_DATA;
 
   if (loading) {
     return (
@@ -70,23 +73,35 @@ export default function CashForecastPage() {
     <div>
       <PageHeader
         title="Cash Forecast"
-        description="13-week rolling cash forecast with scenario analysis"
+        description={
+          hasWeeklyForecast
+            ? "13-week rolling cash forecast with scenario analysis"
+            : "INSUFFICIENT_DATA — no weekly forecast until SOURCE-DERIVED or CALCULATED weeks exist"
+        }
       />
       <DataSourceBanner source={source} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Starting Cash" value={data.financialSnapshot.currentCash} />
+        <MetricCard title="Starting Cash" value={startingCash} />
         <MetricCard
           title="Ending Cash (Wk 13)"
-          value={forecastWeeks[12]?.endingBalance ?? 0}
-          variant={minCash < 150000 ? "warning" : "default"}
+          value={endingWeek13}
+          variant={
+            typeof display.minCash === "number" && display.minCash < 150000
+              ? "warning"
+              : "default"
+          }
         />
-        <MetricCard title="Minimum Cash Point" value={minCash} variant="danger" />
+        <MetricCard
+          title="Minimum Cash Point"
+          value={minCash}
+          variant={typeof display.minCash === "number" ? "danger" : "default"}
+        />
         <MetricCard
           title="Runway"
-          value={data.financialSnapshot.runway}
-          format="months"
-          variant="warning"
+          value={runway}
+          format={typeof runway === "number" ? "months" : "number"}
+          variant={typeof runway === "number" && runway < 6 ? "warning" : "default"}
         />
       </div>
 
@@ -103,29 +118,34 @@ export default function CashForecastPage() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <CardTitle>Weekly Cash Forecast</CardTitle>
-                  <CardDescription>
-                    {riskWeeks.length} risk period{riskWeeks.length !== 1 ? "s" : ""} identified below $150K threshold
-                  </CardDescription>
+                  <CardDescription>{display.riskCopy}</CardDescription>
                 </div>
-                <div className="flex gap-2">
-                  {(["base", "best", "worst"] as ScenarioType[]).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setScenario(s)}
-                      className={`rounded-md px-3 py-1 text-xs font-medium capitalize ${
-                        scenario === s
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground hover:bg-accent"
-                      }`}
-                    >
-                      {s} Case
-                    </button>
-                  ))}
-                </div>
+                {display.scenariosEnabled ? (
+                  <div className="flex gap-2">
+                    {(["base", "best", "worst"] as ScenarioType[]).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setScenario(s)}
+                        className={`rounded-md px-3 py-1 text-xs font-medium capitalize ${
+                          scenario === s
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        {s} Case
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </CardHeader>
             <CardContent>
-              <CashForecastChart data={chartData} />
+              {hasWeeklyForecast ? (
+                <CashForecastChart data={chartData} />
+              ) : (
+                <ForecastEmptyState copy={display.emptyStateCopy} />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -134,30 +154,38 @@ export default function CashForecastPage() {
           <Card>
             <CardHeader>
               <CardTitle>Monthly Cash Forecast</CardTitle>
-              <CardDescription>6-month projection with risk periods highlighted</CardDescription>
+              <CardDescription>
+                {data.cashForecastMonths.length > 0
+                  ? "6-month projection with risk periods highlighted"
+                  : "INSUFFICIENT_DATA — no monthly forecast series"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <DataTable
-                columns={[
-                  { key: "month", label: "Month" },
-                  { key: "inflows", label: "Inflows", align: "right" },
-                  { key: "outflows", label: "Outflows", align: "right" },
-                  { key: "endingBalance", label: "Ending Balance", align: "right" },
-                  { key: "status", label: "Status" },
-                ]}
-                data={data.cashForecastMonths.map((m) => ({
-                  month: m.month,
-                  inflows: m.inflows,
-                  outflows: m.outflows,
-                  endingBalance: m.endingBalance,
-                  status: m.isRiskPeriod ? "⚠ Risk" : "✓ OK",
-                }))}
-                formatters={{
-                  inflows: (v) => formatCurrency(Number(v)),
-                  outflows: (v) => formatCurrency(Number(v)),
-                  endingBalance: (v) => formatCurrency(Number(v)),
-                }}
-              />
+              {data.cashForecastMonths.length > 0 ? (
+                <DataTable
+                  columns={[
+                    { key: "month", label: "Month" },
+                    { key: "inflows", label: "Inflows", align: "right" },
+                    { key: "outflows", label: "Outflows", align: "right" },
+                    { key: "endingBalance", label: "Ending Balance", align: "right" },
+                    { key: "status", label: "Status" },
+                  ]}
+                  data={data.cashForecastMonths.map((m) => ({
+                    month: m.month,
+                    inflows: m.inflows,
+                    outflows: m.outflows,
+                    endingBalance: m.endingBalance,
+                    status: m.isRiskPeriod ? "⚠ Risk" : "✓ OK",
+                  }))}
+                  formatters={{
+                    inflows: (v) => formatCurrency(Number(v)),
+                    outflows: (v) => formatCurrency(Number(v)),
+                    endingBalance: (v) => formatCurrency(Number(v)),
+                  }}
+                />
+              ) : (
+                <ForecastEmptyState copy={display.emptyStateCopy} />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -166,31 +194,39 @@ export default function CashForecastPage() {
           <Card>
             <CardHeader>
               <CardTitle>Forecast Assumptions</CardTitle>
-              <CardDescription>Inputs driving the cash forecast model</CardDescription>
+              <CardDescription>
+                {data.forecastAssumptions.length > 0
+                  ? "Inputs driving the cash forecast model"
+                  : "INSUFFICIENT_DATA — no SOURCE-DERIVED forecast assumptions"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <DataTable
-                columns={[
-                  { key: "category", label: "Category" },
-                  { key: "type", label: "Type" },
-                  { key: "amount", label: "Amount", align: "right" },
-                  { key: "frequency", label: "Frequency" },
-                  { key: "notes", label: "Notes" },
-                ]}
-                data={data.forecastAssumptions.map((a) => ({
-                  category: a.category,
-                  type: a.type,
-                  amount: a.amount,
-                  frequency: a.frequency.replace("_", " "),
-                  notes: a.notes ?? "—",
-                }))}
-                formatters={{
-                  type: (v) => (
-                    <Badge variant={v === "inflow" ? "success" : "destructive"}>{String(v)}</Badge>
-                  ),
-                  amount: (v) => formatCurrency(Number(v)),
-                }}
-              />
+              {data.forecastAssumptions.length > 0 ? (
+                <DataTable
+                  columns={[
+                    { key: "category", label: "Category" },
+                    { key: "type", label: "Type" },
+                    { key: "amount", label: "Amount", align: "right" },
+                    { key: "frequency", label: "Frequency" },
+                    { key: "notes", label: "Notes" },
+                  ]}
+                  data={data.forecastAssumptions.map((a) => ({
+                    category: a.category,
+                    type: a.type,
+                    amount: a.amount,
+                    frequency: a.frequency.replace("_", " "),
+                    notes: a.notes ?? "—",
+                  }))}
+                  formatters={{
+                    type: (v) => (
+                      <Badge variant={v === "inflow" ? "success" : "destructive"}>{String(v)}</Badge>
+                    ),
+                    amount: (v) => formatCurrency(Number(v)),
+                  }}
+                />
+              ) : (
+                <ForecastEmptyState copy={display.emptyStateCopy} />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -201,24 +237,28 @@ export default function CashForecastPage() {
           <CardTitle>13-Week Forecast Detail</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={[
-              { key: "week", label: "Week" },
-              { key: "period", label: "Period" },
-              { key: "starting", label: "Starting", align: "right" },
-              { key: "inflows", label: "Inflows", align: "right" },
-              { key: "outflows", label: "Outflows", align: "right" },
-              { key: "ending", label: "Ending", align: "right" },
-              { key: "status", label: "Status" },
-            ]}
-            data={tableData}
-            formatters={{
-              starting: (v) => formatCurrency(Number(v)),
-              inflows: (v) => formatCurrency(Number(v)),
-              outflows: (v) => formatCurrency(Number(v)),
-              ending: (v) => formatCurrency(Number(v)),
-            }}
-          />
+          {hasWeeklyForecast ? (
+            <DataTable
+              columns={[
+                { key: "week", label: "Week" },
+                { key: "period", label: "Period" },
+                { key: "starting", label: "Starting", align: "right" },
+                { key: "inflows", label: "Inflows", align: "right" },
+                { key: "outflows", label: "Outflows", align: "right" },
+                { key: "ending", label: "Ending", align: "right" },
+                { key: "status", label: "Status" },
+              ]}
+              data={tableData}
+              formatters={{
+                starting: (v) => formatCurrency(Number(v)),
+                inflows: (v) => formatCurrency(Number(v)),
+                outflows: (v) => formatCurrency(Number(v)),
+                ending: (v) => formatCurrency(Number(v)),
+              }}
+            />
+          ) : (
+            <ForecastEmptyState copy={display.emptyStateCopy} />
+          )}
         </CardContent>
       </Card>
     </div>
