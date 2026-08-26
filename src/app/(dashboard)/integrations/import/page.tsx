@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useTenant } from "@/lib/tenant/context";
 import { IMPORT_TEMPLATES, type ImportPreviewResult, type ImportTemplateType } from "@/lib/imports/types";
+import { APEX_DEMO_ORGANIZATION_ID } from "@/lib/journey/founder";
 import { Badge } from "@/components/ui/badge";
+import { ImportSuccessHandoffCard } from "@/components/imports/import-success-handoff";
 import { Loader2, Upload } from "lucide-react";
 
 export default function ImportPage() {
@@ -173,6 +175,12 @@ export default function ImportPage() {
         <div className="mb-4 rounded-lg border border-green-500/30 bg-green-500/5 p-3 text-sm text-green-700 dark:text-green-400">
           {success}
         </div>
+      )}
+      {success && (
+        <ImportSuccessHandoffCard
+          organizationId={organization.id}
+          dataProvenance={organization.id === APEX_DEMO_ORGANIZATION_ID ? "seeded" : "imported"}
+        />
       )}
 
       {preview && (
