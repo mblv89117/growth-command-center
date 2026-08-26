@@ -26,7 +26,7 @@ import {
 } from "../src/lib/imports/honesty";
 import { analyzeValueCreation } from "../src/lib/value-creation/analyze";
 import { buildAdvisorDataContext } from "../src/lib/ai/advisor";
-import { getFinancialRiskSignals } from "../src/lib/ai/kpi-risk";
+import { assessKpiRisk, getAtRiskKpis, getFinancialRiskSignals } from "../src/lib/ai/kpi-risk";
 import { slugifyCompanyName, organizationIdFromSlug } from "../src/lib/tenant/slug";
 import {
   APEX_DEMO_ORGANIZATION_ID,
@@ -850,9 +850,88 @@ describe("AI CFO honesty", () => {
     assert.match(context, /Revenue MTD: \$40,000 \(SOURCE-DERIVED\)/);
     assert.match(context, /EBITDA: INSUFFICIENT_DATA/);
     assert.doesNotMatch(context, /CALCULATED financial snapshot/);
+    assert.doesNotMatch(context, /cash risk elevated|meaningful cash decline|Burn rate is high relative to revenue/);
     assert.equal(context.includes("Harbor View"), false);
     assert.equal(context.includes("Apex Construction"), false);
     assert.doesNotMatch(context, /487,?250|412,?800/);
+  });
+});
+
+describe("AI CFO leftover kpi-risk honesty", () => {
+  const populated = {
+    currentCash: 100000,
+    forecastedCash: 80000,
+    revenueMTD: 50000,
+    revenueYTD: 200000,
+    grossProfit: 20000,
+    netProfit: 10000,
+    operatingExpenses: 30000,
+    accountsReceivable: 40000,
+    accountsPayable: 20000,
+    burnRate: 25000,
+    runway: 4,
+    debtObligations: 0,
+    payrollObligations: 15000,
+    ebitda: 12000,
+  };
+
+  it("does not invent runway<6, forecastedCash*0.85, or burn>revenue*0.9 signals", () => {
+    assert.equal(populated.runway < 6, true);
+    assert.equal(populated.forecastedCash < populated.currentCash * 0.85, true);
+    assert.equal(populated.burnRate > populated.revenueMTD * 0.9, false);
+
+    const highBurn = { ...populated, burnRate: 46000 };
+    assert.equal(highBurn.burnRate > highBurn.revenueMTD * 0.9, true);
+
+    const noTarget = getFinancialRiskSignals(populated);
+    const highBurnSignals = getFinancialRiskSignals(highBurn);
+    const joined = `${noTarget.join(" | ")} || ${highBurnSignals.join(" | ")}`;
+
+    assert.equal(noTarget.some((s) => /cash risk elevated/i.test(s)), false);
+    assert.equal(noTarget.some((s) => /meaningful cash decline/i.test(s)), false);
+    assert.equal(highBurnSignals.some((s) => /Burn rate is high relative to revenue/i.test(s)), false);
+    assert.doesNotMatch(joined, /6-month/);
+    assert.doesNotMatch(joined, /0\.85/);
+    assert.doesNotMatch(joined, /0\.9/);
+    assert.equal(JSON.stringify(noTarget).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(highBurnSignals).includes("Apex Construction"), false);
+  });
+
+  it("empty tenant still returns no invented kpi-risk signals", () => {
+    const empty = getTenantData("org-summit");
+    const provenance = dashboardFieldProvenance("org-summit", empty.financialSnapshot);
+    assert.deepEqual(getFinancialRiskSignals(empty.financialSnapshot, provenance), []);
+    assert.deepEqual(getAtRiskKpis(empty.kpis), []);
+  });
+
+  it("surfaces cash-runway risk only against an owner KPI target", () => {
+    const assessment = assessKpiRisk({
+      id: "cash_runway",
+      name: "Cash Runway",
+      value: 4,
+      unit: "number",
+      change: 0,
+      changeLabel: "vs owner target",
+      target: 8,
+    });
+    assert.ok(assessment);
+    assert.equal(assessment.level, "red");
+    assert.match(assessment.reason, /4 vs 8/);
+    assert.doesNotMatch(assessment.reason, /6-month|0\.85|0\.9/);
+
+    const atRisk = getAtRiskKpis([
+      {
+        id: "cash_runway",
+        name: "Cash Runway",
+        value: 4,
+        unit: "number",
+        change: 0,
+        changeLabel: "vs owner target",
+        target: 8,
+      },
+    ]);
+    assert.equal(atRisk.length, 1);
+    assert.equal(atRisk[0].kpi.id, "cash_runway");
   });
 });
 

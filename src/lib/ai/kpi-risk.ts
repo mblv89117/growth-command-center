@@ -71,32 +71,17 @@ export function getAtRiskKpis(kpis: KPI[]): KpiRiskAssessment[] {
     .filter((item): item is KpiRiskAssessment => item !== null && item.level !== "green");
 }
 
-function fieldUsable(
-  provenance: SnapshotFieldProvenance | undefined,
-  field: keyof SnapshotFieldProvenance
-): boolean {
-  return provenance?.[field] !== "INSUFFICIENT_DATA";
-}
-
 export function getFinancialRiskSignals(
   snapshot: FinancialSnapshot,
-  provenance?: SnapshotFieldProvenance
+  _provenance?: SnapshotFieldProvenance
 ): string[] {
   if (isEmptyFinancialSnapshot(snapshot)) return [];
 
   const signals: string[] = [];
 
-  if (fieldUsable(provenance, "runway") && snapshot.runway > 0 && snapshot.runway < 6) {
-    signals.push(`Runway is ${snapshot.runway.toFixed(1)} months — cash risk elevated`);
-  }
-  if (
-    fieldUsable(provenance, "forecastedCash") &&
-    fieldUsable(provenance, "currentCash") &&
-    snapshot.currentCash > 0 &&
-    snapshot.forecastedCash < snapshot.currentCash * 0.85
-  ) {
-    signals.push("13-week forecast shows meaningful cash decline");
-  }
+  // Do not invent runway<6, forecastedCash<currentCash*0.85, or burn>revenue*0.9.
+  // Owner KPI targets are assessed separately via assessKpiRisk / getAtRiskKpis.
+
   if (snapshot.netProfit < 0) {
     signals.push("Net profit is negative — margin risk");
   } else if (snapshot.grossProfit > 0 && snapshot.netProfit / snapshot.grossProfit < 0.25) {
@@ -104,13 +89,6 @@ export function getFinancialRiskSignals(
   }
   if (snapshot.revenueMTD > 0 && snapshot.accountsReceivable > snapshot.revenueMTD * 1.5) {
     signals.push("Accounts receivable is elevated vs monthly revenue");
-  }
-  if (
-    fieldUsable(provenance, "burnRate") &&
-    snapshot.revenueMTD > 0 &&
-    snapshot.burnRate > snapshot.revenueMTD * 0.9
-  ) {
-    signals.push("Burn rate is high relative to revenue MTD");
   }
 
   return signals;
