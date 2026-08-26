@@ -198,7 +198,7 @@ export const ALERTS: Alert[] = [
 ];
 
 export const KPIS: KPI[] = [
-  { id: "kpi-1", name: "Revenue Growth", value: 12.4, unit: "percent", change: 2.1, changeLabel: "vs last month", target: 10 },
+  { id: "kpi-1", name: "Revenue Growth", value: 12.4, unit: "percent", change: 2.1, changeLabel: "vs last month" }, // Do not invent leftover Revenue Growth target = 10.
   { id: "kpi-2", name: "Gross Margin", value: 35.9, unit: "percent", change: -1.2, changeLabel: "vs last month", target: 32 },
   { id: "kpi-3", name: "Net Margin", value: 13.0, unit: "percent", change: 0.8, changeLabel: "vs last month", target: 12 },
   { id: "kpi-4", name: "Cash Conversion Cycle", value: 42, unit: "days", change: -3, changeLabel: "vs last quarter", target: 45 },
@@ -209,7 +209,7 @@ export const KPIS: KPI[] = [
   { id: "kpi-9", name: "Job Profitability", value: 26.8, unit: "percent", change: -2.4, changeLabel: "vs estimate", target: 28 },
   { id: "kpi-10", name: "Operating Expense Ratio", value: 22.9, unit: "percent", change: -0.5, changeLabel: "vs last month", target: 24 },
   { id: "kpi-11", name: "Debt Service Coverage", value: 1.8, unit: "number", change: -0.2, changeLabel: "vs last quarter", target: 1.5 },
-  { id: "kpi-12", name: "Runway", value: 3.4, unit: "number", change: -0.3, changeLabel: "months", target: 6 },
+  { id: "kpi-12", name: "Runway", value: 3.4, unit: "number", change: -0.3, changeLabel: "months" }, // Do not invent leftover Runway target = 6.
   { id: "kpi-13", name: "EBITDA", value: 1125600, unit: "currency", change: 15.2, changeLabel: "vs last month" },
 ];
 

@@ -16,6 +16,7 @@ import {
   APEX_DEMO_ORGANIZATION_ID,
   EMPTY_FINANCIAL_SNAPSHOT,
   FINANCIAL_SNAPSHOT,
+  KPIS,
   ORGANIZATIONS,
   getTenantData,
 } from "../src/lib/mock-data";
@@ -635,6 +636,98 @@ describe("leftover KPI catalog defaultTarget honesty", () => {
     assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
     assert.equal(provisioned.financialSnapshot.currentCash, 0);
     assert.notDeepEqual(summit.financialSnapshot, apex.financialSnapshot);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
+
+describe("leftover Apex demo KPI target 10/6 honesty", () => {
+  const seedJs = fs.readFileSync(new URL("./seed-supabase.mjs", import.meta.url), "utf8");
+
+  it("does not invent leftover Apex demo Revenue Growth 10 or Runway 6", () => {
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    const runway = KPIS.find((kpi) => kpi.id === "kpi-12");
+    assert.ok(growth);
+    assert.ok(runway);
+    assert.equal(growth.target, undefined);
+    assert.notEqual(growth.target, 10);
+    assert.equal(runway.target, undefined);
+    assert.notEqual(runway.target, 6);
+
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    const apexGrowth = apex.kpis.find((kpi) => kpi.id === "kpi-1");
+    const apexRunway = apex.kpis.find((kpi) => kpi.id === "kpi-12");
+    assert.ok(apexGrowth);
+    assert.ok(apexRunway);
+    assert.equal(apexGrowth.target, undefined);
+    assert.notEqual(apexGrowth.target, 10);
+    assert.equal(apexRunway.target, undefined);
+    assert.notEqual(apexRunway.target, 6);
+
+    const executable = seedJs
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//"))
+      .join("\n");
+    assert.match(executable, /\["revenue_growth", "Revenue Growth", 12\.4, "percent", 2\.1, "vs last month", null\]/);
+    assert.match(executable, /\["runway", "Runway", 3\.4, "number", -0\.3, "months", null\]/);
+    assert.doesNotMatch(executable, /\["revenue_growth", "Revenue Growth", 12\.4, "percent", 2\.1, "vs last month", 10\]/);
+    assert.doesNotMatch(executable, /\["runway", "Runway", 3\.4, "number", -0\.3, "months", 6\]/);
+  });
+
+  it("keeps owner-set leftover Apex demo KPI targets SOURCE-DERIVED", () => {
+    assert.equal(resolveKpiTarget(21), 21);
+    assert.equal(resolveKpiTarget(11), 11);
+    assert.notEqual(resolveKpiTarget(21), 10);
+    assert.notEqual(resolveKpiTarget(11), 6);
+
+    const owner = computeKpis(
+      {
+        snapshot: {
+          currentCash: 50000,
+          forecastedCash: 40000,
+          revenueMTD: 20000,
+          revenueYTD: 80000,
+          grossProfit: 8000,
+          netProfit: 2000,
+          operatingExpenses: 18000,
+          accountsReceivable: 10000,
+          accountsPayable: 8000,
+          burnRate: 18000,
+          runway: 2.8,
+          debtObligations: 0,
+          payrollObligations: 9000,
+          ebitda: 3000,
+        },
+        trends: [
+          { month: "Jan", revenue: 18000, expenses: 12000, profit: 6000, cash: 40000 },
+          { month: "Feb", revenue: 20000, expenses: 13000, profit: 7000, cash: 50000 },
+        ],
+      },
+      ["revenue_growth", "cash_runway"],
+      { revenue_growth: 21, cash_runway: 11 }
+    );
+    const growth = owner.find((kpi) => kpi.key === "revenue_growth");
+    const runway = owner.find((kpi) => kpi.key === "cash_runway");
+    assert.ok(growth);
+    assert.ok(runway);
+    assert.equal(growth.target, 21);
+    assert.equal(runway.target, 11);
+    assert.notEqual(growth.target, 10);
+    assert.notEqual(runway.target, 6);
+  });
+
+  it("empty tenant still has no Apex leak after leftover Apex demo KPI 10/6 honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.kpis.length, 0);
+    assert.equal(provisioned.kpis.length, 0);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
     assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
     assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
