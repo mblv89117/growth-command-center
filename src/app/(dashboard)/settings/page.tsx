@@ -287,7 +287,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Subscription & Billing</CardTitle>
-              <CardDescription>Manage your Growth Command Center plan via Stripe</CardDescription>
+              <CardDescription>{`Billing settings for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent>
               {billingNotice && (
