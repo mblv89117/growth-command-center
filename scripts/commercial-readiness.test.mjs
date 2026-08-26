@@ -1841,3 +1841,70 @@ describe("leftover reports-catalog invented scenario-analysis claim honesty", ()
     );
   });
 });
+
+describe("leftover reports-catalog invented leadership/board-review claim honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/reports/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover high-level financial overview for leadership and board review in reports catalog", () => {
+    const executiveSummary = REPORTS.find((report) => report.id === "rpt-1");
+    assert.ok(executiveSummary);
+    assert.equal(
+      executiveSummary.description.includes(
+        "High-level financial overview for leadership and board review"
+      ),
+      false
+    );
+    assert.equal(executiveSummary.description.includes("leadership and board review"), false);
+    assert.equal(executiveSummary.description.includes("High-level financial overview"), false);
+    assert.equal(
+      REPORTS.some((report) =>
+        report.description.includes("High-level financial overview for leadership and board review")
+      ),
+      false
+    );
+    assert.equal(
+      EMPTY_TENANT_REPORTS.some((report) =>
+        report.description.includes("High-level financial overview for leadership and board review")
+      ),
+      false
+    );
+    assert.match(page, /<CardDescription>\{report\.description\}<\/CardDescription>/);
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover reports-catalog leadership honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+    const executiveSummary = apex.reports.find((report) => report.id === "rpt-1");
+    assert.ok(executiveSummary);
+    assert.equal(executiveSummary.description.includes("leadership and board review"), false);
+    const cashForecast = apex.reports.find((report) => report.id === "rpt-2");
+    assert.ok(cashForecast);
+    assert.equal(cashForecast.description.includes("scenario analysis"), false);
+  });
+
+  it("empty tenant still has no Apex leak after leftover reports-catalog leadership honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+    assert.equal(
+      summit.reports.some((report) =>
+        report.description.includes("leadership and board review")
+      ),
+      false
+    );
+  });
+});
