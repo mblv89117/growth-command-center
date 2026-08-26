@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS organizations (
   slug TEXT UNIQUE NOT NULL,
   industry TEXT,
   plan TEXT DEFAULT 'starter' CHECK (plan IN ('starter', 'growth', 'enterprise')),
-  settings JSONB DEFAULT '{"cashAlertThreshold":150000,"forecastHorizonWeeks":13,"fiscalYearStart":1,"currency":"USD"}',
+  -- Do not invent leftover schema DEFAULT cashAlertThreshold = 150000. Owner-set thresholds remain SOURCE-DERIVED.
+  settings JSONB DEFAULT '{"cashAlertThreshold":0,"forecastHorizonWeeks":13,"fiscalYearStart":1,"currency":"USD"}',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
