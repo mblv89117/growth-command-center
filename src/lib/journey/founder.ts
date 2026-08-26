@@ -101,3 +101,60 @@ export function resolveFounderJourney(input: FounderJourneyInput): FounderJourne
 export function founderJourneyDoesNotInventFinancials(state: FounderJourneyState): boolean {
   return state.inventedFinancialValues === false && !("currentCash" in state) && !("forecastedCash" in state);
 }
+
+export type ImportSuccessHandoffStatus = "import_success" | "not_ready" | "demo_seeded";
+
+export interface InsightDestination {
+  href: string;
+  label: string;
+  rationale: string;
+}
+
+export interface ImportSuccessHandoff {
+  status: ImportSuccessHandoffStatus;
+  destinations: InsightDestination[];
+  inventedFinancialValues: false;
+}
+
+export function resolveImportSuccessHandoff(input: FounderJourneyInput): ImportSuccessHandoff {
+  if (isDemoSeeded(input)) {
+    return {
+      status: "demo_seeded",
+      destinations: [],
+      inventedFinancialValues: false,
+    };
+  }
+
+  if (!hasImportedSource(input.dataProvenance)) {
+    return {
+      status: "not_ready",
+      destinations: [],
+      inventedFinancialValues: false,
+    };
+  }
+
+  return {
+    status: "import_success",
+    destinations: [
+      {
+        href: "/cash-forecast",
+        label: "Review 13-week forecast",
+        rationale: "Understand cash trajectory from imported SOURCE-DERIVED numbers.",
+      },
+      {
+        href: "/dashboard",
+        label: "Open executive dashboard",
+        rationale: "See KPIs, risks, and next actions from the same imported numbers.",
+      },
+    ],
+    inventedFinancialValues: false,
+  };
+}
+
+export function importHandoffDoesNotInventFinancials(handoff: ImportSuccessHandoff): boolean {
+  return (
+    handoff.inventedFinancialValues === false &&
+    !("currentCash" in handoff) &&
+    !("forecastedCash" in handoff)
+  );
+}

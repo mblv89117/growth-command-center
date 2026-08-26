@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useTenant } from "@/lib/tenant/context";
 import {
   resolveFounderJourney,
+  resolveImportSuccessHandoff,
   type FounderDataProvenance,
   type FounderJourneyState,
 } from "@/lib/journey/founder";
@@ -42,6 +43,15 @@ export function FounderJourney({ dataProvenance }: FounderJourneyProps) {
     onboardingComplete,
     dataProvenance,
   });
+  const insightHandoff = resolveImportSuccessHandoff({
+    organizationId: organization.id,
+    onboardingComplete,
+    dataProvenance,
+  });
+  const destinations =
+    journey.status === "ready_for_insight" && insightHandoff.status === "import_success"
+      ? insightHandoff.destinations
+      : [journey.nextAction];
 
   return (
     <div className="mb-6 flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -52,11 +62,15 @@ export function FounderJourney({ dataProvenance }: FounderJourneyProps) {
           <p className="text-sm text-muted-foreground">{journey.nextAction.rationale}</p>
         </div>
       </div>
-      <Button asChild variant="outline" className="shrink-0">
-        <Link href={journey.nextAction.href}>
-          {journey.nextAction.label} <ArrowRight className="ml-1 h-4 w-4" />
-        </Link>
-      </Button>
+      <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+        {destinations.map((destination) => (
+          <Button key={destination.href} asChild variant="outline" className="shrink-0">
+            <Link href={destination.href}>
+              {destination.label} <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }

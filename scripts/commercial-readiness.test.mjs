@@ -31,7 +31,9 @@ import {
 } from "../src/lib/data/organizations";
 import {
   founderJourneyDoesNotInventFinancials,
+  importHandoffDoesNotInventFinancials,
   resolveFounderJourney,
+  resolveImportSuccessHandoff,
 } from "../src/lib/journey/founder";
 
 describe("forecast compute", () => {
@@ -1138,6 +1140,64 @@ describe("founder journey commercial packaging", () => {
     assert.equal(JSON.stringify(journey).includes("Apex Construction"), false);
     assert.equal(JSON.stringify(journey).includes("487250"), false);
     assert.equal(empty.financialSnapshot.currentCash === FINANCIAL_SNAPSHOT.currentCash, false);
+  });
+});
+
+describe("import-success forecast/dashboard insight handoff", () => {
+  it("hands imported SOURCE-DERIVED workspace to forecast and dashboard", () => {
+    const handoff = resolveImportSuccessHandoff({
+      organizationId: "org-hvcg",
+      onboardingComplete: true,
+      dataProvenance: "imported",
+    });
+    assert.equal(handoff.status, "import_success");
+    assert.deepEqual(
+      handoff.destinations.map((d) => d.href),
+      ["/cash-forecast", "/dashboard"],
+    );
+    assert.equal(handoff.inventedFinancialValues, false);
+    assert.equal(importHandoffDoesNotInventFinancials(handoff), true);
+    assert.equal("currentCash" in handoff, false);
+    assert.equal(JSON.stringify(handoff).includes("487250"), false);
+  });
+
+  it("hands computed SOURCE-DERIVED workspace to the same insight destinations", () => {
+    const handoff = resolveImportSuccessHandoff({
+      organizationId: "org-summit",
+      onboardingComplete: true,
+      dataProvenance: "computed",
+    });
+    assert.equal(handoff.status, "import_success");
+    assert.equal(handoff.destinations.length, 2);
+    assert.equal(handoff.destinations[0].href, "/cash-forecast");
+    assert.equal(handoff.destinations[1].href, "/dashboard");
+    assert.equal(importHandoffDoesNotInventFinancials(handoff), true);
+  });
+
+  it("does not hand empty tenant to insight destinations", () => {
+    const handoff = resolveImportSuccessHandoff({
+      organizationId: "org-acme-services",
+      onboardingComplete: true,
+      dataProvenance: "empty",
+    });
+    assert.equal(handoff.status, "not_ready");
+    assert.deepEqual(handoff.destinations, []);
+    assert.equal(importHandoffDoesNotInventFinancials(handoff), true);
+    assert.equal(JSON.stringify(handoff).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(handoff).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(handoff).includes("487250"), false);
+  });
+
+  it("does not claim commercial import-success for Apex demo", () => {
+    const handoff = resolveImportSuccessHandoff({
+      organizationId: APEX_DEMO_ORGANIZATION_ID,
+      onboardingComplete: true,
+      dataProvenance: "imported",
+    });
+    assert.equal(handoff.status, "demo_seeded");
+    assert.deepEqual(handoff.destinations, []);
+    assert.equal(JSON.stringify(handoff).includes("487250"), false);
+    assert.equal(apexPinnedCashUnchanged(), true);
   });
 });
 
