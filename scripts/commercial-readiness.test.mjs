@@ -17,6 +17,11 @@ import {
   FINANCIAL_SNAPSHOT,
   getTenantData,
 } from "../src/lib/mock-data";
+import {
+  DEFAULT_SETTINGS,
+  mapOrganizationRow,
+  resolveCashAlertThreshold,
+} from "../src/lib/data/organizations";
 
 describe("forecast compute", () => {
   it("maintains balance continuity across weeks", () => {
@@ -262,5 +267,79 @@ describe("tenant isolation contract", () => {
     assert.ok(plaid);
     assert.equal(qbo.status, "disconnected");
     assert.equal(plaid.status, "disconnected");
+  });
+});
+
+describe("leftover settings default cashAlertThreshold honesty", () => {
+  it("does not invent cashAlertThreshold 150000 for unconfigured orgs", () => {
+    assert.equal(DEFAULT_SETTINGS.cashAlertThreshold, 0);
+    assert.notEqual(DEFAULT_SETTINGS.cashAlertThreshold, 150000);
+    assert.equal(resolveCashAlertThreshold(undefined), 0);
+    assert.equal(resolveCashAlertThreshold(null), 0);
+    assert.equal(resolveCashAlertThreshold(0), 0);
+    assert.equal(resolveCashAlertThreshold(""), 0);
+
+    const missing = mapOrganizationRow({
+      id: "org-acme-services",
+      name: "Acme Services",
+      slug: "acme-services",
+    });
+    assert.equal(missing.settings.cashAlertThreshold, 0);
+    assert.notEqual(missing.settings.cashAlertThreshold, 150000);
+
+    const emptySettings = mapOrganizationRow({
+      id: "org-acme-services",
+      name: "Acme Services",
+      slug: "acme-services",
+      settings: {},
+    });
+    assert.equal(emptySettings.settings.cashAlertThreshold, 0);
+    assert.notEqual(emptySettings.settings.cashAlertThreshold, 150000);
+
+    const nullSettings = mapOrganizationRow({
+      id: "org-summit-unconfigured",
+      name: "Summit Unconfigured",
+      slug: "summit-unconfigured",
+      settings: null,
+    });
+    assert.equal(nullSettings.settings.cashAlertThreshold, 0);
+    assert.doesNotMatch(JSON.stringify(nullSettings), /150000/);
+  });
+
+  it("keeps owner-set cashAlertThreshold SOURCE-DERIVED", () => {
+    assert.equal(resolveCashAlertThreshold("150000"), 150000);
+    assert.equal(resolveCashAlertThreshold(75000), 75000);
+
+    const owner = mapOrganizationRow({
+      id: "org-acme-services",
+      name: "Acme Services",
+      slug: "acme-services",
+      settings: { cashAlertThreshold: 150000 },
+    });
+    assert.equal(owner.settings.cashAlertThreshold, 150000);
+
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+  });
+
+  it("empty tenant still has no Apex leak after settings default honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const mapped = mapOrganizationRow({
+      id: "org-acme-services",
+      name: "Acme Services",
+      slug: "acme-services",
+      settings: {},
+    });
+
+    assert.equal(mapped.settings.cashAlertThreshold, 0);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.notEqual(summit.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.notDeepEqual(summit.financialSnapshot, getTenantData(APEX_DEMO_ORGANIZATION_ID).financialSnapshot);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+    assert.doesNotMatch(JSON.stringify(mapped), /150000/);
   });
 });
