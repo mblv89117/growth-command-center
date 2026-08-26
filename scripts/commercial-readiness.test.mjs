@@ -1781,3 +1781,63 @@ describe("leftover cash-forecast-page invented scenario-analysis claim honesty",
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover reports-catalog invented scenario-analysis claim honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/reports/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover 13-week rolling cash forecast with scenario analysis in reports catalog", () => {
+    const cashForecast = REPORTS.find((report) => report.id === "rpt-2");
+    assert.ok(cashForecast);
+    assert.equal(
+      cashForecast.description.includes("13-week rolling cash forecast with scenario analysis"),
+      false
+    );
+    assert.equal(cashForecast.description.includes("rolling cash forecast"), false);
+    assert.equal(cashForecast.description.includes("scenario analysis"), false);
+    assert.equal(
+      REPORTS.some((report) =>
+        report.description.includes("13-week rolling cash forecast with scenario analysis")
+      ),
+      false
+    );
+    assert.equal(
+      EMPTY_TENANT_REPORTS.some((report) =>
+        report.description.includes("13-week rolling cash forecast with scenario analysis")
+      ),
+      false
+    );
+    assert.match(page, /<CardDescription>\{report\.description\}<\/CardDescription>/);
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover reports-catalog honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+    const cashForecast = apex.reports.find((report) => report.id === "rpt-2");
+    assert.ok(cashForecast);
+    assert.equal(cashForecast.description.includes("scenario analysis"), false);
+  });
+
+  it("empty tenant still has no Apex leak after leftover reports-catalog honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+    assert.equal(
+      summit.reports.some((report) => report.description.includes("scenario analysis")),
+      false
+    );
+  });
+});

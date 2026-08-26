@@ -235,7 +235,7 @@ export const DISCONNECTED_INTEGRATIONS: Integration[] = INTEGRATIONS.map((item) 
 
 export const REPORTS: Report[] = [
   { id: "rpt-1", name: "Executive Summary", description: "High-level financial overview for leadership and board review", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
-  { id: "rpt-2", name: "Cash Forecast Report", description: "13-week rolling cash forecast with scenario analysis", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
+  { id: "rpt-2", name: "Cash Forecast Report", description: "Cash forecast report", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-3", name: "Profit & Loss Summary", description: "Monthly and YTD P&L with variance analysis", category: "Financials", lastGenerated: "2025-05-23", format: ["pdf", "excel"] },
   { id: "rpt-4", name: "Balance Sheet Summary", description: "Assets, liabilities, and equity snapshot", category: "Financials", lastGenerated: "2025-05-23", format: ["pdf", "excel"] },
   { id: "rpt-5", name: "AR Aging Report", description: "Accounts receivable aging by customer and bucket", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
