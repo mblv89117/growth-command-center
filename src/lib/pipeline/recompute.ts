@@ -6,7 +6,7 @@ import {
   calculateWeeklyBurn,
   generateDeterministicWeeklyForecast,
 } from "@/lib/forecast/compute";
-import { computeKpis } from "@/lib/kpi/catalog";
+import { computeKpis, resolveKpiTarget } from "@/lib/kpi/catalog";
 import { computeWorkingCapital } from "@/lib/financial/deltas";
 import { completeJobRun, logOperationalEvent, startJobRun } from "@/lib/observability/events";
 import type { FinancialSnapshot, MonthlyTrend } from "@/lib/types";
@@ -42,7 +42,13 @@ export async function recomputeTenantFinancials(
     }
 
     const settings = (orgRow?.settings as Record<string, unknown>) ?? {};
-    const cashAlertThreshold = options?.cashAlertThreshold ?? Number(settings.cashAlertThreshold ?? 150000);
+    const ownerThresholdRaw = options?.cashAlertThreshold ?? settings.cashAlertThreshold;
+    const cashAlertThreshold =
+      typeof ownerThresholdRaw === "number" && Number.isFinite(ownerThresholdRaw) && ownerThresholdRaw > 0
+        ? ownerThresholdRaw
+        : typeof ownerThresholdRaw === "string" && Number.isFinite(Number(ownerThresholdRaw)) && Number(ownerThresholdRaw) > 0
+          ? Number(ownerThresholdRaw)
+          : null;
 
     const snapshot = mapSnapshot(snapshotRow);
     const trends: MonthlyTrend[] = (trendsRows ?? []).map((r) => ({
@@ -55,7 +61,7 @@ export async function recomputeTenantFinancials(
 
     const input = buildForecastInputFromSnapshot(snapshot);
     const weeks = generateDeterministicWeeklyForecast(input, 13, 1, cashAlertThreshold);
-    const months = aggregateMonthlyForecast(weeks);
+    const months = aggregateMonthlyForecast(weeks, cashAlertThreshold);
     const weeklyBurn = calculateWeeklyBurn(weeks);
     const runwayWeeks = calculateRunwayWeeks(snapshot.currentCash, weeklyBurn);
     const runwayMonths = Math.round((runwayWeeks / 4.33) * 10) / 10;
@@ -114,7 +120,18 @@ export async function recomputeTenantFinancials(
       .filter((k) => k.enabled !== false)
       .map((k) => k.kpi_key as string);
 
-    const computed = computeKpis({ snapshot: { ...snapshot, runway: runwayMonths }, trends }, enabledKeys.length ? enabledKeys : undefined);
+    const ownerTargets: Record<string, number> = {};
+    for (const row of existingKpis ?? []) {
+      if (row.kpi_key !== "cash_runway_target") continue;
+      const ownerTarget = resolveKpiTarget(row.target);
+      if (ownerTarget !== undefined) ownerTargets.cash_runway = ownerTarget;
+    }
+
+    const computed = computeKpis(
+      { snapshot: { ...snapshot, runway: runwayMonths }, trends },
+      enabledKeys.length ? enabledKeys : undefined,
+      ownerTargets
+    );
 
     let kpisUpdated = 0;
     for (const kpi of computed) {
