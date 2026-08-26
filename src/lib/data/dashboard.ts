@@ -1,3 +1,8 @@
+import {
+  applyImportedFinancials,
+  dashboardFieldProvenance,
+  type SnapshotFieldProvenance,
+} from "@/lib/imports/honesty";
 import { getTenantData } from "@/lib/mock-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -20,6 +25,7 @@ export interface DashboardData {
   kpis: KPI[];
   alerts: Alert[];
   source: "supabase" | "mock";
+  fieldProvenance: SnapshotFieldProvenance;
   deltas?: DashboardDeltas;
   workingCapital?: number;
   forecastVariancePercent?: number;
@@ -107,6 +113,7 @@ async function fetchFromSupabase(
       createdAt: r.created_at,
     })),
     source: "supabase" as const,
+    fieldProvenance: dashboardFieldProvenance(organizationId, financialSnapshot),
     deltas: computeDashboardDeltas(financialSnapshot, monthlyTrends),
     workingCapital: computeWorkingCapital(financialSnapshot),
     forecastVariancePercent:
@@ -131,6 +138,7 @@ export async function getDashboardData(organizationId: string): Promise<Dashboar
       kpis: mock.kpis,
       alerts: mock.alerts,
       source: "mock",
+      fieldProvenance: dashboardFieldProvenance(organizationId, mock.financialSnapshot),
       deltas,
       workingCapital: computeWorkingCapital(mock.financialSnapshot),
       forecastVariancePercent:
@@ -160,6 +168,7 @@ export async function getDashboardData(organizationId: string): Promise<Dashboar
     kpis: mock.kpis,
     alerts: mock.alerts,
     source: "mock",
+    fieldProvenance: dashboardFieldProvenance(organizationId, mock.financialSnapshot),
     deltas,
     workingCapital: computeWorkingCapital(mock.financialSnapshot),
     forecastVariancePercent:
@@ -181,14 +190,18 @@ export async function getTenantDataWithFallback(organizationId: string): Promise
     return { ...mock, dataSource: "mock" };
   }
 
+  const imported = applyImportedFinancials(
+    organizationId,
+    dashboard.financialSnapshot,
+    dashboard.monthlyTrends
+  );
+
   return {
-    ...mock,
-    financialSnapshot: dashboard.financialSnapshot,
-    monthlyTrends: dashboard.monthlyTrends,
+    ...imported,
     budgetVsActual: dashboard.budgetVsActual,
-    kpis: dashboard.kpis,
+    kpis: dashboard.kpis.length ? dashboard.kpis : imported.kpis,
     alerts: dashboard.alerts,
-    dataSource: "supabase",
+    dataSource: "imported",
   };
 }
 

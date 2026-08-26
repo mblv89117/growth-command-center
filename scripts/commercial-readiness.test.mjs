@@ -3,11 +3,30 @@ import assert from "node:assert/strict";
 import {
   generateDeterministicWeeklyForecast,
   buildForecastInputFromSnapshot,
+  hasExplicitWeeklyDrivers,
 } from "../src/lib/forecast/compute";
+import {
+  applyForecastScenario,
+  INSUFFICIENT_DATA,
+  metricOrInsufficient,
+  summarizeWeeklyForecastDisplay,
+} from "../src/lib/forecast/display";
+import { calculateMinimumCash } from "../src/lib/forecast-engine";
 import { computeKpis } from "../src/lib/kpi/catalog";
 import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financial/deltas";
 import { buildImportPreview } from "../src/lib/imports/commit";
+import {
+  applyImportedFinancials,
+  calculateForecastedCash,
+  calculateRunwayMonths,
+  dashboardFieldProvenance,
+  isEmptyFinancialSnapshot,
+  resolveMonthlyTrendRow,
+  snapshotFromImportRow,
+} from "../src/lib/imports/honesty";
 import { analyzeValueCreation } from "../src/lib/value-creation/analyze";
+import { buildAdvisorDataContext } from "../src/lib/ai/advisor";
+import { getFinancialRiskSignals } from "../src/lib/ai/kpi-risk";
 import { slugifyCompanyName, organizationIdFromSlug } from "../src/lib/tenant/slug";
 import {
   APEX_DEMO_ORGANIZATION_ID,
@@ -17,7 +36,7 @@ import {
 } from "../src/lib/mock-data";
 
 describe("forecast compute", () => {
-  it("maintains balance continuity across weeks", () => {
+  it("does not invent a weekly mix from snapshot revenue percents", () => {
     const input = buildForecastInputFromSnapshot({
       currentCash: 500000,
       accountsReceivable: 200000,
@@ -26,6 +45,56 @@ describe("forecast compute", () => {
       payrollObligations: 40000,
       accountsPayable: 80000,
     });
+    assert.equal(input.sales, 0);
+    assert.equal(input.recurringRevenue, 0);
+    assert.equal(input.oneTimeRevenue, 0);
+    assert.equal(input.rent, 0);
+    assert.equal(input.subcontractors, 0);
+    assert.equal(input.materials, 0);
+    assert.equal(input.loanPayments, 0);
+    assert.equal(input.taxes, 0);
+    assert.equal(input.ownerDistributions, 0);
+    assert.equal(input.capex, 0);
+    assert.equal(input.payroll, 40000);
+    assert.equal(input.operatingExpenses, 60000);
+    assert.equal(input.receivables, 200000);
+    assert.equal(hasExplicitWeeklyDrivers(input), false);
+    assert.deepEqual(generateDeterministicWeeklyForecast(input, 13), []);
+  });
+
+  it("does not invent payroll or opex as a percent of revenue when those fields are missing", () => {
+    const input = buildForecastInputFromSnapshot({
+      currentCash: 90000,
+      accountsReceivable: 0,
+      revenueMTD: 40000,
+      operatingExpenses: 0,
+      payrollObligations: 0,
+      accountsPayable: 0,
+    });
+    assert.equal(input.payroll, 0);
+    assert.equal(input.operatingExpenses, 0);
+    assert.equal(input.sales, 0);
+    assert.deepEqual(generateDeterministicWeeklyForecast(input), []);
+  });
+
+  it("maintains balance continuity only for explicit SOURCE-DERIVED drivers", () => {
+    const input = {
+      startingCash: 500000,
+      receivables: 200000,
+      sales: 80000,
+      recurringRevenue: 20000,
+      oneTimeRevenue: 0,
+      payroll: 40000,
+      rent: 8000,
+      subcontractors: 0,
+      materials: 0,
+      operatingExpenses: 60000,
+      loanPayments: 0,
+      taxes: 0,
+      ownerDistributions: 0,
+      capex: 0,
+    };
+    assert.equal(hasExplicitWeeklyDrivers(input), true);
     const weeks = generateDeterministicWeeklyForecast(input, 13);
     assert.equal(weeks.length, 13);
     for (const week of weeks) {
@@ -33,18 +102,128 @@ describe("forecast compute", () => {
     }
   });
 
-  it("is deterministic (no randomness)", () => {
-    const input = buildForecastInputFromSnapshot({
-      currentCash: 100000,
-      accountsReceivable: 50000,
-      revenueMTD: 80000,
+  it("is deterministic (no randomness) for explicit drivers", () => {
+    const input = {
+      startingCash: 100000,
+      receivables: 50000,
+      sales: 40000,
+      recurringRevenue: 0,
+      oneTimeRevenue: 0,
+      payroll: 20000,
+      rent: 0,
+      subcontractors: 0,
+      materials: 0,
       operatingExpenses: 40000,
-      payrollObligations: 20000,
-      accountsPayable: 30000,
-    });
+      loanPayments: 0,
+      taxes: 0,
+      ownerDistributions: 0,
+      capex: 0,
+    };
     const a = generateDeterministicWeeklyForecast(input);
     const b = generateDeterministicWeeklyForecast(input);
     assert.deepEqual(a, b);
+    assert.equal(a.length, 13);
+  });
+});
+
+describe("cash forecast empty-state honesty", () => {
+  it("empty weeks are INSUFFICIENT_DATA without invented $0 week-13 or -Infinity min cash", () => {
+    const empty = summarizeWeeklyForecastDisplay([]);
+    const missing = summarizeWeeklyForecastDisplay(undefined);
+    const fromSnapshot = generateDeterministicWeeklyForecast(
+      buildForecastInputFromSnapshot({
+        currentCash: 90000,
+        accountsReceivable: 0,
+        revenueMTD: 40000,
+        operatingExpenses: 0,
+        payrollObligations: 0,
+        accountsPayable: 0,
+      })
+    );
+
+    assert.deepEqual(fromSnapshot, []);
+    assert.equal(empty.provenance, INSUFFICIENT_DATA);
+    assert.equal(missing.provenance, INSUFFICIENT_DATA);
+    assert.equal(empty.scenariosEnabled, false);
+    assert.deepEqual(empty.weeks, []);
+    assert.equal(empty.endingWeek13, null);
+    assert.equal(empty.minCash, null);
+    assert.equal(empty.riskWeekCount, 0);
+    assert.equal(metricOrInsufficient(empty.endingWeek13), INSUFFICIENT_DATA);
+    assert.equal(metricOrInsufficient(empty.minCash), INSUFFICIENT_DATA);
+    assert.equal(calculateMinimumCash([]), null);
+    assert.notEqual(empty.minCash, Number.NEGATIVE_INFINITY);
+    assert.notEqual(empty.endingWeek13, 0);
+    assert.match(empty.riskCopy, /INSUFFICIENT_DATA/);
+    assert.doesNotMatch(empty.riskCopy, /risk periods identified/i);
+    assert.match(empty.emptyStateCopy, /will not invent a 13-week series/);
+  });
+
+  it("keeps scenario buttons inert and does not invent weeks from empty SOURCE-DERIVED series", () => {
+    assert.deepEqual(applyForecastScenario([], "best"), []);
+    assert.deepEqual(applyForecastScenario([], "worst"), []);
+    const empty = summarizeWeeklyForecastDisplay(applyForecastScenario([], "best"));
+    assert.equal(empty.scenariosEnabled, false);
+    assert.equal(empty.provenance, INSUFFICIENT_DATA);
+    assert.equal(empty.weeks.length, 0);
+  });
+
+  it("summarizes SOURCE-DERIVED weeks without padding a missing week 13", () => {
+    const weeks = [
+      {
+        week: 1,
+        weekStart: "2026-01-05",
+        weekEnd: "2026-01-11",
+        startingBalance: 200000,
+        inflows: 10000,
+        outflows: 80000,
+        endingBalance: 130000,
+        isRiskPeriod: true,
+      },
+      {
+        week: 2,
+        weekStart: "2026-01-12",
+        weekEnd: "2026-01-18",
+        startingBalance: 130000,
+        inflows: 20000,
+        outflows: 10000,
+        endingBalance: 140000,
+        isRiskPeriod: true,
+      },
+    ];
+    const display = summarizeWeeklyForecastDisplay(weeks);
+    assert.equal(display.provenance, "CALCULATED");
+    assert.equal(display.scenariosEnabled, true);
+    assert.equal(display.weeks.length, 2);
+    assert.equal(display.endingWeek13, null);
+    assert.equal(display.minCash, 130000);
+    assert.equal(display.riskWeekCount, 2);
+    assert.equal(metricOrInsufficient(display.endingWeek13), INSUFFICIENT_DATA);
+    assert.equal(metricOrInsufficient(display.minCash), 130000);
+    assert.match(display.riskCopy, /2 risk periods identified/);
+    assert.equal(calculateMinimumCash(weeks), 130000);
+
+    const best = applyForecastScenario(weeks, "best");
+    assert.equal(best.length, 2);
+    assert.notEqual(best[0].inflows, weeks[0].inflows);
+  });
+
+  it("imported cash+burn still has no invented weekly series for the page helper", () => {
+    const snapshot = snapshotFromImportRow({
+      current_cash: 90000,
+      burn_rate: 15000,
+      revenue_mtd: 40000,
+    });
+    const imported = applyImportedFinancials("org-summit", snapshot);
+    const display = summarizeWeeklyForecastDisplay(imported.cashForecastWeeks);
+
+    assert.deepEqual(imported.cashForecastWeeks, []);
+    assert.equal(display.provenance, INSUFFICIENT_DATA);
+    assert.equal(display.endingWeek13, null);
+    assert.equal(display.minCash, null);
+    assert.equal(display.scenariosEnabled, false);
+    assert.equal(imported.fieldProvenance.runway, "CALCULATED");
+    assert.equal(imported.financialSnapshot.runway, 6);
   });
 });
 
@@ -150,6 +329,139 @@ describe("import preview", () => {
   });
 });
 
+describe("honest ingest", () => {
+  it("does not invent monthly expenses as a percent of revenue", () => {
+    const missing = resolveMonthlyTrendRow({ month: "Jan", revenue: 100000 });
+    assert.equal(missing.ok, false);
+    if (!missing.ok) {
+      assert.match(missing.error, /will not invent/i);
+    }
+    assert.doesNotMatch(JSON.stringify(missing), /0\.7|70000/);
+  });
+
+  it("calculates profit only when expenses are SOURCE-DERIVED", () => {
+    const resolved = resolveMonthlyTrendRow({
+      month: "Jan",
+      revenue: 100000,
+      expenses: 40000,
+    });
+    assert.equal(resolved.ok, true);
+    if (resolved.ok) {
+      assert.equal(resolved.trend.profit, 60000);
+      assert.equal(resolved.profitProvenance, "CALCULATED");
+      assert.equal(resolved.expensesProvenance, "SOURCE-DERIVED");
+    }
+  });
+
+  it("applies imported snapshot as SOURCE-DERIVED without Apex leak", () => {
+    const preview = buildImportPreview(
+      "financial_snapshot",
+      "books.csv",
+      ["current_cash", "revenue_mtd", "accounts_receivable"],
+      [["125000", "40000", "18000"]]
+    );
+    assert.equal(preview.validCount, 1);
+    const snapshot = snapshotFromImportRow(preview.rows[0].data);
+    const summit = applyImportedFinancials("org-summit", snapshot);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(summit.financialProvenance, "SOURCE-DERIVED");
+    assert.equal(summit.dataSource, "imported");
+    assert.equal(summit.financialSnapshot.currentCash, 125000);
+    assert.equal(summit.financialSnapshot.revenueMTD, 40000);
+    assert.equal(summit.invoices.length, 0);
+    assert.equal(summit.jobs.length, 0);
+    assert.notEqual(summit.financialSnapshot.currentCash, apex.financialSnapshot.currentCash);
+    assert.equal(
+      summit.integrations.filter((item) => item.status === "connected").length,
+      0
+    );
+    assert.equal(
+      summit.reports.every((report) => report.lastGenerated === undefined),
+      true
+    );
+  });
+});
+
+describe("forecast KPI honesty", () => {
+  it("empty tenant has no Apex forecast weeks, scenarios, or KPIs", () => {
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    const emptyOrgs = ["org-summit", "org-acme-services", "org-unknown-tenant", "org-hvcg"];
+
+    assert.ok(apex.cashForecastWeeks.length > 0);
+    assert.ok(apex.scenarios.length > 0);
+    assert.ok(apex.kpis.length > 0);
+
+    for (const orgId of emptyOrgs) {
+      const tenant = getTenantData(orgId);
+      assert.deepEqual(tenant.cashForecastWeeks, []);
+      assert.deepEqual(tenant.scenarios, []);
+      assert.deepEqual(tenant.kpis, []);
+      assert.equal(tenant.financialSnapshot.forecastedCash, 0);
+      assert.equal(tenant.financialSnapshot.runway, 0);
+      assert.notDeepEqual(tenant.cashForecastWeeks, apex.cashForecastWeeks);
+      assert.equal(JSON.stringify(tenant).includes("Harbor View"), false);
+      assert.equal(JSON.stringify(tenant).includes("Apex Construction"), false);
+    }
+  });
+
+  it("calculates runway from imported cash+burn without Apex leak", () => {
+    const snapshot = snapshotFromImportRow({
+      current_cash: 120000,
+      burn_rate: 20000,
+      revenue_mtd: 50000,
+      gross_profit: 20000,
+    });
+    assert.equal(snapshot.runway, calculateRunwayMonths(120000, 20000));
+    assert.equal(snapshot.runway, 6);
+    assert.equal(snapshot.forecastedCash, calculateForecastedCash(120000, 20000));
+    assert.notEqual(snapshot.forecastedCash, 0);
+
+    const summit = applyImportedFinancials("org-summit", snapshot, []);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(summit.fieldProvenance.runway, "CALCULATED");
+    assert.equal(summit.fieldProvenance.forecastedCash, "CALCULATED");
+    assert.equal(summit.fieldProvenance.burnRate, "SOURCE-DERIVED");
+    assert.equal(summit.financialSnapshot.runway, 6);
+    assert.equal(summit.kpiProvenance, "CALCULATED");
+    assert.ok(summit.kpis.some((kpi) => kpi.id === "gross_margin" && kpi.value === 40));
+    assert.ok(summit.kpis.some((kpi) => kpi.id === "cash_runway" && kpi.value === 6));
+    assert.deepEqual(summit.cashForecastWeeks, []);
+    assert.deepEqual(summit.scenarios, []);
+    assert.equal(summit.invoices.length, 0);
+    assert.equal(summit.jobs.length, 0);
+    assert.notEqual(summit.financialSnapshot.currentCash, apex.financialSnapshot.currentCash);
+    assert.notDeepEqual(summit.cashForecastWeeks, apex.cashForecastWeeks);
+    assert.equal(JSON.stringify(summit).includes("Harbor View"), false);
+    assert.doesNotMatch(JSON.stringify(summit), /0\.6|0\.35|revenue \* /);
+  });
+
+  it("does not invent runway when burn is missing", () => {
+    const snapshot = snapshotFromImportRow({
+      current_cash: 120000,
+      revenue_mtd: 50000,
+    });
+    assert.equal(snapshot.runway, 0);
+    assert.equal(snapshot.forecastedCash, 0);
+    assert.equal(snapshot.burnRate, 0);
+    assert.equal(calculateRunwayMonths(120000, null), null);
+
+    const summit = applyImportedFinancials("org-summit", snapshot);
+    assert.equal(summit.financialSnapshot.runway, 0);
+    assert.equal(summit.financialSnapshot.forecastedCash, 0);
+    assert.equal(summit.fieldProvenance.runway, "INSUFFICIENT_DATA");
+    assert.equal(summit.fieldProvenance.forecastedCash, "INSUFFICIENT_DATA");
+    assert.equal(summit.fieldProvenance.burnRate, "INSUFFICIENT_DATA");
+    assert.equal(
+      summit.kpis.some((kpi) => kpi.id === "cash_runway"),
+      false
+    );
+    assert.deepEqual(summit.cashForecastWeeks, []);
+    assert.deepEqual(summit.scenarios, []);
+  });
+});
+
 describe("value creation", () => {
   it("surfaces runway risk when below threshold", () => {
     const board = analyzeValueCreation({
@@ -175,6 +487,124 @@ describe("value creation", () => {
       alerts: [],
     });
     assert.ok(board.opportunities.some((o) => o.id === "runway-risk"));
+  });
+
+  it("labels revenue-decline threshold math as CALCULATED on real trends", () => {
+    const board = analyzeValueCreation({
+      organizationId: "org-summit",
+      snapshot: {
+        currentCash: 100000,
+        forecastedCash: 0,
+        revenueMTD: 40000,
+        revenueYTD: 180000,
+        grossProfit: 12000,
+        netProfit: 4000,
+        operatingExpenses: 20000,
+        accountsReceivable: 10000,
+        accountsPayable: 8000,
+        burnRate: 15000,
+        runway: 6.7,
+        debtObligations: 0,
+        payrollObligations: 10000,
+        ebitda: 0,
+      },
+      trends: [
+        { month: "Jan", revenue: 100000, expenses: 60000, profit: 40000, cash: 120000 },
+        { month: "Feb", revenue: 95000, expenses: 62000, profit: 33000, cash: 110000 },
+        { month: "Mar", revenue: 80000, expenses: 61000, profit: 19000, cash: 100000 },
+      ],
+      kpis: [],
+      alerts: [],
+    });
+    const decline = board.opportunities.find((o) => o.id === "revenue-decline");
+    assert.ok(decline);
+    assert.match(decline.evidence, /^CALCULATED/);
+    assert.doesNotMatch(decline.evidence, /^SOURCE-DERIVED/);
+  });
+
+  it("empty tenant has no invented value-creation opportunities", () => {
+    const empty = getTenantData("org-summit");
+    assert.equal(isEmptyFinancialSnapshot(empty.financialSnapshot), true);
+    const board = analyzeValueCreation({
+      organizationId: "org-summit",
+      snapshot: empty.financialSnapshot,
+      trends: empty.monthlyTrends,
+      kpis: empty.kpis,
+      alerts: empty.alerts,
+    });
+    assert.deepEqual(board.opportunities, []);
+    assert.equal(board.verifiedImpact, 0);
+    assert.equal(board.estimatedImpact, 0);
+    assert.match(board.summary, /Import or connect/);
+    assert.equal(JSON.stringify(board).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(board).includes("Apex Construction"), false);
+  });
+});
+
+describe("AI CFO honesty", () => {
+  it("empty tenant advisor context is INSUFFICIENT_DATA without Apex leak or invented runway risk", () => {
+    const empty = getTenantData("org-summit");
+    const provenance = dashboardFieldProvenance("org-summit", empty.financialSnapshot);
+    assert.equal(provenance.currentCash, "INSUFFICIENT_DATA");
+    assert.equal(provenance.runway, "INSUFFICIENT_DATA");
+    assert.deepEqual(getFinancialRiskSignals(empty.financialSnapshot, provenance), []);
+
+    const context = buildAdvisorDataContext({
+      organizationName: "Summit",
+      dashboard: {
+        financialSnapshot: empty.financialSnapshot,
+        monthlyTrends: [],
+        budgetVsActual: [],
+        kpis: [],
+        alerts: [],
+        source: "mock",
+        fieldProvenance: provenance,
+      },
+    });
+
+    assert.match(context, /INSUFFICIENT_DATA/);
+    assert.match(context, /Do not invent financial values/);
+    assert.doesNotMatch(context, /CALCULATED financial snapshot/);
+    assert.doesNotMatch(context, /Runway is 0\.0 months/);
+    assert.doesNotMatch(context, /cash risk elevated/);
+    assert.equal(context.includes("Harbor View"), false);
+    assert.equal(context.includes("Apex Construction"), false);
+    assert.doesNotMatch(context, /487,?250|412,?800/);
+  });
+
+  it("imported cash+burn advisor context uses SOURCE-DERIVED and CALCULATED only", () => {
+    const snapshot = snapshotFromImportRow({
+      current_cash: 90000,
+      burn_rate: 15000,
+      revenue_mtd: 40000,
+    });
+    const imported = applyImportedFinancials("org-summit", snapshot);
+    assert.equal(imported.financialSnapshot.runway, calculateRunwayMonths(90000, 15000));
+    assert.equal(imported.financialSnapshot.forecastedCash, calculateForecastedCash(90000, 15000));
+
+    const context = buildAdvisorDataContext({
+      organizationName: "Summit",
+      dashboard: {
+        financialSnapshot: imported.financialSnapshot,
+        monthlyTrends: imported.monthlyTrends,
+        budgetVsActual: [],
+        kpis: imported.kpis,
+        alerts: [],
+        source: "mock",
+        fieldProvenance: imported.fieldProvenance,
+      },
+    });
+
+    assert.match(context, /Current cash: \$90,000 \(SOURCE-DERIVED\)/);
+    assert.match(context, /Burn rate: \$15,000\/mo \(SOURCE-DERIVED\)/);
+    assert.match(context, /Runway \(months\): 6 \(CALCULATED\)/);
+    assert.match(context, /Forecasted cash \(13wk\): \$45,000 \(CALCULATED\)|Forecasted cash \(13wk\): \$44,965 \(CALCULATED\)/);
+    assert.match(context, /Revenue MTD: \$40,000 \(SOURCE-DERIVED\)/);
+    assert.match(context, /EBITDA: INSUFFICIENT_DATA/);
+    assert.doesNotMatch(context, /CALCULATED financial snapshot/);
+    assert.equal(context.includes("Harbor View"), false);
+    assert.equal(context.includes("Apex Construction"), false);
+    assert.doesNotMatch(context, /487,?250|412,?800/);
   });
 });
 
@@ -213,5 +643,38 @@ describe("tenant isolation contract", () => {
     assert.ok(plaid);
     assert.equal(qbo.status, "disconnected");
     assert.equal(plaid.status, "disconnected");
+  });
+
+  it("does not mark Stripe, Gusto, HubSpot, Sheets, or any catalog item connected for empty tenants", () => {
+    const emptyOrgs = ["org-summit", "org-acme-services", "org-unknown-tenant", "org-hvcg"];
+    const namedConnectors = ["Stripe", "Gusto", "HubSpot", "Google Sheets"];
+
+    for (const orgId of emptyOrgs) {
+      const catalog = getTenantData(orgId).integrations;
+      const connected = catalog.filter((item) => item.status === "connected");
+      assert.equal(connected.length, 0, `${orgId} must not have connected catalog items`);
+
+      for (const name of namedConnectors) {
+        const item = catalog.find((entry) => entry.name === name);
+        assert.ok(item, `${orgId} catalog must include ${name}`);
+        assert.equal(item.status, "disconnected", `${orgId} ${name}`);
+        assert.equal(item.lastSync, undefined, `${orgId} ${name} must not advertise lastSync`);
+      }
+    }
+  });
+
+  it("does not advertise lastGenerated demo dates on empty-tenant reports", () => {
+    const emptyOrgs = ["org-summit", "org-acme-services", "org-unknown-tenant", "org-hvcg"];
+
+    for (const orgId of emptyOrgs) {
+      const reports = getTenantData(orgId).reports;
+      for (const report of reports) {
+        assert.equal(
+          report.lastGenerated,
+          undefined,
+          `${orgId} ${report.id} must not advertise lastGenerated`
+        );
+      }
+    }
   });
 });
