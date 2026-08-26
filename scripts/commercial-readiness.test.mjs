@@ -2832,3 +2832,43 @@ describe("leftover reports-page invented Key-performance-indicators-snapshot Car
     );
   });
 });
+
+describe("leftover sales-pipeline invented Total-vs-weighted-value-by-deal-stage CardDescription honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/sales-pipeline/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Total vs weighted value by deal stage on the sales-pipeline page", () => {
+    assert.equal(page.includes("Total vs weighted value by deal stage"), false);
+    assert.equal(page.includes("Total vs weighted"), false);
+    assert.equal(page.includes("weighted value by deal stage"), false);
+    assert.match(
+      page,
+      /<CardDescription>\{\`Pipeline by stage for \$\{organization\.name\}\`\}<\/CardDescription>/
+    );
+    assert.match(page, /description=\{`Sales pipeline for \$\{organization\.name\}`\}/);
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover sales-pipeline total-vs-weighted honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+  });
+
+  it("empty tenant still has no Apex leak after leftover sales-pipeline total-vs-weighted honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});

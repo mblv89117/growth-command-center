@@ -82,7 +82,7 @@ export default function SalesPipelinePage() {
         <Card>
           <CardHeader>
             <CardTitle>Pipeline by Stage</CardTitle>
-            <CardDescription>Total vs weighted value by deal stage</CardDescription>
+            <CardDescription>{`Pipeline by stage for ${organization.name}`}</CardDescription>
           </CardHeader>
           <CardContent>
             <PipelineChart data={stageData} />
