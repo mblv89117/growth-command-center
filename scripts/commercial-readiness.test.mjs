@@ -2772,3 +2772,63 @@ describe("leftover reports-catalog invented Key performance indicators dashboard
     );
   });
 });
+
+describe("leftover reports-page invented Key-performance-indicators-snapshot CardDescription honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/reports/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Key performance indicators snapshot — click edit to update KPIs on the reports page", () => {
+    assert.equal(
+      page.includes("Key performance indicators snapshot — click edit to update KPIs"),
+      false
+    );
+    assert.equal(page.includes("Key performance indicators snapshot"), false);
+    assert.equal(page.includes("click edit to update KPIs"), false);
+    assert.equal(page.includes("Key performance indicators"), false);
+    assert.match(
+      page,
+      /<CardDescription>\{\`KPI scorecard for \$\{organization\.name\}\`\}<\/CardDescription>/
+    );
+    assert.match(page, /description=\{`Reports for \$\{organization\.name\}`\}/);
+    const kpiScorecard = REPORTS.find((report) => report.id === "rpt-11");
+    assert.ok(kpiScorecard);
+    assert.equal(kpiScorecard.description, "KPI scorecard report");
+    assert.equal(
+      kpiScorecard.description.includes("Key performance indicators dashboard export"),
+      false
+    );
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover reports-page kpi-snapshot honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+    const kpiScorecard = apex.reports.find((report) => report.id === "rpt-11");
+    assert.ok(kpiScorecard);
+    assert.equal(kpiScorecard.description, "KPI scorecard report");
+  });
+
+  it("empty tenant still has no Apex leak after leftover reports-page kpi-snapshot honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+    assert.equal(
+      summit.reports.some((report) =>
+        report.description.includes("Key performance indicators snapshot")
+      ),
+      false
+    );
+  });
+});

@@ -53,7 +53,7 @@ export default function ReportsPage() {
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>KPI Scorecard</CardTitle>
-          <CardDescription>Key performance indicators snapshot — click edit to update KPIs</CardDescription>
+          <CardDescription>{`KPI scorecard for ${organization.name}`}</CardDescription>
         </CardHeader>
         <CardContent>
           <KpiScorecardGrid
