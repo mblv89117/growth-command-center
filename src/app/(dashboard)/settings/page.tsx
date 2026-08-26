@@ -45,7 +45,6 @@ export default function SettingsPage() {
     message: string;
     variant: "success" | "preview" | "error";
   } | null>(null);
-  const currentPlan = STRIPE_PLANS[organization.plan as PlanKey] ?? STRIPE_PLANS.growth;
   const [billingNotice, setBillingNotice] = useState<string | null>(() => {
     if (searchParams.get("success")) return "Subscription updated successfully.";
     if (searchParams.get("cancelled")) return "Checkout was cancelled.";
@@ -109,7 +108,7 @@ export default function SettingsPage() {
     <div>
       <PageHeader
         title="Settings"
-        description="Organization settings, forecast assumptions, thresholds, and billing"
+        description={`Settings for ${organization.name}`}
       />
 
       {!canManageSettings && (
@@ -144,7 +143,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Organization Profile</CardTitle>
-              <CardDescription>Basic information about your company</CardDescription>
+              <CardDescription>{`Organization profile for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -187,7 +186,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Forecast Settings</CardTitle>
-              <CardDescription>Default assumptions for cash forecasting</CardDescription>
+              <CardDescription>{`Forecast settings for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -203,14 +202,14 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">Include sales pipeline in forecast</p>
-                  <p className="text-sm text-muted-foreground">Weight open deals into revenue projections</p>
+                  <p className="text-sm text-muted-foreground">{`Sales pipeline forecast setting for ${organization.name}`}</p>
                 </div>
                 <Switch defaultChecked />
               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">Include job billing schedule</p>
-                  <p className="text-sm text-muted-foreground">Project cash from active job milestones</p>
+                  <p className="text-sm text-muted-foreground">{`Job billing schedule setting for ${organization.name}`}</p>
                 </div>
                 <Switch defaultChecked />
               </div>
@@ -238,7 +237,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Alert Thresholds</CardTitle>
-              <CardDescription>Configure when financial alerts are triggered</CardDescription>
+              <CardDescription>{`Alert thresholds for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -255,14 +254,14 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">AR aging alerts</p>
-                  <p className="text-sm text-muted-foreground">Alert when invoices exceed 30 days</p>
+                  <p className="text-sm text-muted-foreground">{`AR aging alert setting for ${organization.name}`}</p>
                 </div>
                 <Switch defaultChecked />
               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">Margin variance alerts</p>
-                  <p className="text-sm text-muted-foreground">Alert when job margin drops 5%+ below estimate</p>
+                  <p className="text-sm text-muted-foreground">{`Margin variance alert setting for ${organization.name}`}</p>
                 </div>
                 <Switch defaultChecked />
               </div>
@@ -287,7 +286,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Subscription & Billing</CardTitle>
-              <CardDescription>Manage your Growth Command Center plan via Stripe</CardDescription>
+              <CardDescription>{`Billing settings for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent>
               {billingNotice && (
@@ -298,11 +297,10 @@ export default function SettingsPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-xl font-bold capitalize">{organization.plan} Plan</h3>
-                    <Badge>Active</Badge>
+                    <Badge>{`Selected plan for ${organization.name}`}</Badge>
                   </div>
                   <p className="mt-1 text-muted-foreground">
-                    ${currentPlan.price / 100}/month
-                    · Up to {currentPlan.users} users
+                    {`Selected plan catalog entry for ${organization.name}`}
                   </p>
                 </div>
                 <Button variant="outline" onClick={openPortal} disabled={billingLoading === "portal"}>
@@ -332,7 +330,7 @@ export default function SettingsPage() {
                         onClick={() => startCheckout(key)}
                       >
                         {billingLoading === key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {organization.plan === key ? "Current Plan" : `Upgrade to ${plan.name}`}
+                        {organization.plan === key ? `Selected catalog plan for ${organization.name}` : `Upgrade to ${plan.name}`}
                       </Button>
                     </div>
                   )
