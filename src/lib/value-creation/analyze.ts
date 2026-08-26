@@ -1,3 +1,4 @@
+import { isEmptyFinancialSnapshot } from "@/lib/imports/honesty";
 import type { Alert, FinancialSnapshot, KPI, MonthlyTrend } from "@/lib/types";
 import { computeWorkingCapital } from "@/lib/financial/deltas";
 
@@ -37,8 +38,19 @@ export function analyzeValueCreation(input: {
   kpis: KPI[];
   alerts: Alert[];
 }): ValueCreationBoard {
-  const opportunities: ValueCreationOpportunity[] = [];
   const { snapshot, trends, kpis, alerts } = input;
+
+  if (isEmptyFinancialSnapshot(snapshot) && trends.length === 0 && kpis.length === 0 && alerts.length === 0) {
+    return {
+      organizationId: input.organizationId,
+      opportunities: [],
+      verifiedImpact: 0,
+      estimatedImpact: 0,
+      summary: "Import or connect financial data to surface value-creation opportunities.",
+    };
+  }
+
+  const opportunities: ValueCreationOpportunity[] = [];
 
   const grossMarginKpi = kpis.find((k) => k.id === "gross_margin" || k.name.toLowerCase().includes("gross margin"));
   const arDaysKpi = kpis.find((k) => k.id === "ar_days" || k.name.toLowerCase().includes("ar days"));
@@ -113,7 +125,7 @@ export function analyzeValueCreation(input: {
         id: "revenue-decline",
         category: "growth",
         finding: "Revenue trend declining over last 3 months",
-        evidence: `SOURCE-DERIVED: ${recent.map((t) => `${t.month}: $${t.revenue.toLocaleString()}`).join(" → ")}`,
+        evidence: `CALCULATED from SOURCE-DERIVED monthly trends (latest < 90% of first of last 3): ${recent.map((t) => `${t.month}: $${t.revenue.toLocaleString()}`).join(" → ")}`,
         businessImpact: "Revenue softness compresses margin and cash generation",
         recommendedAction: "Diagnose pipeline conversion, customer retention, and pricing",
         confidence: "VERIFIED",

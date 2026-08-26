@@ -93,7 +93,11 @@ export const KPI_CATALOG: KpiDefinition[] = [
     unit: "number",
     category: "cash",
     defaultTarget: 6,
-    compute: (ctx) => ctx.snapshot.runway,
+    compute: (ctx) => {
+      if (ctx.snapshot.runway > 0) return ctx.snapshot.runway;
+      if (ctx.snapshot.burnRate > 0) return ctx.snapshot.runway;
+      return null;
+    },
   },
   {
     key: "opex_ratio",
