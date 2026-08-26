@@ -15,7 +15,7 @@ import { formatCurrency } from "@/lib/utils";
 import { activeMonthlyTrends, latestTrendMonthLabel } from "@/lib/forecast/validate";
 import { computeDashboardDeltas } from "@/lib/financial/deltas";
 import { AiAdvisorPanel } from "@/components/dashboard/ai-advisor-panel";
-import { OnboardingCta } from "@/components/dashboard/onboarding-cta";
+import { FounderJourney } from "@/components/dashboard/founder-journey";
 import { KpiList } from "@/components/dashboard/kpi-list";
 import { ArrowRight, AlertTriangle, Loader2 } from "lucide-react";
 
@@ -69,7 +69,7 @@ export default function DashboardPage() {
     <div>
       <PageHeader
         title="Executive Dashboard"
-        description={`Real-time financial overview for ${organization.name}`}
+        description={`Financial overview for ${organization.name}`}
         actions={
           <div className="flex items-center gap-2">
             <Badge variant="secondary">
@@ -92,7 +92,7 @@ export default function DashboardPage() {
 
       <DataSourceBanner source={source} dataProvenance={dataProvenance} />
 
-      <OnboardingCta />
+      <FounderJourney dataProvenance={dataProvenance} />
 
       <div className="mb-6">
         <AiAdvisorPanel department="executive" />

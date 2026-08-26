@@ -7,13 +7,20 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { ForecastInsightBanner } from "@/components/forecast/forecast-insight-banner";
 import { useTenantData } from "@/hooks/use-tenant-data";
+import { useTenant } from "@/lib/tenant/context";
+import { isCashRiskPeriod } from "@/lib/forecast/compute";
 import { getScenarioMultiplier } from "@/lib/forecast-engine";
 import type { CashForecastWeek, ScenarioType } from "@/lib/types";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
-function applyForecastScenario(weeks: CashForecastWeek[], type: ScenarioType): CashForecastWeek[] {
+function applyForecastScenario(
+  weeks: CashForecastWeek[],
+  type: ScenarioType,
+  ownerCashAlertThreshold?: number | null
+): CashForecastWeek[] {
   const multiplier = getScenarioMultiplier(type);
   if (multiplier === 1 || weeks.length === 0) return weeks;
 
@@ -28,15 +35,21 @@ function applyForecastScenario(weeks: CashForecastWeek[], type: ScenarioType): C
       startingBalance,
       inflows,
       endingBalance,
-      isRiskPeriod: endingBalance < 150000,
+      isRiskPeriod: isCashRiskPeriod(endingBalance, ownerCashAlertThreshold),
     };
   });
 }
 
 export default function CashForecastPage() {
   const { data, source, loading } = useTenantData();
+  const { organization } = useTenant();
+  const ownerCashAlertThreshold = organization.settings.cashAlertThreshold;
   const [scenario, setScenario] = useState<ScenarioType>("base");
-  const forecastWeeks = applyForecastScenario(data.cashForecastWeeks, scenario);
+  const forecastWeeks = applyForecastScenario(
+    data.cashForecastWeeks,
+    scenario,
+    ownerCashAlertThreshold
+  );
 
   const chartData = forecastWeeks.map((w) => ({
     week: `W${w.week}`,
@@ -45,8 +58,11 @@ export default function CashForecastPage() {
     outflows: w.outflows,
   }));
 
-  const minCash = Math.min(...forecastWeeks.map((w) => w.endingBalance));
+  const minCash =
+    forecastWeeks.length > 0 ? Math.min(...forecastWeeks.map((w) => w.endingBalance)) : 0;
   const riskWeeks = forecastWeeks.filter((w) => w.isRiskPeriod);
+  const endingWeek13 = forecastWeeks[12]?.endingBalance;
+  const hasEndingWeek13 = typeof endingWeek13 === "number";
 
   const tableData = forecastWeeks.map((w) => ({
     week: `Week ${w.week}`,
@@ -70,18 +86,27 @@ export default function CashForecastPage() {
     <div>
       <PageHeader
         title="Cash Forecast"
-        description="13-week rolling cash forecast with scenario analysis"
+        description={`Cash forecast for ${organization.name}`}
       />
+      <ForecastInsightBanner />
       <DataSourceBanner source={source} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Starting Cash" value={data.financialSnapshot.currentCash} />
         <MetricCard
           title="Ending Cash (Wk 13)"
-          value={forecastWeeks[12]?.endingBalance ?? 0}
-          variant={minCash < 150000 ? "warning" : "default"}
+          value={hasEndingWeek13 ? endingWeek13 : 0}
+          variant={riskWeeks.length > 0 ? "warning" : "default"}
         />
-        <MetricCard title="Minimum Cash Point" value={minCash} variant="danger" />
+        <MetricCard
+          title="Minimum Cash Point"
+          value={forecastWeeks.length > 0 ? minCash : 0}
+          variant={
+            forecastWeeks.length > 0 && isCashRiskPeriod(minCash, ownerCashAlertThreshold)
+              ? "danger"
+              : "default"
+          }
+        />
         <MetricCard
           title="Runway"
           value={data.financialSnapshot.runway}
@@ -104,7 +129,7 @@ export default function CashForecastPage() {
                 <div>
                   <CardTitle>Weekly Cash Forecast</CardTitle>
                   <CardDescription>
-                    {riskWeeks.length} risk period{riskWeeks.length !== 1 ? "s" : ""} identified below $150K threshold
+                    {riskWeeks.length} risk period{riskWeeks.length !== 1 ? "s" : ""} from SOURCE-DERIVED insolvency or owner cash-alert target
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
