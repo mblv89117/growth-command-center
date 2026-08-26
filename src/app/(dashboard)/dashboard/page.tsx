@@ -14,6 +14,7 @@ import type { DashboardData } from "@/lib/data/dashboard";
 import { formatCurrency } from "@/lib/utils";
 import { activeMonthlyTrends, latestTrendMonthLabel } from "@/lib/forecast/validate";
 import { computeDashboardDeltas } from "@/lib/financial/deltas";
+import { dashboardFieldProvenance } from "@/lib/imports/honesty";
 import { AiAdvisorPanel } from "@/components/dashboard/ai-advisor-panel";
 import { OnboardingCta } from "@/components/dashboard/onboarding-cta";
 import { KpiList } from "@/components/dashboard/kpi-list";
@@ -42,6 +43,7 @@ export default function DashboardPage() {
           kpis: mock.kpis,
           alerts: mock.alerts,
           source: "mock",
+          fieldProvenance: dashboardFieldProvenance(organization.id, mock.financialSnapshot),
           deltas,
           workingCapital: mock.financialSnapshot.currentCash + mock.financialSnapshot.accountsReceivable - mock.financialSnapshot.accountsPayable,
           forecastVariancePercent: mock.financialSnapshot.currentCash > 0
