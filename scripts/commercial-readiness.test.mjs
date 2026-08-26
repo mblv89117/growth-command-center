@@ -1566,6 +1566,50 @@ describe("leftover Apex demo alert-7 covenant honesty", () => {
   });
 });
 
+describe("leftover Apex demo seed.sql debt-coverage covenant honesty", () => {
+  const seedSql = fs.readFileSync(new URL("../supabase/seed.sql", import.meta.url), "utf8");
+
+  it("does not invent leftover Apex demo 1.5x covenant in seed.sql", () => {
+    const executable = seedSql
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
+    assert.match(executable, /'org-apex', 'debt-coverage'/);
+    assert.match(
+      executable,
+      /'Debt service coverage ratio is projected at 1\.2x in July\.'/
+    );
+    assert.doesNotMatch(executable, /below 1\.5x covenant threshold/);
+    assert.doesNotMatch(executable, /1\.5x covenant/);
+    assert.doesNotMatch(executable, /covenant threshold/);
+  });
+
+  it("seed.sql leftover debt-coverage row is Apex-only", () => {
+    const debtCoverageRows = seedSql
+      .split("\n")
+      .filter((line) => line.includes("'debt-coverage'"));
+    assert.equal(debtCoverageRows.length, 1);
+    assert.match(debtCoverageRows[0], /'org-apex'/);
+    assert.doesNotMatch(debtCoverageRows[0], /org-summit|org-iron-ridge|org-unknown-seed-27/);
+  });
+
+  it("empty tenants do not inherit leftover Apex demo seed.sql 1.5x covenant", () => {
+    for (const orgId of ["org-summit", "org-pine-hollow", "org-unknown-seed-27"]) {
+      const empty = getTenantData(orgId);
+      assert.equal(empty.alerts.length, 0, orgId);
+      assert.equal(
+        empty.alerts.some((row) => row.id === "alert-7" || row.id === "debt-coverage"),
+        false,
+        orgId
+      );
+      assert.doesNotMatch(JSON.stringify(empty), /1\.5x covenant/);
+      assert.doesNotMatch(JSON.stringify(empty), /covenant threshold/);
+      assert.equal(JSON.stringify(empty).includes("Harbor View"), false, orgId);
+      assert.equal(JSON.stringify(empty).includes("Apex Construction"), false, orgId);
+    }
+  });
+});
+
 describe("tenant slug", () => {
   it("slugifies company names", () => {
     assert.equal(slugifyCompanyName("Acme Services LLC"), "acme-services-llc");
