@@ -1613,3 +1613,45 @@ describe("leftover value-creation-page invented Evidence-backed claim honesty", 
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover alerts-page invented recommended-actions claim honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/alerts/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Financial and operational risk alerts with recommended actions on the alerts page", () => {
+    assert.equal(
+      page.includes("Financial and operational risk alerts with recommended actions"),
+      false
+    );
+    assert.equal(page.includes("recommended actions"), false);
+    assert.equal(page.includes("operational risk alerts"), false);
+    assert.match(
+      page,
+      /description=\{`Alerts for \$\{organization\.name\}`\}/
+    );
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover alerts-page honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+  });
+
+  it("empty tenant still has no Apex leak after leftover alerts-page honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
