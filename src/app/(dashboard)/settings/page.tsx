@@ -330,7 +330,7 @@ export default function SettingsPage() {
                         onClick={() => startCheckout(key)}
                       >
                         {billingLoading === key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {organization.plan === key ? `Selected catalog plan for ${organization.name}` : `Upgrade to ${plan.name}`}
+                        {organization.plan === key ? `Selected catalog plan for ${organization.name}` : `Select catalog plan ${plan.name}`}
                       </Button>
                     </div>
                   )

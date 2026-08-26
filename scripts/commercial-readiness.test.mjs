@@ -3665,3 +3665,55 @@ describe("leftover settings invented Current-Plan catalog-button honesty", () =>
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover settings invented Upgrade-to catalog-button honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/settings/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Upgrade to catalog button without Stripe evidence", () => {
+    assert.equal(page.includes("Upgrade to"), false);
+    assert.equal(page.includes("Upgrade to ${plan.name}"), false);
+    assert.equal(page.includes("`Upgrade to ${plan.name}`"), false);
+    assert.match(page, /Select catalog plan \$\{plan\.name\}/);
+    assert.match(
+      page,
+      /Selected catalog plan for \$\{organization\.name\}/
+    );
+    assert.match(
+      page,
+      /Selected plan catalog entry for \$\{organization\.name\}/
+    );
+    assert.match(
+      page,
+      /<Badge>\{\`Selected plan for \$\{organization\.name\}\`\}<\/Badge>/
+    );
+    assert.match(
+      page,
+      /<CardDescription>\{\`Billing settings for \$\{organization\.name\}\`\}<\/CardDescription>/
+    );
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover settings Upgrade-to catalog-button honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+  });
+
+  it("empty tenant still has no Apex leak after leftover settings Upgrade-to catalog-button honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
