@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   generateDeterministicWeeklyForecast,
   buildForecastInputFromSnapshot,
+  aggregateMonthlyForecast,
+  isCashRiskPeriod,
 } from "../src/lib/forecast/compute";
 import { computeKpis } from "../src/lib/kpi/catalog";
 import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financial/deltas";
@@ -15,6 +17,11 @@ import {
   FINANCIAL_SNAPSHOT,
   getTenantData,
 } from "../src/lib/mock-data";
+import {
+  DEFAULT_SETTINGS,
+  mapOrganizationRow,
+  resolveCashAlertThreshold,
+} from "../src/lib/data/organizations";
 
 describe("forecast compute", () => {
   it("maintains balance continuity across weeks", () => {
@@ -31,6 +38,47 @@ describe("forecast compute", () => {
     for (const week of weeks) {
       assert.equal(week.startingBalance + week.inflows - week.outflows, week.endingBalance);
     }
+  });
+
+  it("does not invent endingBalance < 150000 as a cash-risk rule", () => {
+    const input = buildForecastInputFromSnapshot({
+      currentCash: 140000,
+      accountsReceivable: 20000,
+      revenueMTD: 10000,
+      operatingExpenses: 8000,
+      payrollObligations: 4000,
+      accountsPayable: 5000,
+    });
+    const weeks = generateDeterministicWeeklyForecast(input, 13);
+    assert.ok(weeks.length > 0);
+    assert.equal(
+      weeks.some((week) => week.endingBalance < 150000 && week.endingBalance >= 0 && week.isRiskPeriod),
+      false
+    );
+    const months = aggregateMonthlyForecast(weeks);
+    assert.equal(
+      months.some((month) => month.endingBalance < 150000 && month.endingBalance >= 0 && month.isRiskPeriod),
+      false
+    );
+  });
+
+  it("flags cash risk from SOURCE-DERIVED insolvency or owner cash-alert target", () => {
+    assert.equal(isCashRiskPeriod(140000), false);
+    assert.equal(isCashRiskPeriod(140000, null), false);
+    assert.equal(isCashRiskPeriod(-1), true);
+    assert.equal(isCashRiskPeriod(140000, 150000), true);
+    assert.equal(isCashRiskPeriod(160000, 150000), false);
+
+    const input = buildForecastInputFromSnapshot({
+      currentCash: 140000,
+      accountsReceivable: 20000,
+      revenueMTD: 10000,
+      operatingExpenses: 8000,
+      payrollObligations: 4000,
+      accountsPayable: 5000,
+    });
+    const ownerTargetWeeks = generateDeterministicWeeklyForecast(input, 13, 1, 150000);
+    assert.ok(ownerTargetWeeks.some((week) => week.isRiskPeriod));
   });
 
   it("is deterministic (no randomness)", () => {
@@ -203,6 +251,12 @@ describe("tenant isolation contract", () => {
     assert.equal(provisioned.jobs.length, 0);
     assert.notEqual(summit.financialSnapshot.currentCash, apex.financialSnapshot.currentCash);
     assert.notDeepEqual(summit.financialSnapshot, apex.financialSnapshot);
+    assert.equal(
+      summit.cashForecastWeeks.some(
+        (week) => week.endingBalance < 150000 && week.endingBalance >= 0 && week.isRiskPeriod
+      ),
+      false
+    );
   });
 
   it("keeps QBO and Plaid disconnected in the catalog", () => {
@@ -213,5 +267,112 @@ describe("tenant isolation contract", () => {
     assert.ok(plaid);
     assert.equal(qbo.status, "disconnected");
     assert.equal(plaid.status, "disconnected");
+  });
+});
+
+describe("leftover settings default cashAlertThreshold honesty", () => {
+  it("does not invent cashAlertThreshold 150000 for unconfigured orgs", () => {
+    assert.equal(DEFAULT_SETTINGS.cashAlertThreshold, 0);
+    assert.notEqual(DEFAULT_SETTINGS.cashAlertThreshold, 150000);
+    assert.equal(resolveCashAlertThreshold(undefined), 0);
+    assert.equal(resolveCashAlertThreshold(null), 0);
+    assert.equal(resolveCashAlertThreshold(0), 0);
+    assert.equal(resolveCashAlertThreshold(""), 0);
+
+    const missing = mapOrganizationRow({
+      id: "org-acme-services",
+      name: "Acme Services",
+      slug: "acme-services",
+    });
+    assert.equal(missing.settings.cashAlertThreshold, 0);
+    assert.notEqual(missing.settings.cashAlertThreshold, 150000);
+
+    const emptySettings = mapOrganizationRow({
+      id: "org-acme-services",
+      name: "Acme Services",
+      slug: "acme-services",
+      settings: {},
+    });
+    assert.equal(emptySettings.settings.cashAlertThreshold, 0);
+    assert.notEqual(emptySettings.settings.cashAlertThreshold, 150000);
+
+    const nullSettings = mapOrganizationRow({
+      id: "org-summit-unconfigured",
+      name: "Summit Unconfigured",
+      slug: "summit-unconfigured",
+      settings: null,
+    });
+    assert.equal(nullSettings.settings.cashAlertThreshold, 0);
+    assert.doesNotMatch(JSON.stringify(nullSettings), /150000/);
+  });
+
+  it("keeps owner-set cashAlertThreshold SOURCE-DERIVED", () => {
+    assert.equal(resolveCashAlertThreshold("150000"), 150000);
+    assert.equal(resolveCashAlertThreshold(75000), 75000);
+
+    const owner = mapOrganizationRow({
+      id: "org-acme-services",
+      name: "Acme Services",
+      slug: "acme-services",
+      settings: { cashAlertThreshold: 150000 },
+    });
+    assert.equal(owner.settings.cashAlertThreshold, 150000);
+
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+  });
+
+  it("empty tenant still has no Apex leak after settings default honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const mapped = mapOrganizationRow({
+      id: "org-acme-services",
+      name: "Acme Services",
+      slug: "acme-services",
+      settings: {},
+    });
+
+    assert.equal(mapped.settings.cashAlertThreshold, 0);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.notEqual(summit.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.notDeepEqual(summit.financialSnapshot, getTenantData(APEX_DEMO_ORGANIZATION_ID).financialSnapshot);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+    assert.doesNotMatch(JSON.stringify(mapped), /150000/);
+  });
+});
+
+describe("leftover mock-data organizationForId cashAlertThreshold honesty", () => {
+  it("does not invent cashAlertThreshold 150000 for unknown mock orgs", () => {
+    const provisioned = getTenantData("org-acme-services");
+    const unknown = getTenantData("org-unknown-tenant");
+
+    assert.equal(provisioned.organization.settings.cashAlertThreshold, 0);
+    assert.notEqual(provisioned.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(unknown.organization.settings.cashAlertThreshold, 0);
+    assert.notEqual(unknown.organization.settings.cashAlertThreshold, 150000);
+    assert.doesNotMatch(JSON.stringify(provisioned.organization), /150000/);
+    assert.doesNotMatch(JSON.stringify(unknown.organization), /150000/);
+  });
+
+  it("keeps pinned org-apex mock cashAlertThreshold SOURCE-DERIVED", () => {
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+  });
+
+  it("empty tenant still has no Apex leak after organizationForId honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.notEqual(summit.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.notDeepEqual(summit.financialSnapshot, getTenantData(APEX_DEMO_ORGANIZATION_ID).financialSnapshot);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
