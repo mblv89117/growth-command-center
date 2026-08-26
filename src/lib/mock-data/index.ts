@@ -213,10 +213,10 @@ export const KPIS: KPI[] = [
 ];
 
 export const INTEGRATIONS: Integration[] = [
-  { id: "int-1", name: "QuickBooks Online", category: "accounting", status: "connected", lastSync: "2025-05-24T06:00:00Z", description: "Sync transactions, invoices, bills, and chart of accounts", logo: "QB" },
+  { id: "int-1", name: "QuickBooks Online", category: "accounting", status: "disconnected", description: "Sync transactions, invoices, bills, and chart of accounts", logo: "QB" },
   { id: "int-2", name: "Xero", category: "accounting", status: "disconnected", description: "Alternative accounting platform integration", logo: "XE" },
   { id: "int-3", name: "Stripe", category: "payments", status: "connected", lastSync: "2025-05-24T05:30:00Z", description: "Payment processing and revenue tracking", logo: "ST" },
-  { id: "int-4", name: "Plaid", category: "payments", status: "connected", lastSync: "2025-05-24T06:15:00Z", description: "Bank account connections and cash balance sync", logo: "PL" },
+  { id: "int-4", name: "Plaid", category: "payments", status: "disconnected", description: "Bank account connections and cash balance sync", logo: "PL" },
   { id: "int-5", name: "Gusto", category: "payroll", status: "connected", lastSync: "2025-05-23T18:00:00Z", description: "Payroll, benefits, and contractor payments", logo: "GU" },
   { id: "int-6", name: "Buildertrend", category: "operations", status: "pending", description: "Job costing, scheduling, and production tracking", logo: "BT" },
   { id: "int-7", name: "HubSpot", category: "sales", status: "connected", lastSync: "2025-05-24T04:00:00Z", description: "CRM, deals pipeline, and sales forecasting", logo: "HS" },
@@ -302,38 +302,105 @@ export const PLATFORM_TENANTS: PlatformTenant[] = [
   { id: "org-legacy", name: "Legacy Builders Inc", plan: "Starter", users: 2, mrr: 0, status: "churned", createdAt: "2023-11-01" },
 ];
 
+export const APEX_DEMO_ORGANIZATION_ID = "org-apex";
+
+export const EMPTY_FINANCIAL_SNAPSHOT: FinancialSnapshot = {
+  currentCash: 0,
+  forecastedCash: 0,
+  revenueMTD: 0,
+  revenueYTD: 0,
+  grossProfit: 0,
+  netProfit: 0,
+  operatingExpenses: 0,
+  accountsReceivable: 0,
+  accountsPayable: 0,
+  burnRate: 0,
+  runway: 0,
+  debtObligations: 0,
+  payrollObligations: 0,
+  ebitda: 0,
+};
+
+function organizationForId(organizationId: string): Organization {
+  return (
+    ORGANIZATIONS.find((o) => o.id === organizationId) ?? {
+      id: organizationId,
+      name: organizationId,
+      slug: organizationId.replace(/^org-/, ""),
+      industry: "",
+      plan: "starter",
+      createdAt: new Date().toISOString().slice(0, 10),
+      settings: {
+        cashAlertThreshold: 150000,
+        forecastHorizonWeeks: 13,
+        fiscalYearStart: 1,
+        currency: "USD",
+      },
+    }
+  );
+}
+
 export function getTenantData(organizationId: string): TenantData {
-  const organization = ORGANIZATIONS.find((o) => o.id === organizationId) ?? ORGANIZATIONS[0];
+  const organization = organizationForId(organizationId);
+
+  if (organizationId === APEX_DEMO_ORGANIZATION_ID) {
+    return {
+      organization,
+      users: TEAM_MEMBERS.map((m) => ({
+        id: m.id,
+        email: m.email,
+        name: m.name,
+        role: m.role,
+        organizationId,
+        lastActiveAt: new Date().toISOString(),
+      })),
+      financialSnapshot: FINANCIAL_SNAPSHOT,
+      monthlyTrends: MONTHLY_TRENDS,
+      budgetVsActual: BUDGET_VS_ACTUAL,
+      forecastAssumptions: FORECAST_ASSUMPTIONS,
+      cashForecastWeeks: CASH_FORECAST_WEEKS,
+      cashForecastMonths: CASH_FORECAST_MONTHS,
+      scenarios: SCENARIOS,
+      opportunities: OPPORTUNITIES,
+      jobs: JOBS,
+      invoices: INVOICES,
+      bills: BILLS,
+      alerts: ALERTS,
+      kpis: KPIS,
+      integrations: INTEGRATIONS,
+      reports: REPORTS,
+      teamMembers: TEAM_MEMBERS,
+      transactions: TRANSACTIONS,
+      expenseCategories: EXPENSE_CATEGORIES,
+      revenueSources: REVENUE_SOURCES,
+      arAging: AR_AGING,
+      apAging: AP_AGING,
+    };
+  }
+
   return {
     organization,
-    users: TEAM_MEMBERS.map((m) => ({
-      id: m.id,
-      email: m.email,
-      name: m.name,
-      role: m.role,
-      organizationId,
-      lastActiveAt: new Date().toISOString(),
-    })),
-    financialSnapshot: FINANCIAL_SNAPSHOT,
-    monthlyTrends: MONTHLY_TRENDS,
-    budgetVsActual: BUDGET_VS_ACTUAL,
-    forecastAssumptions: FORECAST_ASSUMPTIONS,
-    cashForecastWeeks: CASH_FORECAST_WEEKS,
-    cashForecastMonths: CASH_FORECAST_MONTHS,
-    scenarios: SCENARIOS,
-    opportunities: OPPORTUNITIES,
-    jobs: JOBS,
-    invoices: INVOICES,
-    bills: BILLS,
-    alerts: ALERTS,
-    kpis: KPIS,
+    users: [],
+    financialSnapshot: EMPTY_FINANCIAL_SNAPSHOT,
+    monthlyTrends: [],
+    budgetVsActual: [],
+    forecastAssumptions: [],
+    cashForecastWeeks: [],
+    cashForecastMonths: [],
+    scenarios: [],
+    opportunities: [],
+    jobs: [],
+    invoices: [],
+    bills: [],
+    alerts: [],
+    kpis: [],
     integrations: INTEGRATIONS,
     reports: REPORTS,
-    teamMembers: TEAM_MEMBERS,
-    transactions: TRANSACTIONS,
-    expenseCategories: EXPENSE_CATEGORIES,
-    revenueSources: REVENUE_SOURCES,
-    arAging: AR_AGING,
-    apAging: AP_AGING,
+    teamMembers: [],
+    transactions: [],
+    expenseCategories: [],
+    revenueSources: [],
+    arAging: [],
+    apAging: [],
   };
 }
