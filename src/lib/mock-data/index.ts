@@ -199,16 +199,16 @@ export const ALERTS: Alert[] = [
 
 export const KPIS: KPI[] = [
   { id: "kpi-1", name: "Revenue Growth", value: 12.4, unit: "percent", change: 2.1, changeLabel: "vs last month" }, // Do not invent leftover Revenue Growth target = 10.
-  { id: "kpi-2", name: "Gross Margin", value: 35.9, unit: "percent", change: -1.2, changeLabel: "vs last month", target: 32 },
-  { id: "kpi-3", name: "Net Margin", value: 13.0, unit: "percent", change: 0.8, changeLabel: "vs last month", target: 12 },
-  { id: "kpi-4", name: "Cash Conversion Cycle", value: 42, unit: "days", change: -3, changeLabel: "vs last quarter", target: 45 },
-  { id: "kpi-5", name: "AR Days", value: 48, unit: "days", change: 5, changeLabel: "vs last month", target: 40 },
-  { id: "kpi-6", name: "AP Days", value: 32, unit: "days", change: -2, changeLabel: "vs last month", target: 35 },
-  { id: "kpi-7", name: "Sales Close Rate", value: 34, unit: "percent", change: 4, changeLabel: "vs last quarter", target: 30 },
+  { id: "kpi-2", name: "Gross Margin", value: 35.9, unit: "percent", change: -1.2, changeLabel: "vs last month" }, // Do not invent leftover Gross Margin target = 32.
+  { id: "kpi-3", name: "Net Margin", value: 13.0, unit: "percent", change: 0.8, changeLabel: "vs last month" }, // Do not invent leftover Net Margin target = 12.
+  { id: "kpi-4", name: "Cash Conversion Cycle", value: 42, unit: "days", change: -3, changeLabel: "vs last quarter" }, // Do not invent leftover Cash Conversion Cycle target = 45.
+  { id: "kpi-5", name: "AR Days", value: 48, unit: "days", change: 5, changeLabel: "vs last month" }, // Do not invent leftover AR Days target = 40.
+  { id: "kpi-6", name: "AP Days", value: 32, unit: "days", change: -2, changeLabel: "vs last month" }, // Do not invent leftover AP Days target = 35.
+  { id: "kpi-7", name: "Sales Close Rate", value: 34, unit: "percent", change: 4, changeLabel: "vs last quarter" }, // Do not invent leftover Sales Close Rate target = 30.
   { id: "kpi-8", name: "Average Deal Size", value: 1420000, unit: "currency", change: 8.5, changeLabel: "vs last quarter" },
-  { id: "kpi-9", name: "Job Profitability", value: 26.8, unit: "percent", change: -2.4, changeLabel: "vs estimate", target: 28 },
-  { id: "kpi-10", name: "Operating Expense Ratio", value: 22.9, unit: "percent", change: -0.5, changeLabel: "vs last month", target: 24 },
-  { id: "kpi-11", name: "Debt Service Coverage", value: 1.8, unit: "number", change: -0.2, changeLabel: "vs last quarter", target: 1.5 },
+  { id: "kpi-9", name: "Job Profitability", value: 26.8, unit: "percent", change: -2.4, changeLabel: "vs estimate" }, // Do not invent leftover Job Profitability target = 28.
+  { id: "kpi-10", name: "Operating Expense Ratio", value: 22.9, unit: "percent", change: -0.5, changeLabel: "vs last month" }, // Do not invent leftover Operating Expense Ratio target = 24.
+  { id: "kpi-11", name: "Debt Service Coverage", value: 1.8, unit: "number", change: -0.2, changeLabel: "vs last quarter" }, // Do not invent leftover Debt Service Coverage target = 1.5.
   { id: "kpi-12", name: "Runway", value: 3.4, unit: "number", change: -0.3, changeLabel: "months" }, // Do not invent leftover Runway target = 6.
   { id: "kpi-13", name: "EBITDA", value: 1125600, unit: "currency", change: 15.2, changeLabel: "vs last month" },
 ];

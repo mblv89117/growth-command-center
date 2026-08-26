@@ -733,3 +733,100 @@ describe("leftover Apex demo KPI target 10/6 honesty", () => {
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover Apex demo KPI targets 32/12/45/40/35/30/28/24/1.5 honesty", () => {
+  const seedJs = fs.readFileSync(new URL("./seed-supabase.mjs", import.meta.url), "utf8");
+  const leftover = [
+    ["kpi-2", 32],
+    ["kpi-3", 12],
+    ["kpi-4", 45],
+    ["kpi-5", 40],
+    ["kpi-6", 35],
+    ["kpi-7", 30],
+    ["kpi-9", 28],
+    ["kpi-10", 24],
+    ["kpi-11", 1.5],
+  ];
+
+  it("does not invent leftover Apex demo KPI targets 32/12/45/40/35/30/28/24/1.5", () => {
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    for (const [id, invented] of leftover) {
+      const card = KPIS.find((kpi) => kpi.id === id);
+      const live = apex.kpis.find((kpi) => kpi.id === id);
+      assert.ok(card, id);
+      assert.ok(live, id);
+      assert.equal(card.target, undefined, id);
+      assert.equal(live.target, undefined, id);
+      assert.notEqual(card.target, invented, id);
+      assert.notEqual(live.target, invented, id);
+    }
+
+    const executable = seedJs
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//"))
+      .join("\n");
+    assert.match(executable, /\["gross_margin", "Gross Margin", 35\.9, "percent", -1\.2, "vs last month", null\]/);
+    assert.match(executable, /\["net_margin", "Net Margin", 13\.0, "percent", 0\.8, "vs last month", null\]/);
+    assert.doesNotMatch(executable, /\["gross_margin", "Gross Margin", 35\.9, "percent", -1\.2, "vs last month", 32\]/);
+    assert.doesNotMatch(executable, /\["net_margin", "Net Margin", 13\.0, "percent", 0\.8, "vs last month", 12\]/);
+  });
+
+  it("keeps owner-set leftover remaining Apex demo KPI targets SOURCE-DERIVED", () => {
+    assert.equal(resolveKpiTarget(29), 29);
+    assert.equal(resolveKpiTarget(11), 11);
+    assert.notEqual(resolveKpiTarget(29), 32);
+    assert.notEqual(resolveKpiTarget(11), 12);
+
+    const owner = computeKpis(
+      {
+        snapshot: {
+          currentCash: 100000,
+          forecastedCash: 80000,
+          revenueMTD: 200000,
+          revenueYTD: 500000,
+          grossProfit: 80000,
+          netProfit: 40000,
+          operatingExpenses: 50000,
+          accountsReceivable: 60000,
+          accountsPayable: 20000,
+          burnRate: 20000,
+          runway: 5,
+          debtObligations: 0,
+          payrollObligations: 30000,
+          ebitda: 45000,
+        },
+        trends: [
+          { month: "Jan", revenue: 180000, expenses: 120000, profit: 60000, cash: 90000 },
+          { month: "Feb", revenue: 200000, expenses: 130000, profit: 70000, cash: 100000 },
+        ],
+      },
+      ["gross_margin", "net_margin"],
+      { gross_margin: 29, net_margin: 11 }
+    );
+    const gross = owner.find((kpi) => kpi.key === "gross_margin");
+    const net = owner.find((kpi) => kpi.key === "net_margin");
+    assert.ok(gross);
+    assert.ok(net);
+    assert.equal(gross.target, 29);
+    assert.equal(net.target, 11);
+    assert.notEqual(gross.target, 32);
+    assert.notEqual(net.target, 12);
+  });
+
+  it("empty tenant still has no Apex leak after leftover remaining Apex demo KPI honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.kpis.length, 0);
+    assert.equal(provisioned.kpis.length, 0);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.notDeepEqual(summit.financialSnapshot, apex.financialSnapshot);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
