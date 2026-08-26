@@ -41,6 +41,7 @@ import {
   APEX_DEMO_ORGANIZATION_ID,
   EMPTY_FINANCIAL_SNAPSHOT,
   FINANCIAL_SNAPSHOT,
+  KPIS,
   getTenantData,
 } from "../src/lib/mock-data";
 
@@ -1345,6 +1346,95 @@ describe("leftover KPI catalog defaultTarget honesty", () => {
     }
     assert.equal(JSON.stringify(imported).includes("Harbor View"), false);
     assert.equal(JSON.stringify(imported).includes("Apex Construction"), false);
+  });
+});
+
+describe("leftover Apex demo KPI target honesty", () => {
+  it("does not invent leftover Apex demo Revenue Growth target 10 or Runway target 6", () => {
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    const runway = KPIS.find((kpi) => kpi.id === "kpi-12");
+    assert.ok(growth);
+    assert.ok(runway);
+    assert.equal(growth.target, undefined);
+    assert.equal(runway.target, undefined);
+    assert.notEqual(growth.target, 10);
+    assert.notEqual(runway.target, 6);
+
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    const apexGrowth = apex.kpis.find((kpi) => kpi.id === "kpi-1");
+    const apexRunway = apex.kpis.find((kpi) => kpi.id === "kpi-12");
+    assert.ok(apexGrowth);
+    assert.ok(apexRunway);
+    assert.equal(apexGrowth.target, undefined);
+    assert.equal(apexRunway.target, undefined);
+    assert.notEqual(apexGrowth.target, 10);
+    assert.notEqual(apexRunway.target, 6);
+
+    const seed = fs.readFileSync(new URL("./seed-supabase.mjs", import.meta.url), "utf8");
+    assert.match(seed, /\["revenue_growth", "Revenue Growth", 12\.4, "percent", 2\.1, "vs last month", null\]/);
+    assert.match(seed, /\["runway", "Runway", 3\.4, "number", -0\.3, "months", null\]/);
+    assert.doesNotMatch(seed, /\["revenue_growth", "Revenue Growth", 12\.4, "percent", 2\.1, "vs last month", 10\]/);
+    assert.doesNotMatch(seed, /\["runway", "Runway", 3\.4, "number", -0\.3, "months", 6\]/);
+  });
+
+  it("applies owner leftover Apex demo KPI targets only", () => {
+    const ownerTargets = { revenue_growth: 14, cash_runway: 9 };
+    const kpis = computeKpis(
+      {
+        snapshot: {
+          currentCash: 100000,
+          forecastedCash: 80000,
+          revenueMTD: 200000,
+          revenueYTD: 500000,
+          grossProfit: 80000,
+          netProfit: 40000,
+          operatingExpenses: 50000,
+          accountsReceivable: 60000,
+          accountsPayable: 20000,
+          burnRate: 20000,
+          runway: 5,
+          debtObligations: 0,
+          payrollObligations: 30000,
+          ebitda: 45000,
+        },
+        trends: [
+          { month: "Jan", revenue: 180000, expenses: 120000, profit: 60000, cash: 90000 },
+          { month: "Feb", revenue: 200000, expenses: 130000, profit: 70000, cash: 100000 },
+        ],
+      },
+      ["revenue_growth", "cash_runway"],
+      ownerTargets
+    );
+    const growth = kpis.find((row) => row.key === "revenue_growth");
+    const runway = kpis.find((row) => row.key === "cash_runway");
+    assert.ok(growth);
+    assert.ok(runway);
+    assert.equal(growth.target, 14);
+    assert.equal(runway.target, 9);
+    assert.notEqual(growth.target, 10);
+    assert.notEqual(runway.target, 6);
+    assert.equal(resolveKpiTarget(14), 14);
+    assert.equal(resolveKpiTarget(9), 9);
+    assert.equal(resolveKpiTarget(undefined), undefined);
+  });
+
+  it("empty tenants do not inherit leftover Apex demo KPI targets", () => {
+    for (const orgId of ["org-summit", "org-acme-services", "org-mesa-works", "org-unknown-apex-demo"]) {
+      const empty = getTenantData(orgId);
+      assert.equal(empty.kpis.length, 0, orgId);
+      assert.equal(
+        empty.kpis.some((kpi) => kpi.id === "kpi-1" && kpi.target === 10),
+        false,
+        orgId
+      );
+      assert.equal(
+        empty.kpis.some((kpi) => kpi.id === "kpi-12" && kpi.target === 6),
+        false,
+        orgId
+      );
+      assert.equal(JSON.stringify(empty).includes("Harbor View"), false, orgId);
+      assert.equal(JSON.stringify(empty).includes("Apex Construction"), false, orgId);
+    }
   });
 });
 
