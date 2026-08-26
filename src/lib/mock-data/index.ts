@@ -216,14 +216,14 @@ export const KPIS: KPI[] = [
 export const INTEGRATIONS: Integration[] = [
   { id: "int-1", name: "QuickBooks Online", category: "accounting", status: "disconnected", description: "Sync transactions, invoices, bills, and chart of accounts", logo: "QB" },
   { id: "int-2", name: "Xero", category: "accounting", status: "disconnected", description: "Alternative accounting platform integration", logo: "XE" },
-  { id: "int-3", name: "Stripe", category: "payments", status: "connected", lastSync: "2025-05-24T05:30:00Z", description: "Payment processing and revenue tracking", logo: "ST" },
+  { id: "int-3", name: "Stripe", category: "payments", status: "disconnected", description: "Payment processing and revenue tracking", logo: "ST" }, // Do not invent leftover Stripe connected lastSync.
   { id: "int-4", name: "Plaid", category: "payments", status: "disconnected", description: "Bank account connections and cash balance sync", logo: "PL" },
-  { id: "int-5", name: "Gusto", category: "payroll", status: "connected", lastSync: "2025-05-23T18:00:00Z", description: "Payroll, benefits, and contractor payments", logo: "GU" },
+  { id: "int-5", name: "Gusto", category: "payroll", status: "disconnected", description: "Payroll, benefits, and contractor payments", logo: "GU" }, // Do not invent leftover Gusto connected lastSync.
   { id: "int-6", name: "Buildertrend", category: "operations", status: "pending", description: "Job costing, scheduling, and production tracking", logo: "BT" },
-  { id: "int-7", name: "HubSpot", category: "sales", status: "connected", lastSync: "2025-05-24T04:00:00Z", description: "CRM, deals pipeline, and sales forecasting", logo: "HS" },
+  { id: "int-7", name: "HubSpot", category: "sales", status: "disconnected", description: "CRM, deals pipeline, and sales forecasting", logo: "HS" }, // Do not invent leftover HubSpot connected lastSync.
   { id: "int-8", name: "Salesforce", category: "sales", status: "disconnected", description: "Enterprise CRM and opportunity management", logo: "SF" },
   { id: "int-9", name: "Jobber", category: "operations", status: "disconnected", description: "Field service and job management", logo: "JB" },
-  { id: "int-10", name: "Google Sheets", category: "other", status: "connected", lastSync: "2025-05-24T03:00:00Z", description: "Import custom spreadsheets and forecasts", logo: "GS" },
+  { id: "int-10", name: "Google Sheets", category: "other", status: "disconnected", description: "Import custom spreadsheets and forecasts", logo: "GS" }, // Do not invent leftover Google Sheets connected lastSync.
 ];
 
 /** Catalog templates with invented connected lastSync must not be served as live connections. */

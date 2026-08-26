@@ -923,7 +923,7 @@ describe("leftover empty-tenant catalog lastSync / lastGenerated honesty", () =>
     );
     assert.equal(
       INTEGRATIONS.some((item) => namedConnectors.includes(item.name) && item.status === "connected"),
-      true
+      false
     );
   });
 
@@ -981,5 +981,52 @@ describe("leftover empty-tenant catalog lastSync / lastGenerated honesty", () =>
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
     assert.equal(JSON.stringify(summit).includes("2025-05-24T05:30:00Z"), false);
     assert.equal(JSON.stringify(provisioned).includes("2025-05-24T05:30:00Z"), false);
+  });
+});
+
+describe("leftover unused INTEGRATIONS template connected lastSync honesty", () => {
+  const namedConnectors = ["Stripe", "Gusto", "HubSpot", "Google Sheets"];
+  const inventedLastSync = [
+    "2025-05-24T05:30:00Z",
+    "2025-05-23T18:00:00Z",
+    "2025-05-24T04:00:00Z",
+    "2025-05-24T03:00:00Z",
+  ];
+
+  it("does not invent leftover connected lastSync on unused INTEGRATIONS template", () => {
+    for (const name of namedConnectors) {
+      const item = INTEGRATIONS.find((entry) => entry.name === name);
+      assert.ok(item, `INTEGRATIONS must include ${name}`);
+      assert.equal(item.status, "disconnected", `${name} template`);
+      assert.equal(item.lastSync, undefined, `${name} template lastSync`);
+    }
+    assert.equal(INTEGRATIONS.some((item) => item.status === "connected"), false);
+    for (const stamp of inventedLastSync) {
+      assert.equal(
+        INTEGRATIONS.some((item) => item.lastSync === stamp),
+        false,
+        stamp
+      );
+    }
+  });
+
+  it("keeps live/owner-set catalog lastSync SOURCE-DERIVED", () => {
+    const live = { status: "connected", lastSync: "2026-08-01T12:00:00Z" };
+    assert.equal(live.status, "connected");
+    assert.equal(live.lastSync, "2026-08-01T12:00:00Z");
+  });
+
+  it("empty tenant still has no Apex leak after leftover INTEGRATIONS template honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.kpis.length, 0);
+    assert.equal(provisioned.kpis.length, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(INTEGRATIONS).includes("2025-05-24T05:30:00Z"), false);
   });
 });
