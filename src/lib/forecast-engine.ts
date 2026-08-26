@@ -10,7 +10,7 @@ export function generateWeeklyForecast(
 }
 
 export function calculateRunway(currentCash: number, weeklyBurn: number): number {
-  if (weeklyBurn <= 0) return 999;
+  if (weeklyBurn <= 0) return 0;
   return Math.round((currentCash / weeklyBurn) * 10) / 10;
 }
 

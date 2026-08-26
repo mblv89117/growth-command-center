@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   generateDeterministicWeeklyForecast,
   buildForecastInputFromSnapshot,
+  hasExplicitWeeklyDrivers,
 } from "../src/lib/forecast/compute";
 import { computeKpis } from "../src/lib/kpi/catalog";
 import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financial/deltas";
@@ -28,7 +29,7 @@ import {
 } from "../src/lib/mock-data";
 
 describe("forecast compute", () => {
-  it("maintains balance continuity across weeks", () => {
+  it("does not invent a weekly mix from snapshot revenue percents", () => {
     const input = buildForecastInputFromSnapshot({
       currentCash: 500000,
       accountsReceivable: 200000,
@@ -37,6 +38,56 @@ describe("forecast compute", () => {
       payrollObligations: 40000,
       accountsPayable: 80000,
     });
+    assert.equal(input.sales, 0);
+    assert.equal(input.recurringRevenue, 0);
+    assert.equal(input.oneTimeRevenue, 0);
+    assert.equal(input.rent, 0);
+    assert.equal(input.subcontractors, 0);
+    assert.equal(input.materials, 0);
+    assert.equal(input.loanPayments, 0);
+    assert.equal(input.taxes, 0);
+    assert.equal(input.ownerDistributions, 0);
+    assert.equal(input.capex, 0);
+    assert.equal(input.payroll, 40000);
+    assert.equal(input.operatingExpenses, 60000);
+    assert.equal(input.receivables, 200000);
+    assert.equal(hasExplicitWeeklyDrivers(input), false);
+    assert.deepEqual(generateDeterministicWeeklyForecast(input, 13), []);
+  });
+
+  it("does not invent payroll or opex as a percent of revenue when those fields are missing", () => {
+    const input = buildForecastInputFromSnapshot({
+      currentCash: 90000,
+      accountsReceivable: 0,
+      revenueMTD: 40000,
+      operatingExpenses: 0,
+      payrollObligations: 0,
+      accountsPayable: 0,
+    });
+    assert.equal(input.payroll, 0);
+    assert.equal(input.operatingExpenses, 0);
+    assert.equal(input.sales, 0);
+    assert.deepEqual(generateDeterministicWeeklyForecast(input), []);
+  });
+
+  it("maintains balance continuity only for explicit SOURCE-DERIVED drivers", () => {
+    const input = {
+      startingCash: 500000,
+      receivables: 200000,
+      sales: 80000,
+      recurringRevenue: 20000,
+      oneTimeRevenue: 0,
+      payroll: 40000,
+      rent: 8000,
+      subcontractors: 0,
+      materials: 0,
+      operatingExpenses: 60000,
+      loanPayments: 0,
+      taxes: 0,
+      ownerDistributions: 0,
+      capex: 0,
+    };
+    assert.equal(hasExplicitWeeklyDrivers(input), true);
     const weeks = generateDeterministicWeeklyForecast(input, 13);
     assert.equal(weeks.length, 13);
     for (const week of weeks) {
@@ -44,18 +95,27 @@ describe("forecast compute", () => {
     }
   });
 
-  it("is deterministic (no randomness)", () => {
-    const input = buildForecastInputFromSnapshot({
-      currentCash: 100000,
-      accountsReceivable: 50000,
-      revenueMTD: 80000,
+  it("is deterministic (no randomness) for explicit drivers", () => {
+    const input = {
+      startingCash: 100000,
+      receivables: 50000,
+      sales: 40000,
+      recurringRevenue: 0,
+      oneTimeRevenue: 0,
+      payroll: 20000,
+      rent: 0,
+      subcontractors: 0,
+      materials: 0,
       operatingExpenses: 40000,
-      payrollObligations: 20000,
-      accountsPayable: 30000,
-    });
+      loanPayments: 0,
+      taxes: 0,
+      ownerDistributions: 0,
+      capex: 0,
+    };
     const a = generateDeterministicWeeklyForecast(input);
     const b = generateDeterministicWeeklyForecast(input);
     assert.deepEqual(a, b);
+    assert.equal(a.length, 13);
   });
 });
 
