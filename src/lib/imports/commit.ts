@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { autoMapColumns } from "@/lib/imports/parser";
 import type { ImportPreviewResult, ImportTemplateType } from "@/lib/imports/types";
 import { IMPORT_TEMPLATES } from "@/lib/imports/types";
+import { resolveImportedSnapshot, resolveMonthlyTrendRow } from "@/lib/imports/honesty";
 import { recomputeTenantFinancials } from "@/lib/pipeline/recompute";
 import { completeJobRun, startJobRun } from "@/lib/observability/events";
 
@@ -83,39 +84,49 @@ export async function commitImport(
 
   try {
     if (preview.templateType === "financial_snapshot") {
-      const row = validRows[0].data;
+      const resolved = resolveImportedSnapshot(validRows[0].data);
+      const snapshot = resolved.snapshot;
       await admin.from("gcc_financial_snapshots").upsert(
         {
           organization_id: organizationId,
-          current_cash: Number(row.current_cash ?? 0),
-          revenue_mtd: Number(row.revenue_mtd ?? 0),
-          revenue_ytd: Number(row.revenue_ytd ?? 0),
-          gross_profit: Number(row.gross_profit ?? 0),
-          net_profit: Number(row.net_profit ?? 0),
-          operating_expenses: Number(row.operating_expenses ?? 0),
-          accounts_receivable: Number(row.accounts_receivable ?? 0),
-          accounts_payable: Number(row.accounts_payable ?? 0),
-          payroll_obligations: Number(row.payroll_obligations ?? 0),
-          ebitda: Number(row.ebitda ?? 0),
+          current_cash: snapshot.currentCash,
+          forecasted_cash: snapshot.forecastedCash,
+          revenue_mtd: snapshot.revenueMTD,
+          revenue_ytd: snapshot.revenueYTD,
+          gross_profit: snapshot.grossProfit,
+          net_profit: snapshot.netProfit,
+          operating_expenses: snapshot.operatingExpenses,
+          accounts_receivable: snapshot.accountsReceivable,
+          accounts_payable: snapshot.accountsPayable,
+          burn_rate: snapshot.burnRate,
+          runway: snapshot.runway,
+          debt_obligations: snapshot.debtObligations,
+          payroll_obligations: snapshot.payrollObligations,
+          ebitda: snapshot.ebitda,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "organization_id" }
       );
     } else if (preview.templateType === "monthly_trends") {
-      for (let i = 0; i < validRows.length; i++) {
-        const row = validRows[i].data;
-        const revenue = Number(row.revenue ?? 0);
-        const expenses = Number(row.expenses ?? revenue * 0.7);
-        const profit = Number(row.profit ?? revenue - expenses);
-        const cash = Number(row.cash ?? 0);
+      const resolved: Array<{ month: string; revenue: number; expenses: number; profit: number; cash: number }> = [];
+      for (const valid of validRows) {
+        const result = resolveMonthlyTrendRow(valid.data);
+        if (!result.ok) {
+          await completeJobRun(jobId, "failed", result.error);
+          return { success: false, rowsCommitted: 0, error: result.error };
+        }
+        resolved.push(result.trend);
+      }
+      for (let i = 0; i < resolved.length; i++) {
+        const trend = resolved[i];
         await admin.from("gcc_monthly_trends").upsert(
           {
             organization_id: organizationId,
-            month: String(row.month),
-            revenue,
-            expenses,
-            profit,
-            cash,
+            month: trend.month,
+            revenue: trend.revenue,
+            expenses: trend.expenses,
+            profit: trend.profit,
+            cash: trend.cash,
             sort_order: i + 1,
           },
           { onConflict: "organization_id,month" }

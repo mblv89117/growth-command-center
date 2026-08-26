@@ -49,7 +49,7 @@ export const ORGANIZATIONS: Organization[] = [
     plan: "starter",
     createdAt: "2024-01-10",
     settings: {
-      cashAlertThreshold: 75000,
+      cashAlertThreshold: 0,
       forecastHorizonWeeks: 13,
       fiscalYearStart: 1,
       currency: "USD",
@@ -197,33 +197,43 @@ export const ALERTS: Alert[] = [
 ];
 
 export const KPIS: KPI[] = [
-  { id: "kpi-1", name: "Revenue Growth", value: 12.4, unit: "percent", change: 2.1, changeLabel: "vs last month", target: 10 },
-  { id: "kpi-2", name: "Gross Margin", value: 35.9, unit: "percent", change: -1.2, changeLabel: "vs last month", target: 32 },
-  { id: "kpi-3", name: "Net Margin", value: 13.0, unit: "percent", change: 0.8, changeLabel: "vs last month", target: 12 },
-  { id: "kpi-4", name: "Cash Conversion Cycle", value: 42, unit: "days", change: -3, changeLabel: "vs last quarter", target: 45 },
-  { id: "kpi-5", name: "AR Days", value: 48, unit: "days", change: 5, changeLabel: "vs last month", target: 40 },
-  { id: "kpi-6", name: "AP Days", value: 32, unit: "days", change: -2, changeLabel: "vs last month", target: 35 },
-  { id: "kpi-7", name: "Sales Close Rate", value: 34, unit: "percent", change: 4, changeLabel: "vs last quarter", target: 30 },
+  // Do not invent leftover Apex demo Revenue Growth target = 10. Owner-set targets remain SOURCE-DERIVED.
+  { id: "kpi-1", name: "Revenue Growth", value: 12.4, unit: "percent", change: 2.1, changeLabel: "vs last month" },
+  // Do not invent leftover Apex demo KPI targets 32/12/45/40/35/30/28/24/1.5. Owner-set targets remain SOURCE-DERIVED.
+  { id: "kpi-2", name: "Gross Margin", value: 35.9, unit: "percent", change: -1.2, changeLabel: "vs last month" },
+  { id: "kpi-3", name: "Net Margin", value: 13.0, unit: "percent", change: 0.8, changeLabel: "vs last month" },
+  { id: "kpi-4", name: "Cash Conversion Cycle", value: 42, unit: "days", change: -3, changeLabel: "vs last quarter" },
+  { id: "kpi-5", name: "AR Days", value: 48, unit: "days", change: 5, changeLabel: "vs last month" },
+  { id: "kpi-6", name: "AP Days", value: 32, unit: "days", change: -2, changeLabel: "vs last month" },
+  { id: "kpi-7", name: "Sales Close Rate", value: 34, unit: "percent", change: 4, changeLabel: "vs last quarter" },
   { id: "kpi-8", name: "Average Deal Size", value: 1420000, unit: "currency", change: 8.5, changeLabel: "vs last quarter" },
-  { id: "kpi-9", name: "Job Profitability", value: 26.8, unit: "percent", change: -2.4, changeLabel: "vs estimate", target: 28 },
-  { id: "kpi-10", name: "Operating Expense Ratio", value: 22.9, unit: "percent", change: -0.5, changeLabel: "vs last month", target: 24 },
-  { id: "kpi-11", name: "Debt Service Coverage", value: 1.8, unit: "number", change: -0.2, changeLabel: "vs last quarter", target: 1.5 },
-  { id: "kpi-12", name: "Runway", value: 3.4, unit: "number", change: -0.3, changeLabel: "months", target: 6 },
+  { id: "kpi-9", name: "Job Profitability", value: 26.8, unit: "percent", change: -2.4, changeLabel: "vs estimate" },
+  { id: "kpi-10", name: "Operating Expense Ratio", value: 22.9, unit: "percent", change: -0.5, changeLabel: "vs last month" },
+  { id: "kpi-11", name: "Debt Service Coverage", value: 1.8, unit: "number", change: -0.2, changeLabel: "vs last quarter" },
+  // Do not invent leftover Apex demo Runway target = 6. Owner-set targets remain SOURCE-DERIVED.
+  { id: "kpi-12", name: "Runway", value: 3.4, unit: "number", change: -0.3, changeLabel: "months" },
   { id: "kpi-13", name: "EBITDA", value: 1125600, unit: "currency", change: 15.2, changeLabel: "vs last month" },
 ];
 
 export const INTEGRATIONS: Integration[] = [
   { id: "int-1", name: "QuickBooks Online", category: "accounting", status: "disconnected", description: "Sync transactions, invoices, bills, and chart of accounts", logo: "QB" },
   { id: "int-2", name: "Xero", category: "accounting", status: "disconnected", description: "Alternative accounting platform integration", logo: "XE" },
-  { id: "int-3", name: "Stripe", category: "payments", status: "connected", lastSync: "2025-05-24T05:30:00Z", description: "Payment processing and revenue tracking", logo: "ST" },
+  { id: "int-3", name: "Stripe", category: "payments", status: "disconnected", description: "Payment processing and revenue tracking", logo: "ST" },
   { id: "int-4", name: "Plaid", category: "payments", status: "disconnected", description: "Bank account connections and cash balance sync", logo: "PL" },
-  { id: "int-5", name: "Gusto", category: "payroll", status: "connected", lastSync: "2025-05-23T18:00:00Z", description: "Payroll, benefits, and contractor payments", logo: "GU" },
-  { id: "int-6", name: "Buildertrend", category: "operations", status: "pending", description: "Job costing, scheduling, and production tracking", logo: "BT" },
-  { id: "int-7", name: "HubSpot", category: "sales", status: "connected", lastSync: "2025-05-24T04:00:00Z", description: "CRM, deals pipeline, and sales forecasting", logo: "HS" },
+  { id: "int-5", name: "Gusto", category: "payroll", status: "disconnected", description: "Payroll, benefits, and contractor payments", logo: "GU" },
+  { id: "int-6", name: "Buildertrend", category: "operations", status: "disconnected", description: "Job costing, scheduling, and production tracking", logo: "BT" },
+  { id: "int-7", name: "HubSpot", category: "sales", status: "disconnected", description: "CRM, deals pipeline, and sales forecasting", logo: "HS" },
   { id: "int-8", name: "Salesforce", category: "sales", status: "disconnected", description: "Enterprise CRM and opportunity management", logo: "SF" },
   { id: "int-9", name: "Jobber", category: "operations", status: "disconnected", description: "Field service and job management", logo: "JB" },
-  { id: "int-10", name: "Google Sheets", category: "other", status: "connected", lastSync: "2025-05-24T03:00:00Z", description: "Import custom spreadsheets and forecasts", logo: "GS" },
+  { id: "int-10", name: "Google Sheets", category: "other", status: "disconnected", description: "Import custom spreadsheets and forecasts", logo: "GS" },
 ];
+
+/** Catalog rows with no live connection claimed. Safe for every org, including empty tenants. */
+export const DISCONNECTED_INTEGRATIONS: Integration[] = INTEGRATIONS.map((item) => ({
+  ...item,
+  status: "disconnected",
+  lastSync: undefined,
+}));
 
 export const REPORTS: Report[] = [
   { id: "rpt-1", name: "Executive Summary", description: "High-level financial overview for leadership and board review", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
@@ -238,6 +248,15 @@ export const REPORTS: Report[] = [
   { id: "rpt-10", name: "Forecast vs Actual", description: "Forecast accuracy and variance tracking", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-11", name: "KPI Scorecard", description: "Key performance indicators dashboard export", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
 ];
+
+/** Report templates with no lastGenerated date — empty tenants must not advertise demo exports. */
+export const EMPTY_TENANT_REPORTS: Report[] = REPORTS.map((item) => ({
+  id: item.id,
+  name: item.name,
+  description: item.description,
+  category: item.category,
+  format: item.format,
+}));
 
 export const TEAM_MEMBERS: TeamMember[] = [
   { id: "tm-1", name: "Sarah Chen", email: "sarah.chen@apexconstruction.com", role: "founder", status: "active", joinedAt: "2023-06-15" },
@@ -331,7 +350,7 @@ function organizationForId(organizationId: string): Organization {
       plan: "starter",
       createdAt: new Date().toISOString().slice(0, 10),
       settings: {
-        cashAlertThreshold: 150000,
+        cashAlertThreshold: 0,
         forecastHorizonWeeks: 13,
         fiscalYearStart: 1,
         currency: "USD",
@@ -367,7 +386,7 @@ export function getTenantData(organizationId: string): TenantData {
       bills: BILLS,
       alerts: ALERTS,
       kpis: KPIS,
-      integrations: INTEGRATIONS,
+      integrations: DISCONNECTED_INTEGRATIONS,
       reports: REPORTS,
       teamMembers: TEAM_MEMBERS,
       transactions: TRANSACTIONS,
@@ -394,8 +413,8 @@ export function getTenantData(organizationId: string): TenantData {
     bills: [],
     alerts: [],
     kpis: [],
-    integrations: INTEGRATIONS,
-    reports: REPORTS,
+    integrations: DISCONNECTED_INTEGRATIONS,
+    reports: EMPTY_TENANT_REPORTS,
     teamMembers: [],
     transactions: [],
     expenseCategories: [],
