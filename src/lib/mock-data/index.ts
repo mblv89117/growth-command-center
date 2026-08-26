@@ -215,15 +215,22 @@ export const KPIS: KPI[] = [
 export const INTEGRATIONS: Integration[] = [
   { id: "int-1", name: "QuickBooks Online", category: "accounting", status: "disconnected", description: "Sync transactions, invoices, bills, and chart of accounts", logo: "QB" },
   { id: "int-2", name: "Xero", category: "accounting", status: "disconnected", description: "Alternative accounting platform integration", logo: "XE" },
-  { id: "int-3", name: "Stripe", category: "payments", status: "connected", lastSync: "2025-05-24T05:30:00Z", description: "Payment processing and revenue tracking", logo: "ST" },
+  { id: "int-3", name: "Stripe", category: "payments", status: "disconnected", description: "Payment processing and revenue tracking", logo: "ST" },
   { id: "int-4", name: "Plaid", category: "payments", status: "disconnected", description: "Bank account connections and cash balance sync", logo: "PL" },
-  { id: "int-5", name: "Gusto", category: "payroll", status: "connected", lastSync: "2025-05-23T18:00:00Z", description: "Payroll, benefits, and contractor payments", logo: "GU" },
-  { id: "int-6", name: "Buildertrend", category: "operations", status: "pending", description: "Job costing, scheduling, and production tracking", logo: "BT" },
-  { id: "int-7", name: "HubSpot", category: "sales", status: "connected", lastSync: "2025-05-24T04:00:00Z", description: "CRM, deals pipeline, and sales forecasting", logo: "HS" },
+  { id: "int-5", name: "Gusto", category: "payroll", status: "disconnected", description: "Payroll, benefits, and contractor payments", logo: "GU" },
+  { id: "int-6", name: "Buildertrend", category: "operations", status: "disconnected", description: "Job costing, scheduling, and production tracking", logo: "BT" },
+  { id: "int-7", name: "HubSpot", category: "sales", status: "disconnected", description: "CRM, deals pipeline, and sales forecasting", logo: "HS" },
   { id: "int-8", name: "Salesforce", category: "sales", status: "disconnected", description: "Enterprise CRM and opportunity management", logo: "SF" },
   { id: "int-9", name: "Jobber", category: "operations", status: "disconnected", description: "Field service and job management", logo: "JB" },
-  { id: "int-10", name: "Google Sheets", category: "other", status: "connected", lastSync: "2025-05-24T03:00:00Z", description: "Import custom spreadsheets and forecasts", logo: "GS" },
+  { id: "int-10", name: "Google Sheets", category: "other", status: "disconnected", description: "Import custom spreadsheets and forecasts", logo: "GS" },
 ];
+
+/** Catalog rows with no live connection claimed. Safe for every org, including empty tenants. */
+export const DISCONNECTED_INTEGRATIONS: Integration[] = INTEGRATIONS.map((item) => ({
+  ...item,
+  status: "disconnected",
+  lastSync: undefined,
+}));
 
 export const REPORTS: Report[] = [
   { id: "rpt-1", name: "Executive Summary", description: "High-level financial overview for leadership and board review", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
@@ -238,6 +245,15 @@ export const REPORTS: Report[] = [
   { id: "rpt-10", name: "Forecast vs Actual", description: "Forecast accuracy and variance tracking", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-11", name: "KPI Scorecard", description: "Key performance indicators dashboard export", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
 ];
+
+/** Report templates with no lastGenerated date — empty tenants must not advertise demo exports. */
+export const EMPTY_TENANT_REPORTS: Report[] = REPORTS.map((item) => ({
+  id: item.id,
+  name: item.name,
+  description: item.description,
+  category: item.category,
+  format: item.format,
+}));
 
 export const TEAM_MEMBERS: TeamMember[] = [
   { id: "tm-1", name: "Sarah Chen", email: "sarah.chen@apexconstruction.com", role: "founder", status: "active", joinedAt: "2023-06-15" },
@@ -331,7 +347,7 @@ function organizationForId(organizationId: string): Organization {
       plan: "starter",
       createdAt: new Date().toISOString().slice(0, 10),
       settings: {
-        cashAlertThreshold: 150000,
+        cashAlertThreshold: 0,
         forecastHorizonWeeks: 13,
         fiscalYearStart: 1,
         currency: "USD",
@@ -367,7 +383,7 @@ export function getTenantData(organizationId: string): TenantData {
       bills: BILLS,
       alerts: ALERTS,
       kpis: KPIS,
-      integrations: INTEGRATIONS,
+      integrations: DISCONNECTED_INTEGRATIONS,
       reports: REPORTS,
       teamMembers: TEAM_MEMBERS,
       transactions: TRANSACTIONS,
@@ -394,8 +410,8 @@ export function getTenantData(organizationId: string): TenantData {
     bills: [],
     alerts: [],
     kpis: [],
-    integrations: INTEGRATIONS,
-    reports: REPORTS,
+    integrations: DISCONNECTED_INTEGRATIONS,
+    reports: EMPTY_TENANT_REPORTS,
     teamMembers: [],
     transactions: [],
     expenseCategories: [],

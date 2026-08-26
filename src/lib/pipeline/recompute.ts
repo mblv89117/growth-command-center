@@ -1,11 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  aggregateMonthlyForecast,
-  buildForecastInputFromSnapshot,
-  calculateRunwayWeeks,
-  calculateWeeklyBurn,
-  generateDeterministicWeeklyForecast,
-} from "@/lib/forecast/compute";
+import { enrichSnapshotWithCalculatedForecast } from "@/lib/imports/honesty";
 import { computeKpis } from "@/lib/kpi/catalog";
 import { computeWorkingCapital } from "@/lib/financial/deltas";
 import { completeJobRun, logOperationalEvent, startJobRun } from "@/lib/observability/events";
@@ -20,7 +14,7 @@ export interface RecomputeResult {
 
 export async function recomputeTenantFinancials(
   organizationId: string,
-  options?: { cashAlertThreshold?: number }
+  _options?: { cashAlertThreshold?: number }
 ): Promise<RecomputeResult> {
   const jobId = await startJobRun(organizationId, "forecast_recompute");
 
@@ -41,9 +35,6 @@ export async function recomputeTenantFinancials(
       return { success: false, forecastWeeks: 0, kpisUpdated: 0, error: "No financial snapshot" };
     }
 
-    const settings = (orgRow?.settings as Record<string, unknown>) ?? {};
-    const cashAlertThreshold = options?.cashAlertThreshold ?? Number(settings.cashAlertThreshold ?? 150000);
-
     const snapshot = mapSnapshot(snapshotRow);
     const trends: MonthlyTrend[] = (trendsRows ?? []).map((r) => ({
       month: r.month as string,
@@ -53,54 +44,21 @@ export async function recomputeTenantFinancials(
       cash: Number(r.cash),
     }));
 
-    const input = buildForecastInputFromSnapshot(snapshot);
-    const weeks = generateDeterministicWeeklyForecast(input, 13, 1, cashAlertThreshold);
-    const months = aggregateMonthlyForecast(weeks);
-    const weeklyBurn = calculateWeeklyBurn(weeks);
-    const runwayWeeks = calculateRunwayWeeks(snapshot.currentCash, weeklyBurn);
-    const runwayMonths = Math.round((runwayWeeks / 4.33) * 10) / 10;
-    const forecastedCash = weeks[weeks.length - 1]?.endingBalance ?? snapshot.currentCash;
+    const settings = (orgRow?.settings as Record<string, unknown>) ?? {};
+    const horizonWeeks = Number(settings.forecastHorizonWeeks ?? 13);
+    const enriched = enrichSnapshotWithCalculatedForecast(snapshot, {
+      horizonWeeks: Number.isFinite(horizonWeeks) && horizonWeeks > 0 ? horizonWeeks : 13,
+    });
 
     await admin
       .from("gcc_financial_snapshots")
       .update({
-        forecasted_cash: forecastedCash,
-        burn_rate: Math.round(weeklyBurn * 4.33),
-        runway: runwayMonths,
+        forecasted_cash: enriched.snapshot.forecastedCash,
+        burn_rate: enriched.snapshot.burnRate,
+        runway: enriched.snapshot.runway,
         updated_at: new Date().toISOString(),
       })
       .eq("organization_id", organizationId);
-
-    for (const week of weeks) {
-      await admin.from("gcc_cash_forecast_weeks").upsert(
-        {
-          organization_id: organizationId,
-          week_num: week.week,
-          week_start: week.weekStart,
-          week_end: week.weekEnd,
-          starting_balance: week.startingBalance,
-          inflows: week.inflows,
-          outflows: week.outflows,
-          ending_balance: week.endingBalance,
-          is_risk_period: week.isRiskPeriod,
-        },
-        { onConflict: "organization_id,week_num" }
-      );
-    }
-
-    for (const month of months) {
-      await admin.from("gcc_cash_forecast_months").upsert(
-        {
-          organization_id: organizationId,
-          month_label: month.month,
-          inflows: month.inflows,
-          outflows: month.outflows,
-          ending_balance: month.endingBalance,
-          is_risk_period: month.isRiskPeriod,
-        },
-        { onConflict: "organization_id,month_label" }
-      );
-    }
 
     const { data: existingKpis } = await admin
       .from("gcc_kpis")
@@ -114,7 +72,10 @@ export async function recomputeTenantFinancials(
       .filter((k) => k.enabled !== false)
       .map((k) => k.kpi_key as string);
 
-    const computed = computeKpis({ snapshot: { ...snapshot, runway: runwayMonths }, trends }, enabledKeys.length ? enabledKeys : undefined);
+    const computed = computeKpis(
+      { snapshot: enriched.snapshot, trends },
+      enabledKeys.length ? enabledKeys : undefined
+    );
 
     let kpisUpdated = 0;
     for (const kpi of computed) {
@@ -138,26 +99,13 @@ export async function recomputeTenantFinancials(
       kpisUpdated++;
     }
 
-    const { count: versionCount } = await admin
-      .from("gcc_forecast_versions")
-      .select("*", { count: "exact", head: true })
-      .eq("organization_id", organizationId);
-
-    await admin.from("gcc_forecast_versions").insert({
-      organization_id: organizationId,
-      version_num: (versionCount ?? 0) + 1,
-      ending_cash: forecastedCash,
-      minimum_cash: Math.min(...weeks.map((w) => w.endingBalance)),
-      assumptions_snapshot: input,
-    });
-
     await admin
       .from("gcc_organizations")
       .update({ data_source: trends.length > 0 ? "imported" : "computed" })
       .eq("id", organizationId);
 
     await completeJobRun(jobId, "success");
-    return { success: true, forecastWeeks: weeks.length, kpisUpdated };
+    return { success: true, forecastWeeks: 0, kpisUpdated };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Recompute failed";
     logOperationalEvent("forecast_recompute_failed", { organizationId, message });
