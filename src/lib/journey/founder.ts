@@ -238,3 +238,40 @@ export function valueCreationBannerDoesNotInventFinancials(banner: ValueCreation
     !("forecastedCash" in banner)
   );
 }
+
+export type FinancialsInsightBannerStatus = ImportSuccessHandoffStatus;
+
+export interface FinancialsInsightBanner {
+  status: FinancialsInsightBannerStatus;
+  destinations: InsightDestination[];
+  inventedFinancialValues: false;
+}
+
+/**
+ * Financials-page import-success banner. Same honesty rules as the import
+ * handoff, but omits /financials because the founder is already on that page.
+ */
+export function resolveFinancialsInsightBanner(input: FounderJourneyInput): FinancialsInsightBanner {
+  const handoff = resolveImportSuccessHandoff(input);
+  if (handoff.status !== "import_success") {
+    return {
+      status: handoff.status,
+      destinations: [],
+      inventedFinancialValues: false,
+    };
+  }
+
+  return {
+    status: "import_success",
+    destinations: handoff.destinations.filter((destination) => destination.href !== "/financials"),
+    inventedFinancialValues: false,
+  };
+}
+
+export function financialsBannerDoesNotInventFinancials(banner: FinancialsInsightBanner): boolean {
+  return (
+    banner.inventedFinancialValues === false &&
+    !("currentCash" in banner) &&
+    !("forecastedCash" in banner)
+  );
+}

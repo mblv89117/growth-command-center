@@ -2,6 +2,7 @@
 
 import { ExpensePieChart, TrendChart } from "@/components/charts";
 import { DataSourceBanner, DataTable, PageHeader } from "@/components/shared";
+import { FinancialsInsightBanner } from "@/components/financials/financials-insight-banner";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,6 +31,7 @@ export default function FinancialsPage() {
         title="Financials"
         description="Revenue, expenses, profit, AR/AP, and financial trends"
       />
+      <FinancialsInsightBanner />
       <DataSourceBanner source={source} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
