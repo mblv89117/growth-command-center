@@ -1,4 +1,8 @@
-import { applyImportedFinancials } from "@/lib/imports/honesty";
+import {
+  applyImportedFinancials,
+  dashboardFieldProvenance,
+  type SnapshotFieldProvenance,
+} from "@/lib/imports/honesty";
 import { getTenantData } from "@/lib/mock-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -21,6 +25,7 @@ export interface DashboardData {
   kpis: KPI[];
   alerts: Alert[];
   source: "supabase" | "mock";
+  fieldProvenance: SnapshotFieldProvenance;
   deltas?: DashboardDeltas;
   workingCapital?: number;
   forecastVariancePercent?: number;
@@ -108,6 +113,7 @@ async function fetchFromSupabase(
       createdAt: r.created_at,
     })),
     source: "supabase" as const,
+    fieldProvenance: dashboardFieldProvenance(organizationId, financialSnapshot),
     deltas: computeDashboardDeltas(financialSnapshot, monthlyTrends),
     workingCapital: computeWorkingCapital(financialSnapshot),
     forecastVariancePercent:
@@ -132,6 +138,7 @@ export async function getDashboardData(organizationId: string): Promise<Dashboar
       kpis: mock.kpis,
       alerts: mock.alerts,
       source: "mock",
+      fieldProvenance: dashboardFieldProvenance(organizationId, mock.financialSnapshot),
       deltas,
       workingCapital: computeWorkingCapital(mock.financialSnapshot),
       forecastVariancePercent:
@@ -161,6 +168,7 @@ export async function getDashboardData(organizationId: string): Promise<Dashboar
     kpis: mock.kpis,
     alerts: mock.alerts,
     source: "mock",
+    fieldProvenance: dashboardFieldProvenance(organizationId, mock.financialSnapshot),
     deltas,
     workingCapital: computeWorkingCapital(mock.financialSnapshot),
     forecastVariancePercent:

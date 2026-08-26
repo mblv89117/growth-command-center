@@ -315,3 +315,36 @@ export function applyImportedFinancials(
     kpiProvenance: kpis.length ? "CALCULATED" : "INSUFFICIENT_DATA",
   };
 }
+
+export function isEmptyFinancialSnapshot(snapshot: FinancialSnapshot): boolean {
+  return (
+    snapshot.currentCash === 0 &&
+    snapshot.forecastedCash === 0 &&
+    snapshot.revenueMTD === 0 &&
+    snapshot.revenueYTD === 0 &&
+    snapshot.grossProfit === 0 &&
+    snapshot.netProfit === 0 &&
+    snapshot.operatingExpenses === 0 &&
+    snapshot.accountsReceivable === 0 &&
+    snapshot.accountsPayable === 0 &&
+    snapshot.burnRate === 0 &&
+    snapshot.runway === 0 &&
+    snapshot.ebitda === 0
+  );
+}
+
+export function dashboardFieldProvenance(
+  organizationId: string,
+  snapshot: FinancialSnapshot
+): SnapshotFieldProvenance {
+  if (organizationId === APEX_DEMO_ORGANIZATION_ID) {
+    return {
+      currentCash: "DEMO",
+      forecastedCash: "DEMO",
+      burnRate: "DEMO",
+      runway: "DEMO",
+      ebitda: "DEMO",
+    };
+  }
+  return enrichSnapshotWithCalculatedForecast(snapshot).fieldProvenance;
+}

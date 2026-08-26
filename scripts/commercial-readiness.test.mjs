@@ -11,10 +11,14 @@ import {
   applyImportedFinancials,
   calculateForecastedCash,
   calculateRunwayMonths,
+  dashboardFieldProvenance,
+  isEmptyFinancialSnapshot,
   resolveMonthlyTrendRow,
   snapshotFromImportRow,
 } from "../src/lib/imports/honesty";
 import { analyzeValueCreation } from "../src/lib/value-creation/analyze";
+import { buildAdvisorDataContext } from "../src/lib/ai/advisor";
+import { getFinancialRiskSignals } from "../src/lib/ai/kpi-risk";
 import { slugifyCompanyName, organizationIdFromSlug } from "../src/lib/tenant/slug";
 import {
   APEX_DEMO_ORGANIZATION_ID,
@@ -348,6 +352,91 @@ describe("value creation", () => {
     assert.ok(decline);
     assert.match(decline.evidence, /^CALCULATED/);
     assert.doesNotMatch(decline.evidence, /^SOURCE-DERIVED/);
+  });
+
+  it("empty tenant has no invented value-creation opportunities", () => {
+    const empty = getTenantData("org-summit");
+    assert.equal(isEmptyFinancialSnapshot(empty.financialSnapshot), true);
+    const board = analyzeValueCreation({
+      organizationId: "org-summit",
+      snapshot: empty.financialSnapshot,
+      trends: empty.monthlyTrends,
+      kpis: empty.kpis,
+      alerts: empty.alerts,
+    });
+    assert.deepEqual(board.opportunities, []);
+    assert.equal(board.verifiedImpact, 0);
+    assert.equal(board.estimatedImpact, 0);
+    assert.match(board.summary, /Import or connect/);
+    assert.equal(JSON.stringify(board).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(board).includes("Apex Construction"), false);
+  });
+});
+
+describe("AI CFO honesty", () => {
+  it("empty tenant advisor context is INSUFFICIENT_DATA without Apex leak or invented runway risk", () => {
+    const empty = getTenantData("org-summit");
+    const provenance = dashboardFieldProvenance("org-summit", empty.financialSnapshot);
+    assert.equal(provenance.currentCash, "INSUFFICIENT_DATA");
+    assert.equal(provenance.runway, "INSUFFICIENT_DATA");
+    assert.deepEqual(getFinancialRiskSignals(empty.financialSnapshot, provenance), []);
+
+    const context = buildAdvisorDataContext({
+      organizationName: "Summit",
+      dashboard: {
+        financialSnapshot: empty.financialSnapshot,
+        monthlyTrends: [],
+        budgetVsActual: [],
+        kpis: [],
+        alerts: [],
+        source: "mock",
+        fieldProvenance: provenance,
+      },
+    });
+
+    assert.match(context, /INSUFFICIENT_DATA/);
+    assert.match(context, /Do not invent financial values/);
+    assert.doesNotMatch(context, /CALCULATED financial snapshot/);
+    assert.doesNotMatch(context, /Runway is 0\.0 months/);
+    assert.doesNotMatch(context, /cash risk elevated/);
+    assert.equal(context.includes("Harbor View"), false);
+    assert.equal(context.includes("Apex Construction"), false);
+    assert.doesNotMatch(context, /487,?250|412,?800/);
+  });
+
+  it("imported cash+burn advisor context uses SOURCE-DERIVED and CALCULATED only", () => {
+    const snapshot = snapshotFromImportRow({
+      current_cash: 90000,
+      burn_rate: 15000,
+      revenue_mtd: 40000,
+    });
+    const imported = applyImportedFinancials("org-summit", snapshot);
+    assert.equal(imported.financialSnapshot.runway, calculateRunwayMonths(90000, 15000));
+    assert.equal(imported.financialSnapshot.forecastedCash, calculateForecastedCash(90000, 15000));
+
+    const context = buildAdvisorDataContext({
+      organizationName: "Summit",
+      dashboard: {
+        financialSnapshot: imported.financialSnapshot,
+        monthlyTrends: imported.monthlyTrends,
+        budgetVsActual: [],
+        kpis: imported.kpis,
+        alerts: [],
+        source: "mock",
+        fieldProvenance: imported.fieldProvenance,
+      },
+    });
+
+    assert.match(context, /Current cash: \$90,000 \(SOURCE-DERIVED\)/);
+    assert.match(context, /Burn rate: \$15,000\/mo \(SOURCE-DERIVED\)/);
+    assert.match(context, /Runway \(months\): 6 \(CALCULATED\)/);
+    assert.match(context, /Forecasted cash \(13wk\): \$45,000 \(CALCULATED\)|Forecasted cash \(13wk\): \$44,965 \(CALCULATED\)/);
+    assert.match(context, /Revenue MTD: \$40,000 \(SOURCE-DERIVED\)/);
+    assert.match(context, /EBITDA: INSUFFICIENT_DATA/);
+    assert.doesNotMatch(context, /CALCULATED financial snapshot/);
+    assert.equal(context.includes("Harbor View"), false);
+    assert.equal(context.includes("Apex Construction"), false);
+    assert.doesNotMatch(context, /487,?250|412,?800/);
   });
 });
 
