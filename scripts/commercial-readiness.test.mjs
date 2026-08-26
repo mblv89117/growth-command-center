@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   generateDeterministicWeeklyForecast,
   buildForecastInputFromSnapshot,
+  aggregateMonthlyForecast,
+  isCashRiskPeriod,
 } from "../src/lib/forecast/compute";
 import { computeKpis } from "../src/lib/kpi/catalog";
 import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financial/deltas";
@@ -31,6 +33,47 @@ describe("forecast compute", () => {
     for (const week of weeks) {
       assert.equal(week.startingBalance + week.inflows - week.outflows, week.endingBalance);
     }
+  });
+
+  it("does not invent endingBalance < 150000 as a cash-risk rule", () => {
+    const input = buildForecastInputFromSnapshot({
+      currentCash: 140000,
+      accountsReceivable: 20000,
+      revenueMTD: 10000,
+      operatingExpenses: 8000,
+      payrollObligations: 4000,
+      accountsPayable: 5000,
+    });
+    const weeks = generateDeterministicWeeklyForecast(input, 13);
+    assert.ok(weeks.length > 0);
+    assert.equal(
+      weeks.some((week) => week.endingBalance < 150000 && week.endingBalance >= 0 && week.isRiskPeriod),
+      false
+    );
+    const months = aggregateMonthlyForecast(weeks);
+    assert.equal(
+      months.some((month) => month.endingBalance < 150000 && month.endingBalance >= 0 && month.isRiskPeriod),
+      false
+    );
+  });
+
+  it("flags cash risk from SOURCE-DERIVED insolvency or owner cash-alert target", () => {
+    assert.equal(isCashRiskPeriod(140000), false);
+    assert.equal(isCashRiskPeriod(140000, null), false);
+    assert.equal(isCashRiskPeriod(-1), true);
+    assert.equal(isCashRiskPeriod(140000, 150000), true);
+    assert.equal(isCashRiskPeriod(160000, 150000), false);
+
+    const input = buildForecastInputFromSnapshot({
+      currentCash: 140000,
+      accountsReceivable: 20000,
+      revenueMTD: 10000,
+      operatingExpenses: 8000,
+      payrollObligations: 4000,
+      accountsPayable: 5000,
+    });
+    const ownerTargetWeeks = generateDeterministicWeeklyForecast(input, 13, 1, 150000);
+    assert.ok(ownerTargetWeeks.some((week) => week.isRiskPeriod));
   });
 
   it("is deterministic (no randomness)", () => {
@@ -203,6 +246,12 @@ describe("tenant isolation contract", () => {
     assert.equal(provisioned.jobs.length, 0);
     assert.notEqual(summit.financialSnapshot.currentCash, apex.financialSnapshot.currentCash);
     assert.notDeepEqual(summit.financialSnapshot, apex.financialSnapshot);
+    assert.equal(
+      summit.cashForecastWeeks.some(
+        (week) => week.endingBalance < 150000 && week.endingBalance >= 0 && week.isRiskPeriod
+      ),
+      false
+    );
   });
 
   it("keeps QBO and Plaid disconnected in the catalog", () => {
