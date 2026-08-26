@@ -131,6 +131,7 @@ export async function POST(request: Request) {
       conversationId,
       wordCount: insights.split(/\s+/).filter(Boolean).length,
       dataSource: dashboard.source,
+      fieldProvenance: dashboard.fieldProvenance,
     });
   } catch (error) {
     logOperationalEvent("ai_advisor_failed", { route: "ai-advisor" });
