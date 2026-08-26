@@ -1418,3 +1418,41 @@ describe("financials-page import-success insight banner", () => {
 function apexPinnedCashUnchanged() {
   return getTenantData(APEX_DEMO_ORGANIZATION_ID).financialSnapshot.currentCash === FINANCIAL_SNAPSHOT.currentCash;
 }
+
+describe("leftover financials-page invented MetricCard change={12.4} honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/financials/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Revenue MTD change={12.4} on the financials page", () => {
+    assert.equal(page.includes("change={12.4}"), false);
+    assert.equal(page.includes('changeLabel="vs last month"'), false);
+    assert.match(
+      page,
+      /<MetricCard title="Revenue MTD" value=\{financialSnapshot\.revenueMTD\} \/>/
+    );
+    assert.equal(/\bchange=\{[^}]+\}/.test(page), false);
+  });
+
+  it("keeps pinned Apex Revenue Growth 12.4 SOURCE-DERIVED", () => {
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.name, "Revenue Growth");
+    assert.equal(growth.value, 12.4);
+    assert.equal(apexPinnedCashUnchanged(), true);
+  });
+
+  it("empty tenant still has no Apex leak after leftover financials MetricCard honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});

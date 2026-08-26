@@ -35,7 +35,7 @@ export default function FinancialsPage() {
       <DataSourceBanner source={source} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Revenue MTD" value={financialSnapshot.revenueMTD} change={12.4} changeLabel="vs last month" />
+        <MetricCard title="Revenue MTD" value={financialSnapshot.revenueMTD} />
         <MetricCard title="Gross Profit" value={financialSnapshot.grossProfit} />
         <MetricCard title="Net Profit" value={financialSnapshot.netProfit} />
         <MetricCard title="Operating Expenses" value={financialSnapshot.operatingExpenses} />
