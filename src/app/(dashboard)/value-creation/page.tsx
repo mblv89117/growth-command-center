@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/shared";
+import { ValueCreationInsightBanner } from "@/components/value-creation/value-creation-insight-banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +51,8 @@ export default function ValueCreationPage() {
           </Button>
         }
       />
+
+      <ValueCreationInsightBanner />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Card>
