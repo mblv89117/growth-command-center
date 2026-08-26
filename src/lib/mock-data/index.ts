@@ -347,7 +347,7 @@ function organizationForId(organizationId: string): Organization {
       plan: "starter",
       createdAt: new Date().toISOString().slice(0, 10),
       settings: {
-        cashAlertThreshold: 150000,
+        cashAlertThreshold: 0,
         forecastHorizonWeeks: 13,
         fiscalYearStart: 1,
         currency: "USD",

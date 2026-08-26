@@ -104,3 +104,19 @@ export function metricOrInsufficient(value: number | null | undefined): number |
   }
   return value;
 }
+
+/**
+ * Runway MetricCard warning is owner-target only.
+ * Do not invent a 6-month safety threshold.
+ */
+export function runwayMetricVariant(
+  runway: unknown,
+  ownerRunwayTarget?: unknown
+): "warning" | "default" {
+  const months = Number(runway);
+  const target = Number(ownerRunwayTarget);
+  if (Number.isFinite(months) && Number.isFinite(target) && target > 0 && months < target) {
+    return "warning";
+  }
+  return "default";
+}

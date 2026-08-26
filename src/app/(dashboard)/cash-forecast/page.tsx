@@ -12,6 +12,7 @@ import {
   applyForecastScenario,
   INSUFFICIENT_DATA,
   metricOrInsufficient,
+  runwayMetricVariant,
   summarizeWeeklyForecastDisplay,
 } from "@/lib/forecast/display";
 import type { ScenarioType } from "@/lib/types";
@@ -97,7 +98,7 @@ export default function CashForecastPage() {
           title="Runway"
           value={runway}
           format={typeof runway === "number" ? "months" : "number"}
-          variant={typeof runway === "number" && runway < 6 ? "warning" : "default"}
+          variant={runwayMetricVariant(typeof runway === "number" ? runway : null)}
         />
       </div>
 

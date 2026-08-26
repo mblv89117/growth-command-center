@@ -12,6 +12,7 @@ import { useTenant } from "@/lib/tenant/context";
 import { getTenantData } from "@/lib/mock-data";
 import type { DashboardData } from "@/lib/data/dashboard";
 import { formatCurrency } from "@/lib/utils";
+import { runwayMetricVariant } from "@/lib/forecast/display";
 import { activeMonthlyTrends, latestTrendMonthLabel } from "@/lib/forecast/validate";
 import { computeDashboardDeltas } from "@/lib/financial/deltas";
 import { dashboardFieldProvenance } from "@/lib/imports/honesty";
@@ -187,7 +188,7 @@ export default function DashboardPage() {
           change={deltas?.runway.change}
           changeLabel="months"
           format="months"
-          variant={financialSnapshot.runway < 6 ? "warning" : "default"}
+          variant={runwayMetricVariant(financialSnapshot.runway)}
           tooltip="How many months you can operate at current burn before running out of cash."
         />
       </div>

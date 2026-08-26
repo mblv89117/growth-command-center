@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import {
   generateDeterministicWeeklyForecast,
   buildForecastInputFromSnapshot,
@@ -11,8 +12,14 @@ import {
   applyForecastScenario,
   INSUFFICIENT_DATA,
   metricOrInsufficient,
+  runwayMetricVariant,
   summarizeWeeklyForecastDisplay,
 } from "../src/lib/forecast/display";
+import {
+  DEFAULT_SETTINGS,
+  mapOrganizationRow,
+  resolveCashAlertThreshold,
+} from "../src/lib/data/organizations";
 import { calculateMinimumCash } from "../src/lib/forecast-engine";
 import { computeKpis } from "../src/lib/kpi/catalog";
 import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financial/deltas";
@@ -1120,6 +1127,80 @@ describe("forecast leftover endingBalance honesty", () => {
     assert.doesNotMatch(display.riskCopy, /\$150K|150000/);
     assert.equal(JSON.stringify(empty).includes("Harbor View"), false);
     assert.equal(JSON.stringify(empty).includes("Apex Construction"), false);
+  });
+});
+
+describe("leftover settings seed and runway UI honesty", () => {
+  it("does not invent cashAlertThreshold 150000 as a default seed", () => {
+    assert.equal(DEFAULT_SETTINGS.cashAlertThreshold, 0);
+    assert.equal(resolveCashAlertThreshold(undefined), 0);
+    assert.equal(resolveCashAlertThreshold(null), 0);
+    assert.equal(resolveCashAlertThreshold(0), 0);
+    assert.equal(resolveCashAlertThreshold("150000"), 150000);
+
+    const unsaved = mapOrganizationRow({
+      id: "org-acme-services",
+      name: "Acme Services",
+      slug: "acme-services",
+      settings: {},
+    });
+    assert.equal(unsaved.settings.cashAlertThreshold, 0);
+    assert.notEqual(unsaved.settings.cashAlertThreshold, 150000);
+
+    const owner = mapOrganizationRow({
+      id: "org-acme-services",
+      name: "Acme Services",
+      slug: "acme-services",
+      settings: { cashAlertThreshold: 150000 },
+    });
+    assert.equal(owner.settings.cashAlertThreshold, 150000);
+
+    const unknown = getTenantData("org-unknown-tenant");
+    const empty = getTenantData("org-hvcg");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(unknown.organization.settings.cashAlertThreshold, 0);
+    assert.equal(empty.organization.settings.cashAlertThreshold, 0);
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(JSON.stringify(unknown).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(empty).includes("Apex Construction"), false);
+  });
+
+  it("does not invent a runway < 6 MetricCard warning", () => {
+    assert.equal(runwayMetricVariant(4), "default");
+    assert.equal(runwayMetricVariant(5.9), "default");
+    assert.equal(runwayMetricVariant(0), "default");
+    assert.equal(runwayMetricVariant(INSUFFICIENT_DATA), "default");
+    assert.equal(runwayMetricVariant(4, 8), "warning");
+    assert.equal(runwayMetricVariant(10, 8), "default");
+    assert.equal(runwayMetricVariant(4, 0), "default");
+
+    const pageSource = fs.readFileSync(
+      new URL("../src/app/(dashboard)/cash-forecast/page.tsx", import.meta.url),
+      "utf8"
+    );
+    const dashboardSource = fs.readFileSync(
+      new URL("../src/app/(dashboard)/dashboard/page.tsx", import.meta.url),
+      "utf8"
+    );
+    assert.doesNotMatch(pageSource, /runway\s*<\s*6/);
+    assert.doesNotMatch(dashboardSource, /runway\s*<\s*6/);
+    assert.match(pageSource, /runwayMetricVariant/);
+    assert.match(dashboardSource, /runwayMetricVariant/);
+  });
+
+  it("empty tenant still has no invented 150000 settings seed", () => {
+    const empty = getTenantData("org-summit");
+    const mapped = mapOrganizationRow({
+      id: "org-summit",
+      name: "Summit",
+      slug: "summit",
+      settings: null,
+    });
+    assert.equal(mapped.settings.cashAlertThreshold, 0);
+    assert.equal(JSON.stringify(empty).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(empty).includes("Apex Construction"), false);
+    assert.doesNotMatch(JSON.stringify(mapped), /150000/);
   });
 });
 
