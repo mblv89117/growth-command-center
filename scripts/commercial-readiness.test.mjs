@@ -1159,7 +1159,7 @@ describe("import-success forecast/dashboard insight handoff", () => {
     assert.equal(handoff.status, "import_success");
     assert.deepEqual(
       handoff.destinations.map((d) => d.href),
-      ["/cash-forecast", "/dashboard", "/value-creation"],
+      ["/cash-forecast", "/dashboard", "/value-creation", "/financials"],
     );
     assert.equal(handoff.inventedFinancialValues, false);
     assert.equal(importHandoffDoesNotInventFinancials(handoff), true);
@@ -1174,10 +1174,11 @@ describe("import-success forecast/dashboard insight handoff", () => {
       dataProvenance: "computed",
     });
     assert.equal(handoff.status, "import_success");
-    assert.equal(handoff.destinations.length, 3);
+    assert.equal(handoff.destinations.length, 4);
     assert.equal(handoff.destinations[0].href, "/cash-forecast");
     assert.equal(handoff.destinations[1].href, "/dashboard");
     assert.equal(handoff.destinations[2].href, "/value-creation");
+    assert.equal(handoff.destinations[3].href, "/financials");
     assert.equal(importHandoffDoesNotInventFinancials(handoff), true);
   });
 
@@ -1219,6 +1220,19 @@ describe("import-success forecast/dashboard insight handoff", () => {
     assert.equal("currentCash" in (valueCreation ?? {}), false);
     assert.equal(importHandoffDoesNotInventFinancials(handoff), true);
   });
+
+  it("does not invent financial values on the financials insight destination", () => {
+    const handoff = resolveImportSuccessHandoff({
+      organizationId: "org-hvcg",
+      onboardingComplete: true,
+      dataProvenance: "imported",
+    });
+    const financials = handoff.destinations.find((d) => d.href === "/financials");
+    assert.equal(Boolean(financials), true);
+    assert.equal(JSON.stringify(financials).includes("487250"), false);
+    assert.equal("currentCash" in (financials ?? {}), false);
+    assert.equal(importHandoffDoesNotInventFinancials(handoff), true);
+  });
 });
 
 describe("forecast-page import-success insight banner", () => {
@@ -1231,7 +1245,7 @@ describe("forecast-page import-success insight banner", () => {
     assert.equal(banner.status, "import_success");
     assert.deepEqual(
       banner.destinations.map((d) => d.href),
-      ["/dashboard", "/value-creation"],
+      ["/dashboard", "/value-creation", "/financials"],
     );
     assert.equal(banner.destinations.some((d) => d.href === "/cash-forecast"), false);
     assert.equal(banner.inventedFinancialValues, false);
@@ -1247,9 +1261,10 @@ describe("forecast-page import-success insight banner", () => {
       dataProvenance: "computed",
     });
     assert.equal(banner.status, "import_success");
-    assert.equal(banner.destinations.length, 2);
+    assert.equal(banner.destinations.length, 3);
     assert.equal(banner.destinations[0].href, "/dashboard");
     assert.equal(banner.destinations[1].href, "/value-creation");
+    assert.equal(banner.destinations[2].href, "/financials");
     assert.equal(forecastBannerDoesNotInventFinancials(banner), true);
   });
 
@@ -1290,7 +1305,7 @@ describe("value-creation-page import-success insight banner", () => {
     assert.equal(banner.status, "import_success");
     assert.deepEqual(
       banner.destinations.map((d) => d.href),
-      ["/cash-forecast", "/dashboard"],
+      ["/cash-forecast", "/dashboard", "/financials"],
     );
     assert.equal(banner.destinations.some((d) => d.href === "/value-creation"), false);
     assert.equal(banner.inventedFinancialValues, false);
@@ -1306,9 +1321,10 @@ describe("value-creation-page import-success insight banner", () => {
       dataProvenance: "computed",
     });
     assert.equal(banner.status, "import_success");
-    assert.equal(banner.destinations.length, 2);
+    assert.equal(banner.destinations.length, 3);
     assert.equal(banner.destinations[0].href, "/cash-forecast");
     assert.equal(banner.destinations[1].href, "/dashboard");
+    assert.equal(banner.destinations[2].href, "/financials");
     assert.equal(valueCreationBannerDoesNotInventFinancials(banner), true);
   });
 

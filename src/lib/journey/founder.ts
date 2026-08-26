@@ -152,6 +152,12 @@ export function resolveImportSuccessHandoff(input: FounderJourneyInput): ImportS
         rationale:
           "See owner-gated recommendations derived from imported SOURCE-DERIVED numbers. AI may explain; it must not invent values.",
       },
+      {
+        href: "/financials",
+        label: "Review imported financials",
+        rationale:
+          "See revenue, expenses, AR/AP, and trends from imported SOURCE-DERIVED numbers. This path does not invent values.",
+      },
     ],
     inventedFinancialValues: false,
   };
