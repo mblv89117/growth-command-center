@@ -109,7 +109,7 @@ export default function SettingsPage() {
     <div>
       <PageHeader
         title="Settings"
-        description="Organization settings, forecast assumptions, thresholds, and billing"
+        description={`Settings for ${organization.name}`}
       />
 
       {!canManageSettings && (
@@ -144,7 +144,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Organization Profile</CardTitle>
-              <CardDescription>Basic information about your company</CardDescription>
+              <CardDescription>{`Organization profile for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -187,7 +187,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Forecast Settings</CardTitle>
-              <CardDescription>Default assumptions for cash forecasting</CardDescription>
+              <CardDescription>{`Forecast settings for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -238,7 +238,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Alert Thresholds</CardTitle>
-              <CardDescription>Configure when financial alerts are triggered</CardDescription>
+              <CardDescription>{`Alert thresholds for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -287,7 +287,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Subscription & Billing</CardTitle>
-              <CardDescription>Manage your Growth Command Center plan via Stripe</CardDescription>
+              <CardDescription>{`Billing settings for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent>
               {billingNotice && (
