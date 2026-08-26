@@ -1,8 +1,29 @@
 # External Pilot Package
 
-**Version:** 1.0 · Post HVCG internal pilot  
+**Version:** 1.1 · Post multi-tenant pilot hardening  
 **Public price:** $149/month (unchanged)  
-**Ingestion:** CSV/XLSX primary path
+**Ingestion:** CSV/XLSX primary path (native connectors coming soon)
+
+---
+
+## 0. Honest capability matrix (pilot-facing)
+
+Tell every pilot customer exactly what is live today:
+
+| Capability | Status |
+|------------|--------|
+| Signup + email verification | **LIVE** |
+| AI onboarding (profile, priorities, KPI targets) | **LIVE** |
+| CSV / XLSX financial import | **LIVE** |
+| Executive dashboard, forecast, KPIs | **LIVE** (after import) |
+| AI CFO advisor | **LIVE** (after import; uses tenant data + onboarding context) |
+| Value creation board | **LIVE** (after import) |
+| QuickBooks / Xero / Plaid / CRM native connectors | **NOT LIVE** — coming soon |
+| Team invites, billing | As configured per environment |
+
+**Pilot promise:** “Import your numbers via CSV or Excel today; native accounting sync is on the roadmap.”
+
+See `docs/multitenant-pilot-certification.md` and `docs/native-connector-priority.md`.
 
 ---
 
@@ -79,8 +100,10 @@ Dashboard → Forecast → KPIs → AI CFO → Value Creation → Weekly return
 ## 6. Automated regression
 
 - `npm run uat:golive` — service-role regression (optional, when secret configured)
-- `npm run pilot:hvcg` — **real-user** certification (preferred for go-live PASS)
+- `npm run pilot:hvcg` — **real-user** HVCG certification
+- `npm run pilot:multitenant` — two-tenant isolation + integration honesty + optional second-tenant synthetic journey
 
 ```
 AUTOMATED_GOLIVE_REGRESSION = READY_PENDING_SECURE_SECRET_CONFIGURATION
+MULTITENANT_PILOT_CERT = READY (requires PILOT_EMAIL/PILOT_PASSWORD; optional SECOND_TENANT_*)
 ```

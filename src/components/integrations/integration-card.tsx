@@ -1,15 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import type { IntegrationStatus } from "@/lib/types";
-import { hasPermission } from "@/lib/auth/permissions";
-import { useAuth } from "@/lib/auth/context";
-import { useTenant } from "@/lib/tenant/context";
-import { Loader2, RefreshCw } from "lucide-react";
+import type { IntegrationAvailability } from "@/lib/integrations/catalog";
 
 interface IntegrationCardProps {
   id: string;
@@ -23,6 +18,8 @@ interface IntegrationCardProps {
   metadata?: Record<string, string | number>;
   organizationId: string;
   connectConfigured?: boolean;
+  availability?: IntegrationAvailability;
+  availabilityLabel?: string;
   onUpdate: () => void;
 }
 
@@ -33,135 +30,40 @@ const statusConfig = {
   error: { label: "Error", variant: "destructive" as const },
 };
 
-const LIVE_INTEGRATIONS: Record<string, { connect: string; sync: string; disconnect: string }> = {
-  "int-1": {
-    connect: "/api/integrations/quickbooks/connect",
-    sync: "/api/integrations/quickbooks/sync",
-    disconnect: "/api/integrations/quickbooks/disconnect",
-  },
-  "int-4": {
-    connect: "/api/integrations/plaid/connect",
-    sync: "/api/integrations/plaid/sync",
-    disconnect: "/api/integrations/plaid/disconnect",
-  },
-};
-
 export function IntegrationCard({
-  id,
   name,
   logo,
   description,
   status,
   lastSync,
   isLive,
-  errorMessage,
-  metadata,
-  organizationId,
-  connectConfigured = false,
-  onUpdate,
+  availability = "coming_soon",
+  availabilityLabel = "Coming Soon",
 }: IntegrationCardProps) {
-  const { user } = useTenant();
-  const { isDemoMode } = useAuth();
-  const canManage = hasPermission(user.role, "integrations:manage");
-  const [loading, setLoading] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
   const config = statusConfig[status];
-  const routes = LIVE_INTEGRATIONS[id];
-  const isLiveIntegration = Boolean(routes);
-  const canConnectLive = isLiveIntegration && connectConfigured;
-
-  const handleConnect = async () => {
-    if (!routes) return;
-    setLoading(true);
-    setActionError(null);
-    try {
-      const res = await fetch(routes.connect, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organizationId, demo: isDemoMode }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setActionError(data.error ?? "Connect failed");
-        return;
-      }
-      if (data.authUrl) {
-        window.location.href = data.authUrl;
-        return;
-      }
-      if (data.mode === "link" || data.linkToken) {
-        setActionError(
-          "Plaid Link is not available in this release. Bank connections stay disconnected until Link is enabled."
-        );
-        return;
-      }
-      onUpdate();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSync = async () => {
-    if (!routes) return;
-    setLoading(true);
-    setActionError(null);
-    try {
-      const res = await fetch(routes.sync, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organizationId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setActionError(data.error ?? data.message ?? "Sync failed");
-        return;
-      }
-      if (data.success === false) {
-        setActionError(data.message ?? "Sync failed");
-      }
-      onUpdate();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDisconnect = async () => {
-    if (!routes) return;
-    setLoading(true);
-    try {
-      await fetch(routes.disconnect, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organizationId }),
-      });
-      onUpdate();
-    } finally {
-      setLoading(false);
-    }
-  };
+  const isComingSoon = availability === "coming_soon" || availability === "not_implemented";
 
   return (
-    <Card>
+    <Card className={isComingSoon ? "opacity-90" : undefined}>
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-sm font-bold text-muted-foreground">
               {logo}
             </div>
             <div>
               <CardTitle className="text-base">{name}</CardTitle>
-              <div className="mt-1 flex gap-1">
-                <Badge variant={config.variant}>{config.label}</Badge>
-                {isLive && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {isLive ? (
                   <Badge variant="outline" className="text-xs">
                     Live
                   </Badge>
-                )}
-                {!isLive && (
+                ) : (
                   <Badge variant="secondary" className="text-xs">
-                    Mock
+                    {availabilityLabel}
                   </Badge>
                 )}
+                {!isComingSoon && <Badge variant={config.variant}>{config.label}</Badge>}
               </div>
             </div>
           </div>
@@ -169,78 +71,15 @@ export function IntegrationCard({
       </CardHeader>
       <CardContent>
         <CardDescription className="mb-4">{description}</CardDescription>
-        {lastSync && (
+        {lastSync && isLive && (
           <p className="mb-2 text-xs text-muted-foreground">Last synced: {formatDate(lastSync)}</p>
         )}
-        {metadata?.totalBalance != null && (
-          <p className="mb-2 text-xs text-muted-foreground">
-            Total balance: ${Number(metadata.totalBalance).toLocaleString()}
-          </p>
-        )}
-        {metadata?.lastRecordsSynced && (
-          <p className="mb-4 text-xs text-muted-foreground">
-            {metadata.lastRecordsSynced} records synced
-          </p>
-        )}
-        {(status === "error" && errorMessage) || actionError ? (
-          <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
-            {actionError ?? errorMessage}
+        {isComingSoon ? (
+          <p className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+            Not available for self-service connection yet. Import your data via{" "}
+            <span className="font-medium text-foreground">CSV / XLSX</span> on the Import page.
           </p>
         ) : null}
-        {isLiveIntegration && !connectConfigured && status !== "connected" && !actionError && (
-          <p className="mb-4 text-xs text-muted-foreground">
-            {name} is disconnected. Live connect stays unavailable until credentials are configured.
-          </p>
-        )}
-        <div className="flex gap-2">
-          {!canManage ? (
-            <p className="text-xs text-muted-foreground">
-              Integration management requires founder or CFO permissions.
-            </p>
-          ) : status === "connected" && !isLiveIntegration ? (
-            <Button variant="outline" size="sm" className="w-full" disabled title="Mock connector — sample data only">
-              Demo Data (Mock)
-            </Button>
-          ) : status === "connected" ? (
-            <>
-              {isLiveIntegration && (
-                <Button variant="outline" size="sm" className="flex-1" onClick={handleSync} disabled={loading}>
-                  {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
-                  Sync
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={handleDisconnect}
-                disabled={loading || !isLiveIntegration}
-              >
-                Disconnect
-              </Button>
-            </>
-          ) : status === "error" && isLiveIntegration ? (
-            <>
-              <Button variant="outline" size="sm" className="flex-1" onClick={handleSync} disabled={loading}>
-                {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
-                Retry Sync
-              </Button>
-              <Button size="sm" className="flex-1" onClick={handleConnect} disabled={loading || !canConnectLive}>
-                Reconnect
-              </Button>
-            </>
-          ) : (
-            <Button
-              size="sm"
-              className="w-full"
-              onClick={handleConnect}
-              disabled={loading || !isLiveIntegration || !canConnectLive}
-            >
-              {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
-              {!isLiveIntegration ? "Coming Soon" : canConnectLive ? "Connect" : "Not configured"}
-            </Button>
-          )}
-        </div>
       </CardContent>
     </Card>
   );
