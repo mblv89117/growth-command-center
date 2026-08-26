@@ -2,12 +2,21 @@ import { ORGANIZATIONS } from "@/lib/mock-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Organization, OrganizationSettings } from "@/lib/types";
 
-const DEFAULT_SETTINGS: OrganizationSettings = {
-  cashAlertThreshold: 150000,
+/**
+ * Defaults are fail-closed. Do not invent cashAlertThreshold = 150000.
+ * An owner-set finite threshold > 0 remains SOURCE-DERIVED.
+ */
+export const DEFAULT_SETTINGS: OrganizationSettings = {
+  cashAlertThreshold: 0,
   forecastHorizonWeeks: 13,
   fiscalYearStart: 1,
   currency: "USD",
 };
+
+export function resolveCashAlertThreshold(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
 
 function isPlan(value: unknown): value is Organization["plan"] {
   return value === "starter" || value === "growth" || value === "enterprise";
@@ -23,7 +32,7 @@ export function mapOrganizationRow(row: Record<string, unknown>): Organization {
     plan: isPlan(row.plan) ? row.plan : "starter",
     createdAt: String(row.created_at ?? new Date().toISOString()).slice(0, 10),
     settings: {
-      cashAlertThreshold: Number(settings.cashAlertThreshold ?? DEFAULT_SETTINGS.cashAlertThreshold),
+      cashAlertThreshold: resolveCashAlertThreshold(settings.cashAlertThreshold),
       forecastHorizonWeeks: Number(settings.forecastHorizonWeeks ?? DEFAULT_SETTINGS.forecastHorizonWeeks),
       fiscalYearStart: Number(settings.fiscalYearStart ?? DEFAULT_SETTINGS.fiscalYearStart),
       currency: String(settings.currency ?? DEFAULT_SETTINGS.currency),
@@ -34,10 +43,13 @@ export function mapOrganizationRow(row: Record<string, unknown>): Organization {
 export async function getOrganizationById(organizationId: string): Promise<Organization> {
   const fallback =
     ORGANIZATIONS.find((org) => org.id === organizationId) ?? {
-      ...ORGANIZATIONS[0],
       id: organizationId,
       name: organizationId,
       slug: organizationId,
+      industry: "",
+      plan: "starter",
+      createdAt: new Date().toISOString().slice(0, 10),
+      settings: { ...DEFAULT_SETTINGS },
     };
 
   const admin = createAdminClient();

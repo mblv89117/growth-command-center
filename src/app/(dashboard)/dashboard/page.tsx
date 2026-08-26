@@ -12,8 +12,10 @@ import { useTenant } from "@/lib/tenant/context";
 import { getTenantData } from "@/lib/mock-data";
 import type { DashboardData } from "@/lib/data/dashboard";
 import { formatCurrency } from "@/lib/utils";
+import { runwayMetricVariant } from "@/lib/forecast/display";
 import { activeMonthlyTrends, latestTrendMonthLabel } from "@/lib/forecast/validate";
 import { computeDashboardDeltas } from "@/lib/financial/deltas";
+import { dashboardFieldProvenance } from "@/lib/imports/honesty";
 import { AiAdvisorPanel } from "@/components/dashboard/ai-advisor-panel";
 import { OnboardingCta } from "@/components/dashboard/onboarding-cta";
 import { KpiList } from "@/components/dashboard/kpi-list";
@@ -42,6 +44,7 @@ export default function DashboardPage() {
           kpis: mock.kpis,
           alerts: mock.alerts,
           source: "mock",
+          fieldProvenance: dashboardFieldProvenance(organization.id, mock.financialSnapshot),
           deltas,
           workingCapital: mock.financialSnapshot.currentCash + mock.financialSnapshot.accountsReceivable - mock.financialSnapshot.accountsPayable,
           forecastVariancePercent: mock.financialSnapshot.currentCash > 0
@@ -185,7 +188,7 @@ export default function DashboardPage() {
           change={deltas?.runway.change}
           changeLabel="months"
           format="months"
-          variant={financialSnapshot.runway < 6 ? "warning" : "default"}
+          variant={runwayMetricVariant(financialSnapshot.runway)}
           tooltip="How many months you can operate at current burn before running out of cash."
         />
       </div>
