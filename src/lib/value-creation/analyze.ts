@@ -1,3 +1,4 @@
+import { isEmptyFinancialSnapshot } from "@/lib/imports/honesty";
 import type { Alert, FinancialSnapshot, KPI, MonthlyTrend } from "@/lib/types";
 import { computeWorkingCapital } from "@/lib/financial/deltas";
 
@@ -37,11 +38,29 @@ export function analyzeValueCreation(input: {
   kpis: KPI[];
   alerts: Alert[];
 }): ValueCreationBoard {
-  const opportunities: ValueCreationOpportunity[] = [];
   const { snapshot, trends, kpis, alerts } = input;
+
+  if (isEmptyFinancialSnapshot(snapshot) && trends.length === 0 && kpis.length === 0 && alerts.length === 0) {
+    return {
+      organizationId: input.organizationId,
+      opportunities: [],
+      verifiedImpact: 0,
+      estimatedImpact: 0,
+      summary: "Import or connect financial data to surface value-creation opportunities.",
+    };
+  }
+
+  const opportunities: ValueCreationOpportunity[] = [];
 
   const grossMarginKpi = kpis.find((k) => k.id === "gross_margin" || k.name.toLowerCase().includes("gross margin"));
   const arDaysKpi = kpis.find((k) => k.id === "ar_days" || k.name.toLowerCase().includes("ar days"));
+  const apDaysKpi = kpis.find((k) => k.id === "ap_days" || k.name.toLowerCase().includes("ap days"));
+  const runwayKpi = kpis.find(
+    (k) => k.id === "cash_runway" || k.name.toLowerCase().includes("runway")
+  );
+  const revenueGrowthKpi = kpis.find(
+    (k) => k.id === "revenue_growth" || k.name.toLowerCase().includes("revenue growth")
+  );
   const workingCapital = computeWorkingCapital(snapshot);
 
   if (grossMarginKpi && grossMarginKpi.target && grossMarginKpi.value < grossMarginKpi.target) {
@@ -77,50 +96,68 @@ export function analyzeValueCreation(input: {
     });
   }
 
-  if (snapshot.accountsPayable > snapshot.accountsReceivable * 0.8 && snapshot.accountsReceivable > 0) {
+  if (apDaysKpi && apDaysKpi.target != null && apDaysKpi.value > apDaysKpi.target) {
+    const excessDays = apDaysKpi.value - apDaysKpi.target;
+    const dailyExpense = snapshot.operatingExpenses / 30;
+    const impact = snapshot.operatingExpenses > 0 ? Math.round(excessDays * dailyExpense) : 0;
     opportunities.push({
       id: "ap-optimization",
       category: "working_capital",
-      finding: "AP balance is high relative to AR — working capital pressure",
-      evidence: `SOURCE-DERIVED: AP $${snapshot.accountsPayable.toLocaleString()} vs AR $${snapshot.accountsReceivable.toLocaleString()}`,
-      businessImpact: `Working capital position: $${workingCapital.toLocaleString()}`,
-      recommendedAction: "Negotiate extended payment terms while accelerating receivables",
-      confidence: "ESTIMATED",
-      financialImpact: Math.round(snapshot.accountsPayable * 0.1),
-      priority: "medium",
+      finding: `AP days at ${apDaysKpi.value} vs ${apDaysKpi.target}-day owner target`,
+      evidence: `CALCULATED: AP $${snapshot.accountsPayable.toLocaleString()} vs owner AP-days target ${apDaysKpi.target}; working capital $${workingCapital.toLocaleString()}`,
+      businessImpact: `AP days above the owner-set target ties ~$${impact.toLocaleString()} in payables timing`,
+      recommendedAction: "Review payment terms against the owner AP-days target; do not invent an AP/AR ratio",
+      confidence: "VERIFIED",
+      financialImpact: impact,
+      priority: excessDays > 10 ? "high" : "medium",
     });
   }
 
-  if (snapshot.runway < 6 && snapshot.runway > 0) {
+  if (
+    runwayKpi &&
+    runwayKpi.target != null &&
+    snapshot.runway > 0 &&
+    runwayKpi.value < runwayKpi.target
+  ) {
     opportunities.push({
       id: "runway-risk",
       category: "forecast_risk",
-      finding: `Cash runway at ${snapshot.runway} months — below 6-month safety threshold`,
-      evidence: `CALCULATED: current cash $${snapshot.currentCash.toLocaleString()}, burn $${snapshot.burnRate.toLocaleString()}/mo`,
-      businessImpact: "Limited buffer for unexpected expenses or revenue delays",
-      recommendedAction: "Review discretionary spend, accelerate collections, and model downside scenarios",
+      finding: `Cash runway at ${runwayKpi.value} months vs ${runwayKpi.target}-month owner target`,
+      evidence: `CALCULATED: current cash $${snapshot.currentCash.toLocaleString()}, burn $${snapshot.burnRate.toLocaleString()}/mo = ${runwayKpi.value} vs owner target ${runwayKpi.target}`,
+      businessImpact: "Runway is below the owner-set target buffer",
+      recommendedAction: "Review discretionary spend against the owner runway target; do not invent a 6-month threshold",
       confidence: "VERIFIED",
       financialImpact: 0,
       priority: "high",
     });
   }
 
-  if (trends.length >= 3) {
+  if (
+    revenueGrowthKpi &&
+    revenueGrowthKpi.target != null &&
+    revenueGrowthKpi.value < revenueGrowthKpi.target
+  ) {
     const recent = trends.slice(-3);
-    const revenueDeclining = recent[2].revenue < recent[0].revenue * 0.9;
-    if (revenueDeclining) {
-      opportunities.push({
-        id: "revenue-decline",
-        category: "growth",
-        finding: "Revenue trend declining over last 3 months",
-        evidence: `SOURCE-DERIVED: ${recent.map((t) => `${t.month}: $${t.revenue.toLocaleString()}`).join(" → ")}`,
-        businessImpact: "Revenue softness compresses margin and cash generation",
-        recommendedAction: "Diagnose pipeline conversion, customer retention, and pricing",
-        confidence: "VERIFIED",
-        financialImpact: Math.round((recent[0].revenue - recent[2].revenue)),
-        priority: "high",
-      });
-    }
+    const trendEvidence =
+      recent.length >= 2
+        ? recent.map((t) => `${t.month}: $${t.revenue.toLocaleString()}`).join(" → ")
+        : "owner revenue-growth KPI";
+    const latest = recent.length ? recent[recent.length - 1]?.revenue ?? 0 : 0;
+    const prior = recent.length >= 2 ? recent[recent.length - 2]?.revenue ?? 0 : 0;
+    const impact =
+      latest > 0 && prior > 0 ? Math.round(prior - latest) : 0;
+    const gap = revenueGrowthKpi.target - revenueGrowthKpi.value;
+    opportunities.push({
+      id: "revenue-decline",
+      category: "growth",
+      finding: `Revenue growth is ${revenueGrowthKpi.value}% vs ${revenueGrowthKpi.target}% owner target`,
+      evidence: `CALCULATED from SOURCE-DERIVED monthly trends vs owner target ${revenueGrowthKpi.target}%: ${trendEvidence}`,
+      businessImpact: "Revenue growth below the owner-set target compresses margin and cash generation",
+      recommendedAction: "Diagnose pipeline conversion against the owner growth target; do not invent a 90% decline rule",
+      confidence: "VERIFIED",
+      financialImpact: impact,
+      priority: gap > 5 ? "high" : "medium",
+    });
   }
 
   const criticalAlerts = alerts.filter((a) => !a.isRead && (a.severity === "critical" || a.severity === "high"));
@@ -138,17 +175,32 @@ export function analyzeValueCreation(input: {
     });
   }
 
-  if (snapshot.operatingExpenses > snapshot.revenueMTD * 0.35 && snapshot.revenueMTD > 0) {
+  const opexKpi = kpis.find(
+    (k) =>
+      k.id === "opex_ratio" ||
+      k.name.toLowerCase().includes("opex") ||
+      k.name.toLowerCase().includes("operating expense")
+  );
+  if (
+    opexKpi &&
+    opexKpi.target != null &&
+    snapshot.revenueMTD > 0 &&
+    opexKpi.value > opexKpi.target
+  ) {
+    const ratio =
+      Math.round((snapshot.operatingExpenses / snapshot.revenueMTD) * 1000) / 10;
+    const gap = opexKpi.value - opexKpi.target;
+    const impact = Math.round(snapshot.revenueMTD * (gap / 100));
     opportunities.push({
       id: "opex-efficiency",
       category: "cost_structure",
-      finding: "Operating expenses exceed 35% of revenue",
-      evidence: `CALCULATED: OpEx $${snapshot.operatingExpenses.toLocaleString()} / Revenue $${snapshot.revenueMTD.toLocaleString()}`,
-      businessImpact: "High fixed cost base reduces operating leverage",
-      recommendedAction: "Benchmark OpEx categories and identify 5-10% reduction targets",
-      confidence: "ESTIMATED",
-      financialImpact: Math.round(snapshot.operatingExpenses * 0.05),
-      priority: "medium",
+      finding: `OpEx ratio is ${opexKpi.value}% vs ${opexKpi.target}% owner target`,
+      evidence: `CALCULATED: OpEx $${snapshot.operatingExpenses.toLocaleString()} / Revenue $${snapshot.revenueMTD.toLocaleString()} = ${ratio}% vs owner target ${opexKpi.target}%`,
+      businessImpact: "OpEx above the owner-set target reduces operating leverage",
+      recommendedAction: "Review OpEx categories against the owner target; do not invent an industry ratio",
+      confidence: "VERIFIED",
+      financialImpact: impact,
+      priority: gap > 5 ? "high" : "medium",
     });
   }
 
