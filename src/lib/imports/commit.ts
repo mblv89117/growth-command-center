@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { autoMapColumns } from "@/lib/imports/parser";
 import type { ImportPreviewResult, ImportTemplateType } from "@/lib/imports/types";
 import { IMPORT_TEMPLATES } from "@/lib/imports/types";
-import { resolveMonthlyTrendRow } from "@/lib/imports/honesty";
+import { resolveImportedSnapshot, resolveMonthlyTrendRow } from "@/lib/imports/honesty";
 import { recomputeTenantFinancials } from "@/lib/pipeline/recompute";
 import { completeJobRun, startJobRun } from "@/lib/observability/events";
 
@@ -84,20 +84,25 @@ export async function commitImport(
 
   try {
     if (preview.templateType === "financial_snapshot") {
-      const row = validRows[0].data;
+      const resolved = resolveImportedSnapshot(validRows[0].data);
+      const snapshot = resolved.snapshot;
       await admin.from("gcc_financial_snapshots").upsert(
         {
           organization_id: organizationId,
-          current_cash: Number(row.current_cash ?? 0),
-          revenue_mtd: Number(row.revenue_mtd ?? 0),
-          revenue_ytd: Number(row.revenue_ytd ?? 0),
-          gross_profit: Number(row.gross_profit ?? 0),
-          net_profit: Number(row.net_profit ?? 0),
-          operating_expenses: Number(row.operating_expenses ?? 0),
-          accounts_receivable: Number(row.accounts_receivable ?? 0),
-          accounts_payable: Number(row.accounts_payable ?? 0),
-          payroll_obligations: Number(row.payroll_obligations ?? 0),
-          ebitda: Number(row.ebitda ?? 0),
+          current_cash: snapshot.currentCash,
+          forecasted_cash: snapshot.forecastedCash,
+          revenue_mtd: snapshot.revenueMTD,
+          revenue_ytd: snapshot.revenueYTD,
+          gross_profit: snapshot.grossProfit,
+          net_profit: snapshot.netProfit,
+          operating_expenses: snapshot.operatingExpenses,
+          accounts_receivable: snapshot.accountsReceivable,
+          accounts_payable: snapshot.accountsPayable,
+          burn_rate: snapshot.burnRate,
+          runway: snapshot.runway,
+          debt_obligations: snapshot.debtObligations,
+          payroll_obligations: snapshot.payrollObligations,
+          ebitda: snapshot.ebitda,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "organization_id" }

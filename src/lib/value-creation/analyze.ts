@@ -113,7 +113,7 @@ export function analyzeValueCreation(input: {
         id: "revenue-decline",
         category: "growth",
         finding: "Revenue trend declining over last 3 months",
-        evidence: `SOURCE-DERIVED: ${recent.map((t) => `${t.month}: $${t.revenue.toLocaleString()}`).join(" → ")}`,
+        evidence: `CALCULATED from SOURCE-DERIVED monthly trends (latest < 90% of first of last 3): ${recent.map((t) => `${t.month}: $${t.revenue.toLocaleString()}`).join(" → ")}`,
         businessImpact: "Revenue softness compresses margin and cash generation",
         recommendedAction: "Diagnose pipeline conversion, customer retention, and pricing",
         confidence: "VERIFIED",

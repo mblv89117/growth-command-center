@@ -9,6 +9,8 @@ import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financ
 import { buildImportPreview } from "../src/lib/imports/commit";
 import {
   applyImportedFinancials,
+  calculateForecastedCash,
+  calculateRunwayMonths,
   resolveMonthlyTrendRow,
   snapshotFromImportRow,
 } from "../src/lib/imports/honesty";
@@ -209,6 +211,85 @@ describe("honest ingest", () => {
   });
 });
 
+describe("forecast KPI honesty", () => {
+  it("empty tenant has no Apex forecast weeks, scenarios, or KPIs", () => {
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    const emptyOrgs = ["org-summit", "org-acme-services", "org-unknown-tenant", "org-hvcg"];
+
+    assert.ok(apex.cashForecastWeeks.length > 0);
+    assert.ok(apex.scenarios.length > 0);
+    assert.ok(apex.kpis.length > 0);
+
+    for (const orgId of emptyOrgs) {
+      const tenant = getTenantData(orgId);
+      assert.deepEqual(tenant.cashForecastWeeks, []);
+      assert.deepEqual(tenant.scenarios, []);
+      assert.deepEqual(tenant.kpis, []);
+      assert.equal(tenant.financialSnapshot.forecastedCash, 0);
+      assert.equal(tenant.financialSnapshot.runway, 0);
+      assert.notDeepEqual(tenant.cashForecastWeeks, apex.cashForecastWeeks);
+      assert.equal(JSON.stringify(tenant).includes("Harbor View"), false);
+      assert.equal(JSON.stringify(tenant).includes("Apex Construction"), false);
+    }
+  });
+
+  it("calculates runway from imported cash+burn without Apex leak", () => {
+    const snapshot = snapshotFromImportRow({
+      current_cash: 120000,
+      burn_rate: 20000,
+      revenue_mtd: 50000,
+      gross_profit: 20000,
+    });
+    assert.equal(snapshot.runway, calculateRunwayMonths(120000, 20000));
+    assert.equal(snapshot.runway, 6);
+    assert.equal(snapshot.forecastedCash, calculateForecastedCash(120000, 20000));
+    assert.notEqual(snapshot.forecastedCash, 0);
+
+    const summit = applyImportedFinancials("org-summit", snapshot, []);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(summit.fieldProvenance.runway, "CALCULATED");
+    assert.equal(summit.fieldProvenance.forecastedCash, "CALCULATED");
+    assert.equal(summit.fieldProvenance.burnRate, "SOURCE-DERIVED");
+    assert.equal(summit.financialSnapshot.runway, 6);
+    assert.equal(summit.kpiProvenance, "CALCULATED");
+    assert.ok(summit.kpis.some((kpi) => kpi.id === "gross_margin" && kpi.value === 40));
+    assert.ok(summit.kpis.some((kpi) => kpi.id === "cash_runway" && kpi.value === 6));
+    assert.deepEqual(summit.cashForecastWeeks, []);
+    assert.deepEqual(summit.scenarios, []);
+    assert.equal(summit.invoices.length, 0);
+    assert.equal(summit.jobs.length, 0);
+    assert.notEqual(summit.financialSnapshot.currentCash, apex.financialSnapshot.currentCash);
+    assert.notDeepEqual(summit.cashForecastWeeks, apex.cashForecastWeeks);
+    assert.equal(JSON.stringify(summit).includes("Harbor View"), false);
+    assert.doesNotMatch(JSON.stringify(summit), /0\.6|0\.35|revenue \* /);
+  });
+
+  it("does not invent runway when burn is missing", () => {
+    const snapshot = snapshotFromImportRow({
+      current_cash: 120000,
+      revenue_mtd: 50000,
+    });
+    assert.equal(snapshot.runway, 0);
+    assert.equal(snapshot.forecastedCash, 0);
+    assert.equal(snapshot.burnRate, 0);
+    assert.equal(calculateRunwayMonths(120000, null), null);
+
+    const summit = applyImportedFinancials("org-summit", snapshot);
+    assert.equal(summit.financialSnapshot.runway, 0);
+    assert.equal(summit.financialSnapshot.forecastedCash, 0);
+    assert.equal(summit.fieldProvenance.runway, "INSUFFICIENT_DATA");
+    assert.equal(summit.fieldProvenance.forecastedCash, "INSUFFICIENT_DATA");
+    assert.equal(summit.fieldProvenance.burnRate, "INSUFFICIENT_DATA");
+    assert.equal(
+      summit.kpis.some((kpi) => kpi.id === "cash_runway"),
+      false
+    );
+    assert.deepEqual(summit.cashForecastWeeks, []);
+    assert.deepEqual(summit.scenarios, []);
+  });
+});
+
 describe("value creation", () => {
   it("surfaces runway risk when below threshold", () => {
     const board = analyzeValueCreation({
@@ -234,6 +315,39 @@ describe("value creation", () => {
       alerts: [],
     });
     assert.ok(board.opportunities.some((o) => o.id === "runway-risk"));
+  });
+
+  it("labels revenue-decline threshold math as CALCULATED on real trends", () => {
+    const board = analyzeValueCreation({
+      organizationId: "org-summit",
+      snapshot: {
+        currentCash: 100000,
+        forecastedCash: 0,
+        revenueMTD: 40000,
+        revenueYTD: 180000,
+        grossProfit: 12000,
+        netProfit: 4000,
+        operatingExpenses: 20000,
+        accountsReceivable: 10000,
+        accountsPayable: 8000,
+        burnRate: 15000,
+        runway: 6.7,
+        debtObligations: 0,
+        payrollObligations: 10000,
+        ebitda: 0,
+      },
+      trends: [
+        { month: "Jan", revenue: 100000, expenses: 60000, profit: 40000, cash: 120000 },
+        { month: "Feb", revenue: 95000, expenses: 62000, profit: 33000, cash: 110000 },
+        { month: "Mar", revenue: 80000, expenses: 61000, profit: 19000, cash: 100000 },
+      ],
+      kpis: [],
+      alerts: [],
+    });
+    const decline = board.opportunities.find((o) => o.id === "revenue-decline");
+    assert.ok(decline);
+    assert.match(decline.evidence, /^CALCULATED/);
+    assert.doesNotMatch(decline.evidence, /^SOURCE-DERIVED/);
   });
 });
 

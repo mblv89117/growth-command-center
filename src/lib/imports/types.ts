@@ -40,6 +40,10 @@ export const IMPORT_TEMPLATES: Record<
       "accounts_payable",
       "payroll_obligations",
       "ebitda",
+      "burn_rate",
+      "forecasted_cash",
+      "runway",
+      "debt_obligations",
     ],
   },
   monthly_trends: {

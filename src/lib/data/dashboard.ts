@@ -1,4 +1,5 @@
-import { APEX_DEMO_ORGANIZATION_ID, getTenantData } from "@/lib/mock-data";
+import { applyImportedFinancials } from "@/lib/imports/honesty";
+import { getTenantData } from "@/lib/mock-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/config";
@@ -181,26 +182,18 @@ export async function getTenantDataWithFallback(organizationId: string): Promise
     return { ...mock, dataSource: "mock" };
   }
 
-  const imported = {
-    ...mock,
-    financialSnapshot: dashboard.financialSnapshot,
-    monthlyTrends: dashboard.monthlyTrends,
-    budgetVsActual: dashboard.budgetVsActual,
-    kpis: dashboard.kpis,
-    alerts: dashboard.alerts,
-    dataSource: "imported" as const,
-  };
-
-  if (organizationId === APEX_DEMO_ORGANIZATION_ID) {
-    return imported;
-  }
+  const imported = applyImportedFinancials(
+    organizationId,
+    dashboard.financialSnapshot,
+    dashboard.monthlyTrends
+  );
 
   return {
     ...imported,
-    jobs: [],
-    invoices: [],
-    bills: mock.bills,
-    transactions: mock.transactions,
+    budgetVsActual: dashboard.budgetVsActual,
+    kpis: dashboard.kpis.length ? dashboard.kpis : imported.kpis,
+    alerts: dashboard.alerts,
+    dataSource: "imported",
   };
 }
 
