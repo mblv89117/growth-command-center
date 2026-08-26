@@ -1,3 +1,4 @@
+import { applyImportedFinancials } from "@/lib/imports/honesty";
 import { getTenantData } from "@/lib/mock-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -181,14 +182,18 @@ export async function getTenantDataWithFallback(organizationId: string): Promise
     return { ...mock, dataSource: "mock" };
   }
 
+  const imported = applyImportedFinancials(
+    organizationId,
+    dashboard.financialSnapshot,
+    dashboard.monthlyTrends
+  );
+
   return {
-    ...mock,
-    financialSnapshot: dashboard.financialSnapshot,
-    monthlyTrends: dashboard.monthlyTrends,
+    ...imported,
     budgetVsActual: dashboard.budgetVsActual,
-    kpis: dashboard.kpis,
+    kpis: dashboard.kpis.length ? dashboard.kpis : imported.kpis,
     alerts: dashboard.alerts,
-    dataSource: "supabase",
+    dataSource: "imported",
   };
 }
 
