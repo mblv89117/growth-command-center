@@ -262,7 +262,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">Margin variance alerts</p>
-                  <p className="text-sm text-muted-foreground">Alert when job margin drops 5%+ below estimate</p>
+                  <p className="text-sm text-muted-foreground">{`Margin variance alert setting for ${organization.name}`}</p>
                 </div>
                 <Switch defaultChecked />
               </div>
