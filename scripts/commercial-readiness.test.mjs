@@ -1704,6 +1704,60 @@ describe("leftover Apex demo seed.sql dscr KPI target honesty", () => {
   });
 });
 
+describe("leftover Apex demo seed.sql remaining KPI target honesty", () => {
+  const seedSql = fs.readFileSync(new URL("../supabase/seed.sql", import.meta.url), "utf8");
+  const leftover = [
+    ["revenue_growth", "Revenue Growth", "12.4", "percent", "2.1", "vs last month", "10"],
+    ["gross_margin", "Gross Margin", "35.9", "percent", "-1.2", "vs last month", "32"],
+    ["net_margin", "Net Margin", "13.0", "percent", "0.8", "vs last month", "12"],
+    ["cash_conversion", "Cash Conversion Cycle", "42", "days", "-3", "vs last quarter", "45"],
+    ["ar_days", "AR Days", "48", "days", "5", "vs last month", "40"],
+    ["ap_days", "AP Days", "32", "days", "-2", "vs last month", "35"],
+    ["close_rate", "Sales Close Rate", "34", "percent", "4", "vs last quarter", "30"],
+    ["job_profit", "Job Profitability", "26.8", "percent", "-2.4", "vs estimate", "28"],
+    ["opex_ratio", "Operating Expense Ratio", "22.9", "percent", "-0.5", "vs last month", "24"],
+    ["runway", "Runway", "3.4", "number", "-0.3", "months", "6"],
+  ];
+
+  it("does not invent leftover Apex demo seed.sql KPI targets 10/32/12/45/40/35/30/28/24/6", () => {
+    const executable = seedSql
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
+    const escapeRe = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    for (const [key, name, value, unit, change, label, invented] of leftover) {
+      const row =
+        `'org-apex', '${escapeRe(key)}', '${escapeRe(name)}', ${escapeRe(value)}, '${escapeRe(unit)}', ${escapeRe(change)}, '${escapeRe(label)}'`;
+      assert.match(executable, new RegExp(`${row}, NULL`), key);
+      assert.doesNotMatch(executable, new RegExp(`${row}, ${escapeRe(invented)}`), key);
+    }
+  });
+
+  it("owner-set leftover seed KPI targets remain SOURCE-DERIVED", () => {
+    assert.equal(resolveKpiTarget(10), 10);
+    assert.equal(resolveKpiTarget("32"), 32);
+    assert.equal(resolveKpiTarget(12), 12);
+    assert.equal(resolveKpiTarget(45), 45);
+    assert.equal(resolveKpiTarget(6), 6);
+    assert.equal(resolveKpiTarget(undefined), undefined);
+    assert.equal(resolveKpiTarget(null), undefined);
+  });
+
+  it("empty tenants do not inherit leftover Apex demo seed.sql KPI targets", () => {
+    for (const orgId of ["org-summit", "org-silver-creek", "org-unknown-seed-kpis-30"]) {
+      const empty = getTenantData(orgId);
+      assert.equal(empty.kpis.length, 0, orgId);
+      assert.equal(
+        empty.kpis.some((row) => [10, 32, 12, 45, 40, 35, 30, 28, 24, 6].includes(row.target)),
+        false,
+        orgId
+      );
+      assert.equal(JSON.stringify(empty).includes("Harbor View"), false, orgId);
+      assert.equal(JSON.stringify(empty).includes("Apex Construction"), false, orgId);
+    }
+  });
+});
+
 describe("tenant slug", () => {
   it("slugifies company names", () => {
     assert.equal(slugifyCompanyName("Acme Services LLC"), "acme-services-llc");
