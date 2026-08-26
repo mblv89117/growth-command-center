@@ -2058,3 +2058,87 @@ describe("leftover reports-catalog invented Category-level budget variance analy
     );
   });
 });
+
+describe("leftover reports-catalog invented Forecast accuracy and variance tracking claim honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/reports/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Forecast accuracy and variance tracking in reports catalog", () => {
+    const forecastVsActual = REPORTS.find((report) => report.id === "rpt-10");
+    assert.ok(forecastVsActual);
+    assert.equal(
+      forecastVsActual.description.includes("Forecast accuracy and variance tracking"),
+      false
+    );
+    assert.equal(forecastVsActual.description.includes("Forecast accuracy"), false);
+    assert.equal(forecastVsActual.description.includes("variance tracking"), false);
+    assert.equal(forecastVsActual.description, "Forecast versus actual report");
+    assert.equal(
+      REPORTS.some((report) =>
+        report.description.includes("Forecast accuracy and variance tracking")
+      ),
+      false
+    );
+    assert.equal(
+      EMPTY_TENANT_REPORTS.some((report) =>
+        report.description.includes("Forecast accuracy and variance tracking")
+      ),
+      false
+    );
+    assert.match(page, /<CardDescription>\{report\.description\}<\/CardDescription>/);
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover reports-catalog forecast-accuracy honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+    const forecastVsActual = apex.reports.find((report) => report.id === "rpt-10");
+    assert.ok(forecastVsActual);
+    assert.equal(
+      forecastVsActual.description.includes("Forecast accuracy and variance tracking"),
+      false
+    );
+    const budgetVsActual = apex.reports.find((report) => report.id === "rpt-9");
+    assert.ok(budgetVsActual);
+    assert.equal(
+      budgetVsActual.description.includes("Category-level budget variance analysis"),
+      false
+    );
+    const profitAndLoss = apex.reports.find((report) => report.id === "rpt-3");
+    assert.ok(profitAndLoss);
+    assert.equal(
+      profitAndLoss.description.includes("Monthly and YTD P&L with variance analysis"),
+      false
+    );
+    const executiveSummary = apex.reports.find((report) => report.id === "rpt-1");
+    assert.ok(executiveSummary);
+    assert.equal(executiveSummary.description.includes("leadership and board review"), false);
+    const cashForecast = apex.reports.find((report) => report.id === "rpt-2");
+    assert.ok(cashForecast);
+    assert.equal(cashForecast.description.includes("scenario analysis"), false);
+  });
+
+  it("empty tenant still has no Apex leak after leftover reports-catalog forecast-accuracy honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+    assert.equal(
+      summit.reports.some((report) =>
+        report.description.includes("Forecast accuracy and variance tracking")
+      ),
+      false
+    );
+  });
+});
