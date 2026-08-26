@@ -28,11 +28,13 @@ export function isAppHost(host: string): boolean {
 }
 
 export function getPrimaryPublicUrl(): string {
-  return process.env.NEXT_PUBLIC_MARKETING_URL ?? `https://${COMMERCIAL_DOMAIN}`;
+  const configured = process.env.NEXT_PUBLIC_MARKETING_URL?.trim();
+  return configured || `https://${COMMERCIAL_DOMAIN}`;
 }
 
 export function getAppUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? `https://${APP_SUBDOMAIN}`;
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  return configured || `https://${APP_SUBDOMAIN}`;
 }
 
 export function getCanonicalOrigin(host: string): string {
