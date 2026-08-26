@@ -296,7 +296,7 @@ export default function SettingsPage() {
               <div className="mb-6 flex items-center justify-between rounded-xl border bg-primary/5 p-6">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-xl font-bold capitalize">{organization.plan} Plan</h3>
+                    <h3 className="text-xl font-bold">{`Selected catalog plan heading for ${organization.name}`}</h3>
                     <Badge>{`Selected plan for ${organization.name}`}</Badge>
                   </div>
                   <p className="mt-1 text-muted-foreground">
