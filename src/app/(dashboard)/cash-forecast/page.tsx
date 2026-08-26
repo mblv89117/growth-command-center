@@ -159,7 +159,7 @@ export default function CashForecastPage() {
           <Card>
             <CardHeader>
               <CardTitle>Monthly Cash Forecast</CardTitle>
-              <CardDescription>6-month projection with risk periods highlighted</CardDescription>
+              <CardDescription>{`Monthly cash forecast for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent>
               <DataTable

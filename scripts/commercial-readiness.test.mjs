@@ -2915,3 +2915,43 @@ describe("leftover sales-pipeline invented Performance-by-sales-representative C
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover cash-forecast invented 6-month-projection-with-risk-periods CardDescription honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/cash-forecast/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover 6-month projection with risk periods highlighted on the cash-forecast page", () => {
+    assert.equal(page.includes("6-month projection with risk periods highlighted"), false);
+    assert.equal(page.includes("6-month projection"), false);
+    assert.equal(page.includes("risk periods highlighted"), false);
+    assert.match(
+      page,
+      /<CardDescription>\{\`Monthly cash forecast for \$\{organization\.name\}\`\}<\/CardDescription>/
+    );
+    assert.match(page, /description=\{`Cash forecast for \$\{organization\.name\}`\}/);
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover cash-forecast 6-month-projection honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+  });
+
+  it("empty tenant still has no Apex leak after leftover cash-forecast 6-month-projection honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
