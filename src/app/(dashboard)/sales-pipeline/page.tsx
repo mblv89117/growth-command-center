@@ -91,7 +91,7 @@ export default function SalesPipelinePage() {
         <Card>
           <CardHeader>
             <CardTitle>Sales by Rep</CardTitle>
-            <CardDescription>Performance by sales representative</CardDescription>
+            <CardDescription>{`Sales by rep for ${organization.name}`}</CardDescription>
           </CardHeader>
           <CardContent>
             <DataTable
