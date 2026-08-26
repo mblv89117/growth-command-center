@@ -44,70 +44,87 @@ function withAttributionCookie(
   return response;
 }
 
+function hasLikelyAuthSession(request: NextRequest): boolean {
+  return request.cookies.getAll().some((cookie) => {
+    const name = cookie.name.toLowerCase();
+    return name.includes("auth-token") || name.includes("access-token");
+  });
+}
+
 async function getAuthenticatedUser(request: NextRequest): Promise<boolean> {
+  if (hasLikelyAuthSession(request)) return true;
+
   if (!isSupabaseConfigured()) {
     return isDemoModeAllowed() && request.cookies.get(DEMO_MODE_COOKIE)?.value === "1";
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll() {
+            // Read-only probe for routing decisions
+          },
         },
-        setAll() {
-          // Read-only probe for routing decisions
-        },
-      },
-    }
-  );
+      }
+    );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  return Boolean(user);
+    return Boolean(user);
+  } catch {
+    return false;
+  }
 }
 
 export async function handleDomainRouting(request: NextRequest): Promise<NextResponse | null> {
-  const host = request.headers.get("host") ?? "";
-  if (!shouldApplyCommercialDomainRouting(host)) return null;
+  try {
+    const host = request.headers.get("host") ?? "";
+    if (!shouldApplyCommercialDomainRouting(host)) return null;
 
-  const wwwTarget = resolveWwwRedirectTarget(request);
-  if (wwwTarget) {
-    return withAttributionCookie(redirectTo(wwwTarget, 308), request);
-  }
-
-  const marketingToAppTarget = resolveMarketingToAppRedirectTarget(request);
-  if (marketingToAppTarget) {
-    const parsed = new URL(marketingToAppTarget);
-    const finalTarget = buildAppRedirectUrl(
-      getAppUrl(),
-      parsed.pathname,
-      request,
-      parsed.search
-    );
-    return withAttributionCookie(redirectTo(finalTarget), request);
-  }
-
-  const isAuthenticated = await getAuthenticatedUser(request);
-  const appTarget = resolveAppHostRedirectTarget(request, isAuthenticated);
-  if (appTarget) {
-    if (appTarget.startsWith("http")) {
-      return redirectTo(appTarget, appTarget.includes("/pricing") ? 308 : 307);
+    const wwwTarget = resolveWwwRedirectTarget(request);
+    if (wwwTarget) {
+      return withAttributionCookie(redirectTo(wwwTarget, 308), request);
     }
-    const url = request.nextUrl.clone();
-    url.pathname = appTarget;
-    return NextResponse.redirect(url);
-  }
 
-  if (isMarketingHost(host)) {
-    return withAttributionCookie(NextResponse.next({ request }), request);
-  }
+    const marketingToAppTarget = resolveMarketingToAppRedirectTarget(request);
+    if (marketingToAppTarget) {
+      const parsed = new URL(marketingToAppTarget);
+      const finalTarget = buildAppRedirectUrl(
+        getAppUrl(),
+        parsed.pathname,
+        request,
+        parsed.search
+      );
+      return withAttributionCookie(redirectTo(finalTarget), request);
+    }
 
-  return null;
+    const isAuthenticated = await getAuthenticatedUser(request);
+    const appTarget = resolveAppHostRedirectTarget(request, isAuthenticated);
+    if (appTarget) {
+      if (appTarget.startsWith("http")) {
+        return redirectTo(appTarget, appTarget.includes("/pricing") ? 308 : 307);
+      }
+      const url = request.nextUrl.clone();
+      url.pathname = appTarget;
+      return NextResponse.redirect(url);
+    }
+
+    if (isMarketingHost(host)) {
+      return withAttributionCookie(NextResponse.next({ request }), request);
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export async function updateSession(request: NextRequest) {

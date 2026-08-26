@@ -1,7 +1,12 @@
 import { GtmHomepage } from "@/components/marketing/gtm-homepage";
 import type { Metadata } from "next";
-import { getPrimaryPublicUrl } from "@/lib/domains";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { getPrimaryPublicUrl, isAppHost } from "@/lib/domains";
 import { attributionFromSearchParams } from "@/lib/gtm/attribution";
+import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Growth Command Center — See your business clearly",
@@ -24,6 +29,17 @@ export default async function Home({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const host = (await headers()).get("host") ?? "";
+
+  if (isAppHost(host)) {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+
+    redirect(user ? "/dashboard" : "/login");
+  }
+
   const params = await searchParams;
   const attribution = attributionFromSearchParams(params);
 
