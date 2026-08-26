@@ -2,11 +2,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { organizationIdFromSlug, uniqueSlug } from "@/lib/tenant/slug";
 import type { Organization } from "@/lib/types";
 import { mapOrganizationRow } from "@/lib/data/organizations";
+import type { GtmAttribution } from "@/lib/gtm/attribution";
 
 export interface ProvisionTenantInput {
   userId: string;
   companyName: string;
   industry?: string;
+  attribution?: GtmAttribution;
 }
 
 export interface ProvisionTenantResult {
@@ -52,6 +54,11 @@ export async function provisionTenantForUser(
     subscription_status: "trial",
     data_source: "empty",
     trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    utm_source: input.attribution?.utm_source ?? null,
+    utm_medium: input.attribution?.utm_medium ?? null,
+    utm_campaign: input.attribution?.utm_campaign ?? null,
+    utm_content: input.attribution?.utm_content ?? null,
+    utm_term: input.attribution?.utm_term ?? null,
   });
 
   if (orgError && !orgError.message.includes("duplicate")) {

@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 import {
   generateDeterministicWeeklyForecast,
@@ -213,5 +213,104 @@ describe("tenant isolation contract", () => {
     assert.ok(plaid);
     assert.equal(qbo.status, "disconnected");
     assert.equal(plaid.status, "disconnected");
+  });
+});
+
+describe("connector registry", () => {
+  it("has zero false-live connectors (live flag requires configured)", async () => {
+    const { CONNECTOR_REGISTRY } = await import("../src/lib/connectors/registry.js");
+    const falseLive = CONNECTOR_REGISTRY.filter((c) => c.isProductionLive && !c.isConfigured);
+    assert.equal(falseLive.length, 0, `false-live: ${falseLive.map((c) => c.id).join(", ")}`);
+  });
+
+  it("marks upload connectors as production live", async () => {
+    const { CONNECTOR_REGISTRY } = await import("../src/lib/connectors/registry.js");
+    const csv = CONNECTOR_REGISTRY.find((c) => c.id === "csv");
+    const pdf = CONNECTOR_REGISTRY.find((c) => c.id === "pdf");
+    assert.ok(csv?.isProductionLive);
+    assert.ok(pdf?.isProductionLive);
+  });
+
+  it("native connectors require provider approval", async () => {
+    const { CONNECTOR_REGISTRY } = await import("../src/lib/connectors/registry.js");
+    const qbo = CONNECTOR_REGISTRY.find((c) => c.id === "quickbooks");
+    assert.ok(qbo);
+    assert.equal(qbo.isProductionLive, false);
+    assert.equal(qbo.requiresProviderApproval, true);
+  });
+});
+
+describe("domain routing", () => {
+  const marketingUrl = "https://growthcommandcenter.com";
+  const appUrl = "https://app.growthcommandcenter.com";
+
+  function mockRequest({ host, pathname, search = "" }) {
+    return {
+      headers: { get: (key) => (key === "host" ? host : null) },
+      nextUrl: { pathname, search },
+      cookies: { get: () => undefined },
+    };
+  }
+
+  before(() => {
+    process.env.NEXT_PUBLIC_MARKETING_URL = marketingUrl;
+    process.env.NEXT_PUBLIC_APP_URL = appUrl;
+  });
+
+  it("redirects www to marketing apex", async () => {
+    const { resolveWwwRedirectTarget } = await import("../src/lib/domains/routing.ts");
+    const target = resolveWwwRedirectTarget(
+      mockRequest({ host: "www.growthcommandcenter.com", pathname: "/pricing" })
+    );
+    assert.equal(target, `${marketingUrl}/pricing`);
+  });
+
+  it("keeps marketing homepage on apex", async () => {
+    const { resolveMarketingToAppRedirectTarget } = await import("../src/lib/domains/routing.ts");
+    const target = resolveMarketingToAppRedirectTarget(
+      mockRequest({ host: "growthcommandcenter.com", pathname: "/" })
+    );
+    assert.equal(target, null);
+  });
+
+  it("redirects marketing auth routes to app subdomain", async () => {
+    const { resolveMarketingToAppRedirectTarget } = await import("../src/lib/domains/routing.ts");
+    const target = resolveMarketingToAppRedirectTarget(
+      mockRequest({ host: "growthcommandcenter.com", pathname: "/signup", search: "?utm_source=360" })
+    );
+    assert.equal(target, `${appUrl}/signup?utm_source=360`);
+  });
+
+  it("redirects app root to login when logged out", async () => {
+    const { resolveAppHostRedirectTarget } = await import("../src/lib/domains/routing.ts");
+    const target = resolveAppHostRedirectTarget(
+      mockRequest({ host: "app.growthcommandcenter.com", pathname: "/" }),
+      false
+    );
+    assert.equal(target, "/login");
+  });
+
+  it("redirects app root to dashboard when logged in", async () => {
+    const { resolveAppHostRedirectTarget } = await import("../src/lib/domains/routing.ts");
+    const target = resolveAppHostRedirectTarget(
+      mockRequest({ host: "app.growthcommandcenter.com", pathname: "/" }),
+      true
+    );
+    assert.equal(target, "/dashboard");
+  });
+
+  it("redirects app pricing to marketing pricing", async () => {
+    const { resolveAppHostRedirectTarget } = await import("../src/lib/domains/routing.ts");
+    const target = resolveAppHostRedirectTarget(
+      mockRequest({ host: "app.growthcommandcenter.com", pathname: "/pricing" }),
+      false
+    );
+    assert.equal(target, `${marketingUrl}/pricing`);
+  });
+
+  it("builds signup URLs on the app domain with UTM params", async () => {
+    const { appSignupUrl } = await import("../src/lib/domains/links.ts");
+    const url = appSignupUrl({ utm_source: "360", utm_campaign: "gcc-launch" });
+    assert.equal(url, `${appUrl}/signup?utm_source=360&utm_campaign=gcc-launch`);
   });
 });
