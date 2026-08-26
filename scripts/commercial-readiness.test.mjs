@@ -7,6 +7,11 @@ import {
 import { computeKpis } from "../src/lib/kpi/catalog";
 import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financial/deltas";
 import { buildImportPreview } from "../src/lib/imports/commit";
+import {
+  applyImportedFinancials,
+  resolveMonthlyTrendRow,
+  snapshotFromImportRow,
+} from "../src/lib/imports/honesty";
 import { analyzeValueCreation } from "../src/lib/value-creation/analyze";
 import { slugifyCompanyName, organizationIdFromSlug } from "../src/lib/tenant/slug";
 import {
@@ -147,6 +152,60 @@ describe("import preview", () => {
     );
     assert.equal(preview.validCount, 0);
     assert.equal(preview.errorCount, 1);
+  });
+});
+
+describe("honest ingest", () => {
+  it("does not invent monthly expenses as a percent of revenue", () => {
+    const missing = resolveMonthlyTrendRow({ month: "Jan", revenue: 100000 });
+    assert.equal(missing.ok, false);
+    if (!missing.ok) {
+      assert.match(missing.error, /will not invent/i);
+    }
+    assert.doesNotMatch(JSON.stringify(missing), /0\.7|70000/);
+  });
+
+  it("calculates profit only when expenses are SOURCE-DERIVED", () => {
+    const resolved = resolveMonthlyTrendRow({
+      month: "Jan",
+      revenue: 100000,
+      expenses: 40000,
+    });
+    assert.equal(resolved.ok, true);
+    if (resolved.ok) {
+      assert.equal(resolved.trend.profit, 60000);
+      assert.equal(resolved.profitProvenance, "CALCULATED");
+      assert.equal(resolved.expensesProvenance, "SOURCE-DERIVED");
+    }
+  });
+
+  it("applies imported snapshot as SOURCE-DERIVED without Apex leak", () => {
+    const preview = buildImportPreview(
+      "financial_snapshot",
+      "books.csv",
+      ["current_cash", "revenue_mtd", "accounts_receivable"],
+      [["125000", "40000", "18000"]]
+    );
+    assert.equal(preview.validCount, 1);
+    const snapshot = snapshotFromImportRow(preview.rows[0].data);
+    const summit = applyImportedFinancials("org-summit", snapshot);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(summit.financialProvenance, "SOURCE-DERIVED");
+    assert.equal(summit.dataSource, "imported");
+    assert.equal(summit.financialSnapshot.currentCash, 125000);
+    assert.equal(summit.financialSnapshot.revenueMTD, 40000);
+    assert.equal(summit.invoices.length, 0);
+    assert.equal(summit.jobs.length, 0);
+    assert.notEqual(summit.financialSnapshot.currentCash, apex.financialSnapshot.currentCash);
+    assert.equal(
+      summit.integrations.filter((item) => item.status === "connected").length,
+      0
+    );
+    assert.equal(
+      summit.reports.every((report) => report.lastGenerated === undefined),
+      true
+    );
   });
 });
 
