@@ -343,3 +343,36 @@ describe("leftover settings default cashAlertThreshold honesty", () => {
     assert.doesNotMatch(JSON.stringify(mapped), /150000/);
   });
 });
+
+describe("leftover mock-data organizationForId cashAlertThreshold honesty", () => {
+  it("does not invent cashAlertThreshold 150000 for unknown mock orgs", () => {
+    const provisioned = getTenantData("org-acme-services");
+    const unknown = getTenantData("org-unknown-tenant");
+
+    assert.equal(provisioned.organization.settings.cashAlertThreshold, 0);
+    assert.notEqual(provisioned.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(unknown.organization.settings.cashAlertThreshold, 0);
+    assert.notEqual(unknown.organization.settings.cashAlertThreshold, 150000);
+    assert.doesNotMatch(JSON.stringify(provisioned.organization), /150000/);
+    assert.doesNotMatch(JSON.stringify(unknown.organization), /150000/);
+  });
+
+  it("keeps pinned org-apex mock cashAlertThreshold SOURCE-DERIVED", () => {
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+  });
+
+  it("empty tenant still has no Apex leak after organizationForId honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.notEqual(summit.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.notDeepEqual(summit.financialSnapshot, getTenantData(APEX_DEMO_ORGANIZATION_ID).financialSnapshot);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
