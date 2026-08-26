@@ -1610,6 +1610,49 @@ describe("leftover Apex demo seed.sql debt-coverage covenant honesty", () => {
   });
 });
 
+describe("leftover schema.sql DEFAULT cashAlertThreshold honesty", () => {
+  const schemaSql = fs.readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+
+  it("does not invent leftover schema.sql DEFAULT cashAlertThreshold 150000", () => {
+    const executable = schemaSql
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
+    assert.match(
+      executable,
+      /settings JSONB DEFAULT '\{"cashAlertThreshold":0,"forecastHorizonWeeks":13,"fiscalYearStart":1,"currency":"USD"\}'/
+    );
+    assert.doesNotMatch(executable, /"cashAlertThreshold":150000/);
+    assert.doesNotMatch(executable, /cashAlertThreshold":150000/);
+    assert.equal(DEFAULT_SETTINGS.cashAlertThreshold, 0);
+    assert.equal(resolveCashAlertThreshold(undefined), 0);
+    assert.equal(resolveCashAlertThreshold(0), 0);
+    assert.equal(resolveCashAlertThreshold("150000"), 150000);
+  });
+
+  it("owner-set cashAlertThreshold remains SOURCE-DERIVED", () => {
+    const owner = mapOrganizationRow({
+      id: "org-iron-ridge",
+      name: "Iron Ridge",
+      slug: "iron-ridge",
+      settings: { cashAlertThreshold: 150000 },
+    });
+    assert.equal(owner.settings.cashAlertThreshold, 150000);
+    assert.equal(resolveCashAlertThreshold(75000), 75000);
+  });
+
+  it("empty tenants do not inherit leftover schema.sql 150000 default", () => {
+    for (const orgId of ["org-summit", "org-cedar-falls", "org-unknown-schema-28"]) {
+      const empty = getTenantData(orgId);
+      assert.equal(empty.organization.settings.cashAlertThreshold, 0, orgId);
+      assert.notEqual(empty.organization.settings.cashAlertThreshold, 150000, orgId);
+      assert.doesNotMatch(JSON.stringify(empty), /"cashAlertThreshold":150000/);
+      assert.equal(JSON.stringify(empty).includes("Harbor View"), false, orgId);
+      assert.equal(JSON.stringify(empty).includes("Apex Construction"), false, orgId);
+    }
+  });
+});
+
 describe("tenant slug", () => {
   it("slugifies company names", () => {
     assert.equal(slugifyCompanyName("Acme Services LLC"), "acme-services-llc");
