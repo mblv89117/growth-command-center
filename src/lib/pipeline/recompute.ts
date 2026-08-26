@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enrichSnapshotWithCalculatedForecast } from "@/lib/imports/honesty";
-import { computeKpis } from "@/lib/kpi/catalog";
+import { computeKpis, resolveKpiTarget } from "@/lib/kpi/catalog";
 import { computeWorkingCapital } from "@/lib/financial/deltas";
 import { completeJobRun, logOperationalEvent, startJobRun } from "@/lib/observability/events";
 import type { FinancialSnapshot, MonthlyTrend } from "@/lib/types";
@@ -72,9 +72,17 @@ export async function recomputeTenantFinancials(
       .filter((k) => k.enabled !== false)
       .map((k) => k.kpi_key as string);
 
+    const ownerTargets: Record<string, number> = {};
+    for (const row of existingKpis ?? []) {
+      if (row.kpi_key !== "cash_runway_target") continue;
+      const ownerTarget = resolveKpiTarget(row.target);
+      if (ownerTarget !== undefined) ownerTargets.cash_runway = ownerTarget;
+    }
+
     const computed = computeKpis(
       { snapshot: enriched.snapshot, trends },
-      enabledKeys.length ? enabledKeys : undefined
+      enabledKeys.length ? enabledKeys : undefined,
+      ownerTargets
     );
 
     let kpisUpdated = 0;

@@ -92,7 +92,7 @@ export const KPI_CATALOG: KpiDefinition[] = [
     name: "Cash Runway",
     unit: "number",
     category: "cash",
-    defaultTarget: 6,
+    // Do not invent cash_runway defaultTarget = 6. Owner-set targets remain SOURCE-DERIVED.
     compute: (ctx) => {
       if (ctx.snapshot.runway > 0) return ctx.snapshot.runway;
       if (ctx.snapshot.burnRate > 0) return ctx.snapshot.runway;
@@ -131,9 +131,24 @@ export const KPI_CATALOG: KpiDefinition[] = [
   },
 ];
 
+/**
+ * Owner-set finite targets > 0 are SOURCE-DERIVED.
+ * Catalog defaults apply only when the definition still publishes one.
+ * Do not invent cash_runway defaultTarget = 6.
+ */
+export function resolveKpiTarget(ownerTarget: unknown, catalogDefault?: number): number | undefined {
+  const parsed = Number(ownerTarget);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  if (catalogDefault !== undefined && Number.isFinite(catalogDefault) && catalogDefault > 0) {
+    return catalogDefault;
+  }
+  return undefined;
+}
+
 export function computeKpis(
   ctx: KpiComputeContext,
-  enabledKeys?: string[]
+  enabledKeys?: string[],
+  ownerTargets?: Record<string, number | null | undefined>
 ): Array<Omit<KPI, "id"> & { key: string }> {
   const enabled = enabledKeys ?? KPI_CATALOG.map((k) => k.key);
   return KPI_CATALOG.filter((def) => enabled.includes(def.key))
@@ -145,6 +160,7 @@ export function computeKpis(
         priorValue !== null && priorValue !== 0
           ? Math.round(((value - priorValue) / Math.abs(priorValue)) * 1000) / 10
           : 0;
+      const target = resolveKpiTarget(ownerTargets?.[def.key], def.defaultTarget);
       return {
         key: def.key,
         name: def.name,
@@ -152,8 +168,8 @@ export function computeKpis(
         unit: def.unit,
         change,
         changeLabel: "vs prior period",
-        target: def.defaultTarget,
-        status: suggestStatus(value, def.defaultTarget, def.unit),
+        target,
+        status: suggestStatus(value, target, def.unit),
         manualOverride: false,
       };
     })

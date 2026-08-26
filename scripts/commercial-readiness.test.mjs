@@ -21,7 +21,7 @@ import {
   resolveCashAlertThreshold,
 } from "../src/lib/data/organizations";
 import { calculateMinimumCash } from "../src/lib/forecast-engine";
-import { computeKpis } from "../src/lib/kpi/catalog";
+import { computeKpis, KPI_CATALOG, resolveKpiTarget } from "../src/lib/kpi/catalog";
 import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financial/deltas";
 import { buildImportPreview } from "../src/lib/imports/commit";
 import {
@@ -1201,6 +1201,66 @@ describe("leftover settings seed and runway UI honesty", () => {
     assert.equal(JSON.stringify(empty).includes("Harbor View"), false);
     assert.equal(JSON.stringify(empty).includes("Apex Construction"), false);
     assert.doesNotMatch(JSON.stringify(mapped), /150000/);
+  });
+});
+
+describe("leftover KPI catalog cash_runway honesty", () => {
+  const runwaySnapshot = {
+    currentCash: 100000,
+    forecastedCash: 80000,
+    revenueMTD: 0,
+    revenueYTD: 0,
+    grossProfit: 0,
+    netProfit: 0,
+    operatingExpenses: 0,
+    accountsReceivable: 0,
+    accountsPayable: 0,
+    burnRate: 25000,
+    runway: 4,
+    debtObligations: 0,
+    payrollObligations: 0,
+    ebitda: 0,
+  };
+
+  it("does not invent cash_runway defaultTarget 6", () => {
+    const def = KPI_CATALOG.find((kpi) => kpi.key === "cash_runway");
+    assert.ok(def);
+    assert.equal(def.defaultTarget, undefined);
+    assert.equal(resolveKpiTarget(undefined), undefined);
+    assert.equal(resolveKpiTarget(null), undefined);
+    assert.equal(resolveKpiTarget(0), undefined);
+    assert.equal(resolveKpiTarget(6), 6);
+
+    const kpis = computeKpis({ snapshot: runwaySnapshot, trends: [] }, ["cash_runway"]);
+    const runway = kpis.find((kpi) => kpi.key === "cash_runway");
+    assert.ok(runway);
+    assert.equal(runway.value, 4);
+    assert.equal(runway.target, undefined);
+    assert.equal(runway.status, "green");
+    assert.notEqual(runway.target, 6);
+  });
+
+  it("applies owner cash_runway target only", () => {
+    const kpis = computeKpis(
+      { snapshot: runwaySnapshot, trends: [] },
+      ["cash_runway"],
+      { cash_runway: 9 }
+    );
+    const runway = kpis.find((kpi) => kpi.key === "cash_runway");
+    assert.ok(runway);
+    assert.equal(runway.target, 9);
+    assert.equal(runway.status, "red");
+    assert.notEqual(runway.target, 6);
+  });
+
+  it("org-summit listed seed has no invented 75000 cashAlertThreshold", () => {
+    const summit = getTenantData("org-summit");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(summit.organization.settings.cashAlertThreshold, 0);
+    assert.notEqual(summit.organization.settings.cashAlertThreshold, 75000);
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(JSON.stringify(summit).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
 
