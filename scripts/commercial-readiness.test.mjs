@@ -487,6 +487,85 @@ describe("value creation", () => {
       alerts: [],
     });
     assert.ok(board.opportunities.some((o) => o.id === "runway-risk"));
+    assert.equal(
+      board.opportunities.some((o) => o.id === "opex-efficiency"),
+      false,
+      "runway-only input must not invent a 35% OpEx industry threshold"
+    );
+  });
+
+  it("does not invent an opex-efficiency opportunity from revenueMTD * 0.35", () => {
+    const board = analyzeValueCreation({
+      organizationId: "org-summit",
+      snapshot: {
+        currentCash: 90000,
+        forecastedCash: 0,
+        revenueMTD: 100000,
+        revenueYTD: 400000,
+        grossProfit: 40000,
+        netProfit: 10000,
+        operatingExpenses: 50000,
+        accountsReceivable: 20000,
+        accountsPayable: 10000,
+        burnRate: 15000,
+        runway: 6,
+        debtObligations: 0,
+        payrollObligations: 20000,
+        ebitda: 12000,
+      },
+      trends: [],
+      kpis: [],
+      alerts: [],
+    });
+    assert.equal(
+      board.opportunities.some((o) => o.id === "opex-efficiency"),
+      false
+    );
+    assert.equal(JSON.stringify(board).includes("35% of revenue"), false);
+    assert.equal(JSON.stringify(board).includes("revenueMTD * 0.35"), false);
+  });
+
+  it("surfaces opex-efficiency only against an owner KPI target", () => {
+    const board = analyzeValueCreation({
+      organizationId: "org-summit",
+      snapshot: {
+        currentCash: 90000,
+        forecastedCash: 0,
+        revenueMTD: 100000,
+        revenueYTD: 400000,
+        grossProfit: 40000,
+        netProfit: 10000,
+        operatingExpenses: 50000,
+        accountsReceivable: 20000,
+        accountsPayable: 10000,
+        burnRate: 15000,
+        runway: 6,
+        debtObligations: 0,
+        payrollObligations: 20000,
+        ebitda: 12000,
+      },
+      trends: [],
+      kpis: [
+        {
+          id: "opex_ratio",
+          name: "OpEx Ratio",
+          value: 50,
+          unit: "percent",
+          change: 0,
+          changeLabel: "vs owner target",
+          target: 40,
+        },
+      ],
+      alerts: [],
+    });
+    const opex = board.opportunities.find((o) => o.id === "opex-efficiency");
+    assert.ok(opex);
+    assert.match(opex.finding, /50% vs 40% owner target/);
+    assert.match(opex.evidence, /^CALCULATED: OpEx \$50,000 \/ Revenue \$100,000 = 50% vs owner target 40%/);
+    assert.doesNotMatch(opex.finding, /35%/);
+    assert.doesNotMatch(opex.evidence, /35%/);
+    assert.equal(opex.financialImpact, 10000);
+    assert.equal(opex.confidence, "VERIFIED");
   });
 
   it("labels revenue-decline threshold math as CALCULATED on real trends", () => {

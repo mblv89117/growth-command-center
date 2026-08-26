@@ -150,17 +150,32 @@ export function analyzeValueCreation(input: {
     });
   }
 
-  if (snapshot.operatingExpenses > snapshot.revenueMTD * 0.35 && snapshot.revenueMTD > 0) {
+  const opexKpi = kpis.find(
+    (k) =>
+      k.id === "opex_ratio" ||
+      k.name.toLowerCase().includes("opex") ||
+      k.name.toLowerCase().includes("operating expense")
+  );
+  if (
+    opexKpi &&
+    opexKpi.target != null &&
+    snapshot.revenueMTD > 0 &&
+    opexKpi.value > opexKpi.target
+  ) {
+    const ratio =
+      Math.round((snapshot.operatingExpenses / snapshot.revenueMTD) * 1000) / 10;
+    const gap = opexKpi.value - opexKpi.target;
+    const impact = Math.round(snapshot.revenueMTD * (gap / 100));
     opportunities.push({
       id: "opex-efficiency",
       category: "cost_structure",
-      finding: "Operating expenses exceed 35% of revenue",
-      evidence: `CALCULATED: OpEx $${snapshot.operatingExpenses.toLocaleString()} / Revenue $${snapshot.revenueMTD.toLocaleString()}`,
-      businessImpact: "High fixed cost base reduces operating leverage",
-      recommendedAction: "Benchmark OpEx categories and identify 5-10% reduction targets",
-      confidence: "ESTIMATED",
-      financialImpact: Math.round(snapshot.operatingExpenses * 0.05),
-      priority: "medium",
+      finding: `OpEx ratio is ${opexKpi.value}% vs ${opexKpi.target}% owner target`,
+      evidence: `CALCULATED: OpEx $${snapshot.operatingExpenses.toLocaleString()} / Revenue $${snapshot.revenueMTD.toLocaleString()} = ${ratio}% vs owner target ${opexKpi.target}%`,
+      businessImpact: "OpEx above the owner-set target reduces operating leverage",
+      recommendedAction: "Review OpEx categories against the owner target; do not invent an industry ratio",
+      confidence: "VERIFIED",
+      financialImpact: impact,
+      priority: gap > 5 ? "high" : "medium",
     });
   }
 
