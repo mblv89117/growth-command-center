@@ -49,7 +49,8 @@ export const ORGANIZATIONS: Organization[] = [
     plan: "starter",
     createdAt: "2024-01-10",
     settings: {
-      cashAlertThreshold: 75000,
+      // Listed empty tenant. Do not invent cashAlertThreshold = 75000.
+      cashAlertThreshold: 0,
       forecastHorizonWeeks: 13,
       fiscalYearStart: 1,
       currency: "USD",
@@ -197,47 +198,63 @@ export const ALERTS: Alert[] = [
 ];
 
 export const KPIS: KPI[] = [
-  { id: "kpi-1", name: "Revenue Growth", value: 12.4, unit: "percent", change: 2.1, changeLabel: "vs last month", target: 10 },
-  { id: "kpi-2", name: "Gross Margin", value: 35.9, unit: "percent", change: -1.2, changeLabel: "vs last month", target: 32 },
-  { id: "kpi-3", name: "Net Margin", value: 13.0, unit: "percent", change: 0.8, changeLabel: "vs last month", target: 12 },
-  { id: "kpi-4", name: "Cash Conversion Cycle", value: 42, unit: "days", change: -3, changeLabel: "vs last quarter", target: 45 },
-  { id: "kpi-5", name: "AR Days", value: 48, unit: "days", change: 5, changeLabel: "vs last month", target: 40 },
-  { id: "kpi-6", name: "AP Days", value: 32, unit: "days", change: -2, changeLabel: "vs last month", target: 35 },
-  { id: "kpi-7", name: "Sales Close Rate", value: 34, unit: "percent", change: 4, changeLabel: "vs last quarter", target: 30 },
+  { id: "kpi-1", name: "Revenue Growth", value: 12.4, unit: "percent", change: 2.1, changeLabel: "vs last month" }, // Do not invent leftover Revenue Growth target = 10.
+  { id: "kpi-2", name: "Gross Margin", value: 35.9, unit: "percent", change: -1.2, changeLabel: "vs last month" }, // Do not invent leftover Gross Margin target = 32.
+  { id: "kpi-3", name: "Net Margin", value: 13.0, unit: "percent", change: 0.8, changeLabel: "vs last month" }, // Do not invent leftover Net Margin target = 12.
+  { id: "kpi-4", name: "Cash Conversion Cycle", value: 42, unit: "days", change: -3, changeLabel: "vs last quarter" }, // Do not invent leftover Cash Conversion Cycle target = 45.
+  { id: "kpi-5", name: "AR Days", value: 48, unit: "days", change: 5, changeLabel: "vs last month" }, // Do not invent leftover AR Days target = 40.
+  { id: "kpi-6", name: "AP Days", value: 32, unit: "days", change: -2, changeLabel: "vs last month" }, // Do not invent leftover AP Days target = 35.
+  { id: "kpi-7", name: "Sales Close Rate", value: 34, unit: "percent", change: 4, changeLabel: "vs last quarter" }, // Do not invent leftover Sales Close Rate target = 30.
   { id: "kpi-8", name: "Average Deal Size", value: 1420000, unit: "currency", change: 8.5, changeLabel: "vs last quarter" },
-  { id: "kpi-9", name: "Job Profitability", value: 26.8, unit: "percent", change: -2.4, changeLabel: "vs estimate", target: 28 },
-  { id: "kpi-10", name: "Operating Expense Ratio", value: 22.9, unit: "percent", change: -0.5, changeLabel: "vs last month", target: 24 },
-  { id: "kpi-11", name: "Debt Service Coverage", value: 1.8, unit: "number", change: -0.2, changeLabel: "vs last quarter", target: 1.5 },
-  { id: "kpi-12", name: "Runway", value: 3.4, unit: "number", change: -0.3, changeLabel: "months", target: 6 },
+  { id: "kpi-9", name: "Job Profitability", value: 26.8, unit: "percent", change: -2.4, changeLabel: "vs estimate" }, // Do not invent leftover Job Profitability target = 28.
+  { id: "kpi-10", name: "Operating Expense Ratio", value: 22.9, unit: "percent", change: -0.5, changeLabel: "vs last month" }, // Do not invent leftover Operating Expense Ratio target = 24.
+  { id: "kpi-11", name: "Debt Service Coverage", value: 1.8, unit: "number", change: -0.2, changeLabel: "vs last quarter" }, // Do not invent leftover Debt Service Coverage target = 1.5.
+  { id: "kpi-12", name: "Runway", value: 3.4, unit: "number", change: -0.3, changeLabel: "months" }, // Do not invent leftover Runway target = 6.
   { id: "kpi-13", name: "EBITDA", value: 1125600, unit: "currency", change: 15.2, changeLabel: "vs last month" },
 ];
 
 export const INTEGRATIONS: Integration[] = [
   { id: "int-1", name: "QuickBooks Online", category: "accounting", status: "disconnected", description: "Sync transactions, invoices, bills, and chart of accounts", logo: "QB" },
   { id: "int-2", name: "Xero", category: "accounting", status: "disconnected", description: "Alternative accounting platform integration", logo: "XE" },
-  { id: "int-3", name: "Stripe", category: "payments", status: "connected", lastSync: "2025-05-24T05:30:00Z", description: "Payment processing and revenue tracking", logo: "ST" },
+  { id: "int-3", name: "Stripe", category: "payments", status: "disconnected", description: "Payment processing and revenue tracking", logo: "ST" }, // Do not invent leftover Stripe connected lastSync.
   { id: "int-4", name: "Plaid", category: "payments", status: "disconnected", description: "Bank account connections and cash balance sync", logo: "PL" },
-  { id: "int-5", name: "Gusto", category: "payroll", status: "connected", lastSync: "2025-05-23T18:00:00Z", description: "Payroll, benefits, and contractor payments", logo: "GU" },
-  { id: "int-6", name: "Buildertrend", category: "operations", status: "pending", description: "Job costing, scheduling, and production tracking", logo: "BT" },
-  { id: "int-7", name: "HubSpot", category: "sales", status: "connected", lastSync: "2025-05-24T04:00:00Z", description: "CRM, deals pipeline, and sales forecasting", logo: "HS" },
+  { id: "int-5", name: "Gusto", category: "payroll", status: "disconnected", description: "Payroll, benefits, and contractor payments", logo: "GU" }, // Do not invent leftover Gusto connected lastSync.
+  { id: "int-6", name: "Buildertrend", category: "operations", status: "disconnected", description: "Job costing, scheduling, and production tracking", logo: "BT" }, // Do not invent leftover Buildertrend pending.
+  { id: "int-7", name: "HubSpot", category: "sales", status: "disconnected", description: "CRM, deals pipeline, and sales forecasting", logo: "HS" }, // Do not invent leftover HubSpot connected lastSync.
   { id: "int-8", name: "Salesforce", category: "sales", status: "disconnected", description: "Enterprise CRM and opportunity management", logo: "SF" },
   { id: "int-9", name: "Jobber", category: "operations", status: "disconnected", description: "Field service and job management", logo: "JB" },
-  { id: "int-10", name: "Google Sheets", category: "other", status: "connected", lastSync: "2025-05-24T03:00:00Z", description: "Import custom spreadsheets and forecasts", logo: "GS" },
+  { id: "int-10", name: "Google Sheets", category: "other", status: "disconnected", description: "Import custom spreadsheets and forecasts", logo: "GS" }, // Do not invent leftover Google Sheets connected lastSync.
 ];
 
+/** Catalog templates with invented connected lastSync must not be served as live connections. */
+export const DISCONNECTED_INTEGRATIONS: Integration[] = INTEGRATIONS.map((item) => ({
+  ...item,
+  status: "disconnected",
+  lastSync: undefined,
+}));
+
 export const REPORTS: Report[] = [
-  { id: "rpt-1", name: "Executive Summary", description: "High-level financial overview for leadership and board review", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
-  { id: "rpt-2", name: "Cash Forecast Report", description: "13-week rolling cash forecast with scenario analysis", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
-  { id: "rpt-3", name: "Profit & Loss Summary", description: "Monthly and YTD P&L with variance analysis", category: "Financials", lastGenerated: "2025-05-23", format: ["pdf", "excel"] },
-  { id: "rpt-4", name: "Balance Sheet Summary", description: "Assets, liabilities, and equity snapshot", category: "Financials", lastGenerated: "2025-05-23", format: ["pdf", "excel"] },
+  { id: "rpt-1", name: "Executive Summary", description: "Executive summary report", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
+  { id: "rpt-2", name: "Cash Forecast Report", description: "Cash forecast report", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
+  { id: "rpt-3", name: "Profit & Loss Summary", description: "Profit and loss report", category: "Financials", lastGenerated: "2025-05-23", format: ["pdf", "excel"] },
+  { id: "rpt-4", name: "Balance Sheet Summary", description: "Balance sheet report", category: "Financials", lastGenerated: "2025-05-23", format: ["pdf", "excel"] },
   { id: "rpt-5", name: "AR Aging Report", description: "Accounts receivable aging by customer and bucket", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-6", name: "AP Aging Report", description: "Accounts payable aging by vendor and due date", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
-  { id: "rpt-7", name: "Sales Pipeline Forecast", description: "Weighted pipeline revenue projection by stage and rep", category: "Sales", lastGenerated: "2025-05-22", format: ["pdf", "excel"] },
-  { id: "rpt-8", name: "Job Profitability Report", description: "Margin analysis by active and completed jobs", category: "Operations", lastGenerated: "2025-05-21", format: ["pdf", "excel"] },
-  { id: "rpt-9", name: "Budget vs Actual", description: "Category-level budget variance analysis", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
-  { id: "rpt-10", name: "Forecast vs Actual", description: "Forecast accuracy and variance tracking", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
+  { id: "rpt-7", name: "Sales Pipeline Forecast", description: "Sales pipeline forecast report", category: "Sales", lastGenerated: "2025-05-22", format: ["pdf", "excel"] },
+  { id: "rpt-8", name: "Job Profitability Report", description: "Job profitability report", category: "Operations", lastGenerated: "2025-05-21", format: ["pdf", "excel"] },
+  { id: "rpt-9", name: "Budget vs Actual", description: "Budget versus actual report", category: "Financials", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
+  { id: "rpt-10", name: "Forecast vs Actual", description: "Forecast versus actual report", category: "Forecasting", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
   { id: "rpt-11", name: "KPI Scorecard", description: "Key performance indicators dashboard export", category: "Executive", lastGenerated: "2025-05-24", format: ["pdf", "excel"] },
 ];
+
+/** Report templates with no lastGenerated date — empty tenants must not advertise demo exports. */
+export const EMPTY_TENANT_REPORTS: Report[] = REPORTS.map((item) => ({
+  id: item.id,
+  name: item.name,
+  description: item.description,
+  category: item.category,
+  format: item.format,
+}));
 
 export const TEAM_MEMBERS: TeamMember[] = [
   { id: "tm-1", name: "Sarah Chen", email: "sarah.chen@apexconstruction.com", role: "founder", status: "active", joinedAt: "2023-06-15" },
@@ -321,6 +338,10 @@ export const EMPTY_FINANCIAL_SNAPSHOT: FinancialSnapshot = {
   ebitda: 0,
 };
 
+/**
+ * Unknown mock orgs are fail-closed. Do not invent cashAlertThreshold = 150000.
+ * org-apex pinned demo settings remain SOURCE-DERIVED on ORGANIZATIONS.
+ */
 function organizationForId(organizationId: string): Organization {
   return (
     ORGANIZATIONS.find((o) => o.id === organizationId) ?? {
@@ -331,7 +352,7 @@ function organizationForId(organizationId: string): Organization {
       plan: "starter",
       createdAt: new Date().toISOString().slice(0, 10),
       settings: {
-        cashAlertThreshold: 150000,
+        cashAlertThreshold: 0,
         forecastHorizonWeeks: 13,
         fiscalYearStart: 1,
         currency: "USD",
@@ -367,7 +388,7 @@ export function getTenantData(organizationId: string): TenantData {
       bills: BILLS,
       alerts: ALERTS,
       kpis: KPIS,
-      integrations: INTEGRATIONS,
+      integrations: DISCONNECTED_INTEGRATIONS,
       reports: REPORTS,
       teamMembers: TEAM_MEMBERS,
       transactions: TRANSACTIONS,
@@ -394,8 +415,8 @@ export function getTenantData(organizationId: string): TenantData {
     bills: [],
     alerts: [],
     kpis: [],
-    integrations: INTEGRATIONS,
-    reports: REPORTS,
+    integrations: DISCONNECTED_INTEGRATIONS,
+    reports: EMPTY_TENANT_REPORTS,
     teamMembers: [],
     transactions: [],
     expenseCategories: [],
