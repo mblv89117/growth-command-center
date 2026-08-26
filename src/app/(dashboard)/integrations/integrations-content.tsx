@@ -11,12 +11,17 @@ import type { Integration, IntegrationStatus } from "@/lib/types";
 import type { IntegrationAvailability } from "@/lib/integrations/catalog";
 import { Download, Loader2, Upload } from "lucide-react";
 import Link from "next/link";
+import { ConnectionHealthCenter } from "@/components/connectors/connection-health-center";
 
 const categoryLabels: Record<string, string> = {
   accounting: "Accounting",
-  payments: "Payments & Banking",
+  banking: "Banking",
+  payments: "Payments",
   payroll: "Payroll",
   operations: "Operations",
+  crm: "CRM / Sales",
+  spreadsheets: "Spreadsheets",
+  uploads: "File Uploads",
   sales: "Sales & CRM",
   other: "Other",
 };
@@ -70,36 +75,39 @@ export default function IntegrationsContent() {
   return (
     <div>
       <PageHeader
-        title="Integrations"
-        description="Connect your financial data — import now, native connectors coming soon"
+        title="Data Connections"
+        description="Connect your systems or upload your data — two first-class paths to financial intelligence"
       />
 
       {notice && (
         <div className="mb-6 rounded-xl border bg-primary/5 p-4 text-sm">{notice}</div>
       )}
 
+      <div className="mb-8">
+        <ConnectionHealthCenter />
+      </div>
+
       <div className="mb-8 rounded-xl border-2 border-primary/30 bg-primary/5 p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">Import financial data</h2>
+              <h2 className="text-lg font-semibold">Upload My Data</h2>
               <Badge>Live</Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              CSV and XLSX upload is the supported way to add your numbers today. Map columns, preview,
-              validate, and commit — then your dashboard, forecast, KPIs, and AI CFO activate.
+              CSV, Excel, and PDF financial reports — map, preview, validate, and confirm before commit.
             </p>
             <ul className="list-inside list-disc text-sm text-muted-foreground">
-              <li>Supported formats: CSV, XLSX</li>
-              <li>Templates available on the import page</li>
-              <li>No accounting connector required for pilot customers</li>
+              <li>Supported: CSV, XLS, XLSX, PDF (P&L, balance sheet, cash flow)</li>
+              <li>PDF values require your confirmation before becoming financial truth</li>
+              <li>Templates and field guidance included</li>
             </ul>
           </div>
           <div className="flex shrink-0 flex-col gap-2">
             <Button asChild size="lg">
               <Link href="/integrations/import">
                 <Upload className="mr-2 h-4 w-4" />
-                Import CSV / XLSX
+                Import files
               </Link>
             </Button>
             <Button variant="outline" asChild>
@@ -113,10 +121,10 @@ export default function IntegrationsContent() {
       </div>
 
       <div className="mb-6 rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
-        <p className="font-medium text-foreground">Native connectors — coming soon</p>
+        <p className="font-medium text-foreground">Connect My Systems</p>
         <p className="mt-1">
-          QuickBooks, Xero, Plaid, and other integrations are planned but not yet certified for
-          production self-service. Use CSV/XLSX import to get value today.
+          Native connectors sync automatically when production-certified. Providers below show honest
+          status — we never mark a connector live until authorization and sync are verified.
         </p>
       </div>
 

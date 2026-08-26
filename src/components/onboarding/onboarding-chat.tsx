@@ -233,6 +233,11 @@ export function OnboardingChat() {
                 KPIs, and AI CFO.
               </p>
               <Button asChild className="w-full">
+                <Link href="/data-connection">
+                  Add your business data <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full">
                 <Link href="/integrations/import">
                   Import CSV / XLSX <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>

@@ -9,6 +9,8 @@ import { AI_ADVISOR_RATE_LIMIT } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { organizationIdSchema } from "@/lib/validation/schemas";
 import { logOperationalEvent } from "@/lib/observability/events";
+import { getProvenanceForOrg } from "@/lib/connectors/provenance";
+import { getOrganizationConnections } from "@/lib/integrations/store";
 
 const aiAdvisorBodySchema = organizationIdSchema.extend({
   department: z
@@ -104,18 +106,37 @@ export async function POST(request: Request) {
       },
     });
 
-    const [dashboard, organizationName, history, onboardingState] = await Promise.all([
-      getDashboardData(body.organizationId),
-      getOrganizationName(body.organizationId),
-      loadConversationHistory(body.conversationId, body.organizationId),
-      getOnboardingState(body.organizationId),
-    ]);
+    const [dashboard, organizationName, history, onboardingState, provenanceRecords, connections] =
+      await Promise.all([
+        getDashboardData(body.organizationId),
+        getOrganizationName(body.organizationId),
+        loadConversationHistory(body.conversationId, body.organizationId),
+        getOnboardingState(body.organizationId),
+        getProvenanceForOrg(body.organizationId),
+        getOrganizationConnections(body.organizationId),
+      ]);
+
+    const connectedSources = connections
+      .filter((c) => c.status === "connected")
+      .map((c) => c.provider);
 
     const insights = await generateAdvisorInsights({
       organizationName,
       department: body.department,
       dashboard,
       onboardingProfile: onboardingState.profile,
+      provenanceRecords: provenanceRecords.map((p) => ({
+        source: p.source,
+        sourceType: p.sourceType,
+        connectorId: p.connectorId,
+        fileName: p.fileName,
+        period: p.periodEnd ?? p.periodStart,
+        syncedAt: p.syncedAt,
+        uploadedAt: p.uploadedAt,
+        category: p.category,
+        confidence: p.confidence,
+      })),
+      connectedSources,
       userMessage: body.message,
       conversationHistory: history,
     });

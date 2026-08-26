@@ -215,3 +215,27 @@ describe("tenant isolation contract", () => {
     assert.equal(plaid.status, "disconnected");
   });
 });
+
+describe("connector registry", () => {
+  it("has zero false-live connectors (live flag requires configured)", async () => {
+    const { CONNECTOR_REGISTRY } = await import("../src/lib/connectors/registry.js");
+    const falseLive = CONNECTOR_REGISTRY.filter((c) => c.isProductionLive && !c.isConfigured);
+    assert.equal(falseLive.length, 0, `false-live: ${falseLive.map((c) => c.id).join(", ")}`);
+  });
+
+  it("marks upload connectors as production live", async () => {
+    const { CONNECTOR_REGISTRY } = await import("../src/lib/connectors/registry.js");
+    const csv = CONNECTOR_REGISTRY.find((c) => c.id === "csv");
+    const pdf = CONNECTOR_REGISTRY.find((c) => c.id === "pdf");
+    assert.ok(csv?.isProductionLive);
+    assert.ok(pdf?.isProductionLive);
+  });
+
+  it("native connectors require provider approval", async () => {
+    const { CONNECTOR_REGISTRY } = await import("../src/lib/connectors/registry.js");
+    const qbo = CONNECTOR_REGISTRY.find((c) => c.id === "quickbooks");
+    assert.ok(qbo);
+    assert.equal(qbo.isProductionLive, false);
+    assert.equal(qbo.requiresProviderApproval, true);
+  });
+});
