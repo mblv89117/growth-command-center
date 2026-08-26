@@ -212,7 +212,7 @@ export default function FinancialsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Recent Transactions</CardTitle>
-              <CardDescription>Synced from QuickBooks Online and Plaid</CardDescription>
+              <CardDescription>Recent tenant transactions</CardDescription>
             </CardHeader>
             <CardContent>
               <DataTable

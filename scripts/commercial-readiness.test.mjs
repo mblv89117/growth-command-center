@@ -1456,3 +1456,40 @@ describe("leftover financials-page invented MetricCard change={12.4} honesty", (
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover financials-page invented QBO/Plaid sync claim honesty", () => {
+  const page = fs.readFileSync(
+    new URL("../src/app/(dashboard)/financials/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  it("does not invent leftover Synced from QuickBooks Online and Plaid on the financials page", () => {
+    assert.equal(page.includes("Synced from QuickBooks Online and Plaid"), false);
+    assert.equal(page.includes("QuickBooks Online and Plaid"), false);
+    assert.equal(page.includes("Synced from QuickBooks"), false);
+    assert.match(page, /<CardTitle>Recent Transactions<\/CardTitle>/);
+    assert.match(page, /<CardDescription>Recent tenant transactions<\/CardDescription>/);
+  });
+
+  it("keeps pinned Apex snapshot and alerts SOURCE-DERIVED after leftover sync-claim honesty", () => {
+    assert.equal(apexPinnedCashUnchanged(), true);
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+    assert.equal(apex.alerts.length, 7);
+    const growth = KPIS.find((kpi) => kpi.id === "kpi-1");
+    assert.ok(growth);
+    assert.equal(growth.value, 12.4);
+  });
+
+  it("empty tenant still has no Apex leak after leftover financials sync-claim honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
