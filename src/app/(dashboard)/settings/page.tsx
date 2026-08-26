@@ -298,7 +298,7 @@ export default function SettingsPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-xl font-bold capitalize">{organization.plan} Plan</h3>
-                    <Badge>Active</Badge>
+                    <Badge>{`Selected plan for ${organization.name}`}</Badge>
                   </div>
                   <p className="mt-1 text-muted-foreground">
                     ${currentPlan.price / 100}/month
