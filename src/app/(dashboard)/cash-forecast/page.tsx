@@ -7,6 +7,7 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { ForecastInsightBanner } from "@/components/forecast/forecast-insight-banner";
 import { useTenantData } from "@/hooks/use-tenant-data";
 import { useTenant } from "@/lib/tenant/context";
 import { isCashRiskPeriod } from "@/lib/forecast/compute";
@@ -87,6 +88,7 @@ export default function CashForecastPage() {
         title="Cash Forecast"
         description="13-week rolling cash forecast with scenario analysis"
       />
+      <ForecastInsightBanner />
       <DataSourceBanner source={source} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

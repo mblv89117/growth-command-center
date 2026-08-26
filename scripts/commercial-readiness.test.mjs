@@ -30,8 +30,10 @@ import {
   resolveCashAlertThreshold,
 } from "../src/lib/data/organizations";
 import {
+  forecastBannerDoesNotInventFinancials,
   founderJourneyDoesNotInventFinancials,
   importHandoffDoesNotInventFinancials,
+  resolveForecastInsightBanner,
   resolveFounderJourney,
   resolveImportSuccessHandoff,
 } from "../src/lib/journey/founder";
@@ -1212,6 +1214,65 @@ describe("import-success forecast/dashboard insight handoff", () => {
     assert.equal(JSON.stringify(valueCreation).includes("487250"), false);
     assert.equal("currentCash" in (valueCreation ?? {}), false);
     assert.equal(importHandoffDoesNotInventFinancials(handoff), true);
+  });
+});
+
+describe("forecast-page import-success insight banner", () => {
+  it("shows remaining insight destinations after landing on cash-forecast", () => {
+    const banner = resolveForecastInsightBanner({
+      organizationId: "org-hvcg",
+      onboardingComplete: true,
+      dataProvenance: "imported",
+    });
+    assert.equal(banner.status, "import_success");
+    assert.deepEqual(
+      banner.destinations.map((d) => d.href),
+      ["/dashboard", "/value-creation"],
+    );
+    assert.equal(banner.destinations.some((d) => d.href === "/cash-forecast"), false);
+    assert.equal(banner.inventedFinancialValues, false);
+    assert.equal(forecastBannerDoesNotInventFinancials(banner), true);
+    assert.equal("currentCash" in banner, false);
+    assert.equal(JSON.stringify(banner).includes("487250"), false);
+  });
+
+  it("hands computed SOURCE-DERIVED workspace to the same remaining destinations", () => {
+    const banner = resolveForecastInsightBanner({
+      organizationId: "org-summit",
+      onboardingComplete: true,
+      dataProvenance: "computed",
+    });
+    assert.equal(banner.status, "import_success");
+    assert.equal(banner.destinations.length, 2);
+    assert.equal(banner.destinations[0].href, "/dashboard");
+    assert.equal(banner.destinations[1].href, "/value-creation");
+    assert.equal(forecastBannerDoesNotInventFinancials(banner), true);
+  });
+
+  it("does not show the forecast banner for an empty tenant", () => {
+    const banner = resolveForecastInsightBanner({
+      organizationId: "org-acme-services",
+      onboardingComplete: true,
+      dataProvenance: "empty",
+    });
+    assert.equal(banner.status, "not_ready");
+    assert.deepEqual(banner.destinations, []);
+    assert.equal(forecastBannerDoesNotInventFinancials(banner), true);
+    assert.equal(JSON.stringify(banner).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(banner).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(banner).includes("487250"), false);
+  });
+
+  it("does not claim commercial import-success on the forecast page for Apex demo", () => {
+    const banner = resolveForecastInsightBanner({
+      organizationId: APEX_DEMO_ORGANIZATION_ID,
+      onboardingComplete: true,
+      dataProvenance: "imported",
+    });
+    assert.equal(banner.status, "demo_seeded");
+    assert.deepEqual(banner.destinations, []);
+    assert.equal(JSON.stringify(banner).includes("487250"), false);
+    assert.equal(apexPinnedCashUnchanged(), true);
   });
 });
 

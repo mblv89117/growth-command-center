@@ -164,3 +164,40 @@ export function importHandoffDoesNotInventFinancials(handoff: ImportSuccessHando
     !("forecastedCash" in handoff)
   );
 }
+
+export type ForecastInsightBannerStatus = ImportSuccessHandoffStatus;
+
+export interface ForecastInsightBanner {
+  status: ForecastInsightBannerStatus;
+  destinations: InsightDestination[];
+  inventedFinancialValues: false;
+}
+
+/**
+ * Forecast-page import-success banner. Same honesty rules as the import handoff,
+ * but omits /cash-forecast because the founder is already on that page.
+ */
+export function resolveForecastInsightBanner(input: FounderJourneyInput): ForecastInsightBanner {
+  const handoff = resolveImportSuccessHandoff(input);
+  if (handoff.status !== "import_success") {
+    return {
+      status: handoff.status,
+      destinations: [],
+      inventedFinancialValues: false,
+    };
+  }
+
+  return {
+    status: "import_success",
+    destinations: handoff.destinations.filter((destination) => destination.href !== "/cash-forecast"),
+    inventedFinancialValues: false,
+  };
+}
+
+export function forecastBannerDoesNotInventFinancials(banner: ForecastInsightBanner): boolean {
+  return (
+    banner.inventedFinancialValues === false &&
+    !("currentCash" in banner) &&
+    !("forecastedCash" in banner)
+  );
+}
