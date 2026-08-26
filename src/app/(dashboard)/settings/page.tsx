@@ -238,7 +238,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Alert Thresholds</CardTitle>
-              <CardDescription>Configure when financial alerts are triggered</CardDescription>
+              <CardDescription>{`Alert thresholds for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
