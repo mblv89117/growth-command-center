@@ -155,8 +155,38 @@ export function PageHeader({
   );
 }
 
-export function DataSourceBanner({ source }: { source?: "supabase" | "mock" }) {
-  const label = source === "supabase" ? "Seeded demo data" : "Demo / sample data";
+export function DataSourceBanner({
+  source,
+  dataProvenance,
+}: {
+  source?: "supabase" | "mock";
+  dataProvenance?: "empty" | "imported" | "computed" | "seeded" | "mock";
+}) {
+  const provenance = dataProvenance ?? (source === "supabase" ? "seeded" : "mock");
+
+  if (provenance === "empty") {
+    return (
+      <div className="mb-6 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+        <p className="font-medium">No financial data imported yet</p>
+        <p className="text-muted-foreground">
+          Import a CSV/XLSX snapshot under Integrations to populate your dashboard, forecast, and KPIs.
+        </p>
+      </div>
+    );
+  }
+
+  if (provenance === "imported" || provenance === "computed") {
+    return (
+      <div className="mb-6 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+        <p className="font-medium">Imported / computed data</p>
+        <p className="text-muted-foreground">
+          Figures are derived from your tenant imports and GCC compute pipeline — not live bank feeds unless connected.
+        </p>
+      </div>
+    );
+  }
+
+  const label = provenance === "seeded" ? "Seeded demo data" : "Demo / sample data";
   return (
     <div className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
       <p className="font-medium">{label}</p>

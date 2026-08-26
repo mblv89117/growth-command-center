@@ -4,6 +4,7 @@ import { generateAdvisorInsights } from "@/lib/ai/advisor";
 import { apiErrorResponse } from "@/lib/api/errors";
 import { requireSecureTenantRequest } from "@/lib/api/secure-access";
 import { getDashboardData } from "@/lib/data/dashboard";
+import { getOnboardingState } from "@/lib/onboarding/store";
 import { AI_ADVISOR_RATE_LIMIT } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { organizationIdSchema } from "@/lib/validation/schemas";
@@ -103,16 +104,18 @@ export async function POST(request: Request) {
       },
     });
 
-    const [dashboard, organizationName, history] = await Promise.all([
+    const [dashboard, organizationName, history, onboardingState] = await Promise.all([
       getDashboardData(body.organizationId),
       getOrganizationName(body.organizationId),
       loadConversationHistory(body.conversationId, body.organizationId),
+      getOnboardingState(body.organizationId),
     ]);
 
     const insights = await generateAdvisorInsights({
       organizationName,
       department: body.department,
       dashboard,
+      onboardingProfile: onboardingState.profile,
       userMessage: body.message,
       conversationHistory: history,
     });

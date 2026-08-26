@@ -60,7 +60,7 @@ export default function DashboardPage() {
     );
   }
 
-  const { financialSnapshot, monthlyTrends, alerts, kpis, budgetVsActual, source, deltas, workingCapital, forecastVariancePercent } = data;
+  const { financialSnapshot, monthlyTrends, alerts, kpis, budgetVsActual, source, dataProvenance, deltas, workingCapital, forecastVariancePercent } = data;
   const chartTrends = activeMonthlyTrends(monthlyTrends);
   const budgetPeriodLabel = latestTrendMonthLabel(monthlyTrends);
   const criticalAlerts = alerts.filter((a) => !a.isRead && (a.severity === "critical" || a.severity === "high"));
@@ -73,7 +73,13 @@ export default function DashboardPage() {
         actions={
           <div className="flex items-center gap-2">
             <Badge variant="secondary">
-              {source === "supabase" ? "Seeded Demo Data" : "Demo Data"}
+              {dataProvenance === "empty"
+                ? "Awaiting Import"
+                : dataProvenance === "imported" || dataProvenance === "computed"
+                  ? "Your Data"
+                  : dataProvenance === "seeded"
+                    ? "Seeded Demo Data"
+                    : "Demo Data"}
             </Badge>
             <Button asChild>
               <Link href="/cash-forecast">
@@ -84,7 +90,7 @@ export default function DashboardPage() {
         }
       />
 
-      <DataSourceBanner source={source} />
+      <DataSourceBanner source={source} dataProvenance={dataProvenance} />
 
       <OnboardingCta />
 

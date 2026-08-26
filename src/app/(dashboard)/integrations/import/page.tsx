@@ -145,6 +145,16 @@ export default function ImportPage() {
                 setSuccess(null);
               }}
             />
+            <p className="text-xs text-muted-foreground">
+              Download templates:{" "}
+              <a href="/templates/import-template-financial-snapshot.csv" className="text-primary hover:underline" download>
+                financial snapshot CSV
+              </a>
+              {" · "}
+              <a href="/templates/import-template-monthly-trends.csv" className="text-primary hover:underline" download>
+                monthly trends CSV
+              </a>
+            </p>
           </div>
 
           <Button onClick={handlePreview} disabled={!file || loading}>

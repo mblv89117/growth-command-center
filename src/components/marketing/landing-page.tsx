@@ -72,7 +72,7 @@ export function LandingPage() {
             </Button>
           </div>
           <p className="mt-4 text-sm text-muted-foreground">
-            14-day trial · Import CSV/XLSX or connect QuickBooks · No developer required
+            14-day trial · Import CSV/XLSX today · Native accounting connectors coming soon
           </p>
         </section>
 
@@ -104,7 +104,7 @@ export function LandingPage() {
               <h2 className="mb-4 text-2xl font-bold">How to start</h2>
               <ol className="space-y-2 text-muted-foreground">
                 <li>1. Create your workspace (takes 2 minutes)</li>
-                <li>2. Import financial data via CSV/XLSX or connect QuickBooks</li>
+                <li>2. Complete AI onboarding, then import financial data via CSV/XLSX</li>
                 <li>3. Set your KPI targets during guided onboarding</li>
                 <li>4. View your executive dashboard and ask the AI CFO questions</li>
               </ol>
@@ -129,8 +129,9 @@ export function LandingPage() {
               <CardContent className="text-left text-sm text-muted-foreground">
                 <ul className="space-y-1">
                   <li>Executive dashboard & cash forecast</li>
-                  <li>CSV/XLSX import</li>
-                  <li>AI CFO advisor</li>
+              <li>CSV/XLSX import (live today)</li>
+              <li>AI CFO advisor after import</li>
+              <li>Native accounting connectors — coming soon</li>
                   <li>Up to 5 team members</li>
                 </ul>
                 <Button className="mt-4 w-full" asChild>

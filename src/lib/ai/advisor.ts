@@ -7,6 +7,7 @@ import {
 } from "@/lib/ai/kpi-risk";
 import type { DashboardData } from "@/lib/data/dashboard";
 import { computeWorkingCapital } from "@/lib/financial/deltas";
+import type { OnboardingProfile } from "@/lib/onboarding/types";
 import { ServiceUnavailableError } from "@/lib/api/errors";
 
 const ADVISOR_MODEL = "claude-sonnet-4-6";
@@ -15,12 +16,13 @@ export interface AdvisorRequestContext {
   organizationName: string;
   department?: string;
   dashboard: DashboardData;
+  onboardingProfile?: OnboardingProfile;
   userMessage?: string;
   conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
 }
 
 function buildDataContext(context: AdvisorRequestContext): string {
-  const { dashboard, organizationName } = context;
+  const { dashboard, organizationName, onboardingProfile } = context;
   const atRiskKpis = getAtRiskKpis(dashboard.kpis);
   const financialSignals = getFinancialRiskSignals(dashboard.financialSnapshot);
   const priorityAlerts = getPriorityAlerts(dashboard.alerts);
@@ -54,7 +56,13 @@ function buildDataContext(context: AdvisorRequestContext): string {
 
   return `Organization: ${organizationName}
 Data source: ${dashboard.source}
-
+${onboardingProfile ? `
+Onboarding profile (SOURCE-DERIVED from AI onboarding):
+- Industry: ${onboardingProfile.industry ?? "not set"}
+- Company size: ${onboardingProfile.companySize ?? "not set"}
+- Priorities: ${onboardingProfile.priorities.length ? onboardingProfile.priorities.join("; ") : "not set"}
+- Software stack: ${Object.entries(onboardingProfile.software).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(", ") || "not set"}
+` : ""}
 CALCULATED financial snapshot:
 - Current cash: $${dashboard.financialSnapshot.currentCash.toLocaleString()}
 - Forecasted cash (13wk): $${dashboard.financialSnapshot.forecastedCash.toLocaleString()}

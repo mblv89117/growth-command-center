@@ -227,8 +227,17 @@ export function OnboardingChat() {
               </div>
             </form>
           ) : (
-            <div className="border-t border-border/60 p-4">
+            <div className="space-y-3 border-t border-border/60 p-4">
+              <p className="text-sm text-muted-foreground">
+                Onboarding complete. Import your financial data to activate your dashboard, forecast,
+                KPIs, and AI CFO.
+              </p>
               <Button asChild className="w-full">
+                <Link href="/integrations/import">
+                  Import CSV / XLSX <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full">
                 <Link href="/dashboard">
                   Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>

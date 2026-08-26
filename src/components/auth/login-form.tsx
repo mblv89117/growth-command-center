@@ -18,12 +18,14 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setMessage(null);
 
     const supabase = createClient();
     if (!supabase) {
@@ -41,6 +43,34 @@ export function LoginForm() {
 
     router.push(redirect);
     router.refresh();
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError("Enter your email address first.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    const supabase = createClient();
+    if (!supabase) {
+      setError("Supabase is not configured.");
+      setLoading(false);
+      return;
+    }
+
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/auth/callback?next=/login`,
+    });
+
+    if (resetError) {
+      setError(resetError.message);
+    } else {
+      setMessage("Password reset link sent — check your email (and spam folder).");
+    }
+    setLoading(false);
   };
 
   const handleDemoMode = async () => {
@@ -85,6 +115,17 @@ export function LoginForm() {
                 />
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
+              {message && <p className="text-sm text-muted-foreground">{message}</p>}
+              <div className="text-right">
+                <button
+                  type="button"
+                  className="text-sm text-primary hover:underline"
+                  onClick={handleForgotPassword}
+                  disabled={loading}
+                >
+                  Forgot password?
+                </button>
+              </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Sign In

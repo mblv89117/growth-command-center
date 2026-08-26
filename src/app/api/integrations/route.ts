@@ -7,6 +7,10 @@ import { requireApiAccess } from "@/lib/auth/access";
 import { authErrorResponse } from "@/lib/auth/api";
 import { isProduction, isQuickBooksConfigured } from "@/lib/config";
 import { isPlaidConfigured } from "@/lib/integrations/plaid";
+import {
+  FILE_IMPORT_CAPABILITY,
+  normalizeIntegrationForProduction,
+} from "@/lib/integrations/catalog";
 
 const PROVIDER_MAP: Record<string, IntegrationProvider> = {
   "int-1": "quickbooks",
@@ -60,24 +64,40 @@ export async function GET(request: Request) {
             metadata: usableLive.metadata,
             isLive: true,
             connectConfigured,
+            availability: "live",
+            availabilityLabel: "Live",
           };
+        }
+
+        const base = {
+          ...integration,
+          status: "disconnected" as const,
+          lastSync: undefined,
+          connectedAt: undefined,
+          errorMessage: connectConfigured
+            ? undefined
+            : `${integration.name} is not yet available for self-service connection`,
+          isLive: false,
+          connectConfigured,
+        };
+
+        if (isProduction) {
+          return normalizeIntegrationForProduction(base, connectConfigured);
         }
 
         if (LIVE_CONNECT_IDS.has(integration.id)) {
           return {
-            ...integration,
-            status: "disconnected" as const,
-            lastSync: undefined,
-            connectedAt: undefined,
-            errorMessage: connectConfigured
-              ? undefined
-              : `${integration.name} credentials are not configured in this environment`,
-            isLive: false,
-            connectConfigured,
+            ...base,
+            availability: connectConfigured ? "partial" : "coming_soon",
+            availabilityLabel: connectConfigured ? "Partial" : "Coming Soon",
           };
         }
 
-        return { ...integration, isLive: false, connectConfigured: false };
+        return {
+          ...base,
+          availability: "coming_soon",
+          availabilityLabel: "Coming Soon",
+        };
       })
     );
 
@@ -89,8 +109,10 @@ export async function GET(request: Request) {
       integrations,
       connections: visibleConnections.map(sanitizeConnectionForClient),
       capabilities: {
-        quickbooks: { configured: isQuickBooksConfigured() },
-        plaid: { configured: isPlaidConfigured() },
+        fileImport: FILE_IMPORT_CAPABILITY,
+        quickbooks: { configured: isQuickBooksConfigured(), availability: "coming_soon" },
+        plaid: { configured: isPlaidConfigured(), availability: "coming_soon" },
+        nativeConnectorsLive: false,
       },
     });
   } catch (error) {
