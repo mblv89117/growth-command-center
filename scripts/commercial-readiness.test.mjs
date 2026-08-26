@@ -214,4 +214,37 @@ describe("tenant isolation contract", () => {
     assert.equal(qbo.status, "disconnected");
     assert.equal(plaid.status, "disconnected");
   });
+
+  it("does not mark Stripe, Gusto, HubSpot, Sheets, or any catalog item connected for empty tenants", () => {
+    const emptyOrgs = ["org-summit", "org-acme-services", "org-unknown-tenant", "org-hvcg"];
+    const namedConnectors = ["Stripe", "Gusto", "HubSpot", "Google Sheets"];
+
+    for (const orgId of emptyOrgs) {
+      const catalog = getTenantData(orgId).integrations;
+      const connected = catalog.filter((item) => item.status === "connected");
+      assert.equal(connected.length, 0, `${orgId} must not have connected catalog items`);
+
+      for (const name of namedConnectors) {
+        const item = catalog.find((entry) => entry.name === name);
+        assert.ok(item, `${orgId} catalog must include ${name}`);
+        assert.equal(item.status, "disconnected", `${orgId} ${name}`);
+        assert.equal(item.lastSync, undefined, `${orgId} ${name} must not advertise lastSync`);
+      }
+    }
+  });
+
+  it("does not advertise lastGenerated demo dates on empty-tenant reports", () => {
+    const emptyOrgs = ["org-summit", "org-acme-services", "org-unknown-tenant", "org-hvcg"];
+
+    for (const orgId of emptyOrgs) {
+      const reports = getTenantData(orgId).reports;
+      for (const report of reports) {
+        assert.equal(
+          report.lastGenerated,
+          undefined,
+          `${orgId} ${report.id} must not advertise lastGenerated`
+        );
+      }
+    }
+  });
 });
