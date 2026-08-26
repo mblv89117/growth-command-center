@@ -1264,6 +1264,90 @@ describe("leftover KPI catalog cash_runway honesty", () => {
   });
 });
 
+describe("leftover KPI catalog defaultTarget honesty", () => {
+  const inventedDefaults = {
+    revenue_growth: 10,
+    gross_margin: 35,
+    net_margin: 15,
+    ebitda_margin: 20,
+    ar_days: 45,
+    ap_days: 30,
+    opex_ratio: 25,
+    labor_pct: 35,
+  };
+
+  const snapshot = {
+    currentCash: 100000,
+    forecastedCash: 80000,
+    revenueMTD: 200000,
+    revenueYTD: 500000,
+    grossProfit: 80000,
+    netProfit: 40000,
+    operatingExpenses: 50000,
+    accountsReceivable: 60000,
+    accountsPayable: 20000,
+    burnRate: 20000,
+    runway: 5,
+    debtObligations: 0,
+    payrollObligations: 30000,
+    ebitda: 45000,
+  };
+
+  const trends = [
+    { month: "Jan", revenue: 180000, expenses: 120000, profit: 60000, cash: 90000 },
+    { month: "Feb", revenue: 200000, expenses: 130000, profit: 70000, cash: 100000 },
+  ];
+
+  it("does not invent leftover catalog defaultTargets", () => {
+    for (const [key, invented] of Object.entries(inventedDefaults)) {
+      const def = KPI_CATALOG.find((kpi) => kpi.key === key);
+      assert.ok(def, key);
+      assert.equal(def.defaultTarget, undefined, `${key} defaultTarget`);
+      assert.notEqual(def.defaultTarget, invented, `${key} invented ${invented}`);
+    }
+
+    const kpis = computeKpis({ snapshot, trends }, Object.keys(inventedDefaults));
+    for (const [key, invented] of Object.entries(inventedDefaults)) {
+      const kpi = kpis.find((row) => row.key === key);
+      assert.ok(kpi, key);
+      assert.equal(kpi.target, undefined, `${key} target`);
+      assert.notEqual(kpi.target, invented, `${key} invented target ${invented}`);
+    }
+  });
+
+  it("applies owner leftover catalog targets only", () => {
+    const ownerTargets = {
+      revenue_growth: 12,
+      gross_margin: 28,
+      net_margin: 8,
+      ebitda_margin: 18,
+      ar_days: 40,
+      ap_days: 25,
+      opex_ratio: 22,
+      labor_pct: 18,
+    };
+    const kpis = computeKpis({ snapshot, trends }, Object.keys(ownerTargets), ownerTargets);
+    for (const [key, owner] of Object.entries(ownerTargets)) {
+      const kpi = kpis.find((row) => row.key === key);
+      assert.ok(kpi, key);
+      assert.equal(kpi.target, owner, `${key} owner target`);
+      assert.notEqual(kpi.target, inventedDefaults[key], `${key} must not fall back to invented default`);
+    }
+  });
+
+  it("imported empty-tenant compute does not seed invented catalog targets", () => {
+    const imported = applyImportedFinancials("org-summit", snapshot, trends);
+    for (const [key, invented] of Object.entries(inventedDefaults)) {
+      const kpi = imported.kpis.find((row) => row.id === key);
+      assert.ok(kpi, key);
+      assert.equal(kpi.target, undefined, `${key} imported target`);
+      assert.notEqual(kpi.target, invented, `${key} imported invented ${invented}`);
+    }
+    assert.equal(JSON.stringify(imported).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(imported).includes("Apex Construction"), false);
+  });
+});
+
 describe("tenant slug", () => {
   it("slugifies company names", () => {
     assert.equal(slugifyCompanyName("Acme Services LLC"), "acme-services-llc");
