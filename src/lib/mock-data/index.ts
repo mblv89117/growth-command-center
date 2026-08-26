@@ -321,6 +321,10 @@ export const EMPTY_FINANCIAL_SNAPSHOT: FinancialSnapshot = {
   ebitda: 0,
 };
 
+/**
+ * Unknown mock orgs are fail-closed. Do not invent cashAlertThreshold = 150000.
+ * org-apex pinned demo settings remain SOURCE-DERIVED on ORGANIZATIONS.
+ */
 function organizationForId(organizationId: string): Organization {
   return (
     ORGANIZATIONS.find((o) => o.id === organizationId) ?? {
@@ -331,7 +335,7 @@ function organizationForId(organizationId: string): Organization {
       plan: "starter",
       createdAt: new Date().toISOString().slice(0, 10),
       settings: {
-        cashAlertThreshold: 150000,
+        cashAlertThreshold: 0,
         forecastHorizonWeeks: 13,
         fiscalYearStart: 1,
         currency: "USD",
