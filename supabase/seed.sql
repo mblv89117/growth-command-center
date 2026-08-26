@@ -41,19 +41,20 @@ INSERT INTO budget_vs_actual (organization_id, category, budget, actual, varianc
   ('org-apex', 'Payroll', 186000, 186400, -400, -0.2)
 ON CONFLICT (organization_id, category) DO NOTHING;
 
+-- Do not invent leftover org-apex seed.sql KPI targets 10/32/12/45/40/35/30/28/24/1.5/6. Owner-set targets remain SOURCE-DERIVED.
 INSERT INTO kpis (organization_id, kpi_key, name, value, unit, change, change_label, target) VALUES
-  ('org-apex', 'revenue_growth', 'Revenue Growth', 12.4, 'percent', 2.1, 'vs last month', 10),
-  ('org-apex', 'gross_margin', 'Gross Margin', 35.9, 'percent', -1.2, 'vs last month', 32),
-  ('org-apex', 'net_margin', 'Net Margin', 13.0, 'percent', 0.8, 'vs last month', 12),
-  ('org-apex', 'cash_conversion', 'Cash Conversion Cycle', 42, 'days', -3, 'vs last quarter', 45),
-  ('org-apex', 'ar_days', 'AR Days', 48, 'days', 5, 'vs last month', 40),
-  ('org-apex', 'ap_days', 'AP Days', 32, 'days', -2, 'vs last month', 35),
-  ('org-apex', 'close_rate', 'Sales Close Rate', 34, 'percent', 4, 'vs last quarter', 30),
+  ('org-apex', 'revenue_growth', 'Revenue Growth', 12.4, 'percent', 2.1, 'vs last month', NULL),
+  ('org-apex', 'gross_margin', 'Gross Margin', 35.9, 'percent', -1.2, 'vs last month', NULL),
+  ('org-apex', 'net_margin', 'Net Margin', 13.0, 'percent', 0.8, 'vs last month', NULL),
+  ('org-apex', 'cash_conversion', 'Cash Conversion Cycle', 42, 'days', -3, 'vs last quarter', NULL),
+  ('org-apex', 'ar_days', 'AR Days', 48, 'days', 5, 'vs last month', NULL),
+  ('org-apex', 'ap_days', 'AP Days', 32, 'days', -2, 'vs last month', NULL),
+  ('org-apex', 'close_rate', 'Sales Close Rate', 34, 'percent', 4, 'vs last quarter', NULL),
   ('org-apex', 'avg_deal', 'Average Deal Size', 1420000, 'currency', 8.5, 'vs last quarter', NULL),
-  ('org-apex', 'job_profit', 'Job Profitability', 26.8, 'percent', -2.4, 'vs estimate', 28),
-  ('org-apex', 'opex_ratio', 'Operating Expense Ratio', 22.9, 'percent', -0.5, 'vs last month', 24),
-  ('org-apex', 'dscr', 'Debt Service Coverage', 1.8, 'number', -0.2, 'vs last quarter', 1.5),
-  ('org-apex', 'runway', 'Runway', 3.4, 'number', -0.3, 'months', 6),
+  ('org-apex', 'job_profit', 'Job Profitability', 26.8, 'percent', -2.4, 'vs estimate', NULL),
+  ('org-apex', 'opex_ratio', 'Operating Expense Ratio', 22.9, 'percent', -0.5, 'vs last month', NULL),
+  ('org-apex', 'dscr', 'Debt Service Coverage', 1.8, 'number', -0.2, 'vs last quarter', NULL),
+  ('org-apex', 'runway', 'Runway', 3.4, 'number', -0.3, 'months', NULL),
   ('org-apex', 'ebitda', 'EBITDA', 1125600, 'currency', 15.2, 'vs last month', NULL)
 ON CONFLICT (organization_id, kpi_key) DO NOTHING;
 
