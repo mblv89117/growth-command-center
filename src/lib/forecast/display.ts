@@ -1,3 +1,4 @@
+import { isCashRiskPeriod } from "@/lib/forecast/compute";
 import { getScenarioMultiplier } from "@/lib/forecast-engine";
 import type { CashForecastWeek, ScenarioType } from "@/lib/types";
 
@@ -20,7 +21,8 @@ export interface WeeklyForecastDisplay {
  */
 export function applyForecastScenario(
   weeks: CashForecastWeek[],
-  type: ScenarioType
+  type: ScenarioType,
+  ownerCashAlertThreshold?: number | null
 ): CashForecastWeek[] {
   if (!Array.isArray(weeks) || weeks.length === 0) return [];
 
@@ -38,7 +40,7 @@ export function applyForecastScenario(
       startingBalance,
       inflows,
       endingBalance,
-      isRiskPeriod: endingBalance < 150000,
+      isRiskPeriod: isCashRiskPeriod(endingBalance, ownerCashAlertThreshold),
     };
   });
 }
@@ -88,7 +90,10 @@ export function summarizeWeeklyForecastDisplay(
     endingWeek13,
     minCash,
     riskWeekCount,
-    riskCopy: `${riskWeekCount} risk period${riskWeekCount !== 1 ? "s" : ""} identified below $150K threshold`,
+    riskCopy:
+      riskWeekCount > 0
+        ? `${riskWeekCount} risk period${riskWeekCount !== 1 ? "s" : ""} identified from SOURCE-DERIVED negative cash or owner cash-alert target`
+        : "No cash-risk periods identified from SOURCE-DERIVED negative cash or owner cash-alert target",
     emptyStateCopy: "",
   };
 }

@@ -4,6 +4,8 @@ import {
   generateDeterministicWeeklyForecast,
   buildForecastInputFromSnapshot,
   hasExplicitWeeklyDrivers,
+  isCashRiskPeriod,
+  aggregateMonthlyForecast,
 } from "../src/lib/forecast/compute";
 import {
   applyForecastScenario,
@@ -201,6 +203,7 @@ describe("cash forecast empty-state honesty", () => {
     assert.equal(metricOrInsufficient(display.endingWeek13), INSUFFICIENT_DATA);
     assert.equal(metricOrInsufficient(display.minCash), 130000);
     assert.match(display.riskCopy, /2 risk periods identified/);
+    assert.doesNotMatch(display.riskCopy, /\$150K|150000/);
     assert.equal(calculateMinimumCash(weeks), 130000);
 
     const best = applyForecastScenario(weeks, "best");
@@ -971,6 +974,152 @@ describe("AI CFO leftover kpi-risk honesty", () => {
     assert.equal(assessment.level, "red");
     assert.match(assessment.reason, /20 vs 40/);
     assert.doesNotMatch(assessment.reason, /0\.25|1\.5|thin relative/);
+  });
+});
+
+describe("forecast leftover endingBalance honesty", () => {
+  const explicitDrivers = {
+    startingCash: 200000,
+    receivables: 0,
+    sales: 10000,
+    recurringRevenue: 0,
+    oneTimeRevenue: 0,
+    payroll: 5000,
+    rent: 0,
+    subcontractors: 0,
+    materials: 0,
+    operatingExpenses: 0,
+    loanPayments: 0,
+    taxes: 0,
+    ownerDistributions: 0,
+    capex: 0,
+  };
+
+  it("does not invent endingBalance < 150000 as a cash-risk rule", () => {
+    assert.equal(isCashRiskPeriod(149999), false);
+    assert.equal(isCashRiskPeriod(149999, null), false);
+    assert.equal(isCashRiskPeriod(149999, 0), false);
+
+    const weeks = generateDeterministicWeeklyForecast(explicitDrivers, 2);
+    assert.equal(weeks.length, 2);
+    assert.equal(
+      weeks.some((week) => week.endingBalance < 150000 && week.endingBalance >= 0 && week.isRiskPeriod),
+      false
+    );
+
+    const months = aggregateMonthlyForecast([
+      {
+        week: 1,
+        weekStart: "2026-01-05",
+        weekEnd: "2026-01-11",
+        startingBalance: 200000,
+        inflows: 10000,
+        outflows: 80000,
+        endingBalance: 130000,
+        isRiskPeriod: false,
+      },
+    ]);
+    assert.equal(months[0].endingBalance, 130000);
+    assert.equal(months[0].isRiskPeriod, false);
+
+    const scenario = applyForecastScenario(
+      [
+        {
+          week: 1,
+          weekStart: "2026-01-05",
+          weekEnd: "2026-01-11",
+          startingBalance: 140000,
+          inflows: 10000,
+          outflows: 20000,
+          endingBalance: 130000,
+          isRiskPeriod: false,
+        },
+      ],
+      "worst"
+    );
+    assert.equal(scenario.length, 1);
+    assert.equal(scenario[0].endingBalance < 150000, true);
+    assert.equal(scenario[0].isRiskPeriod, scenario[0].endingBalance < 0);
+
+    const display = summarizeWeeklyForecastDisplay(weeks);
+    assert.doesNotMatch(display.riskCopy, /\$150K|150000|150K threshold/);
+    assert.equal(JSON.stringify(weeks).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(months).includes("Apex Construction"), false);
+  });
+
+  it("keeps SOURCE-DERIVED negative cash and owner cash-alert target paths", () => {
+    assert.equal(isCashRiskPeriod(-1), true);
+    assert.equal(isCashRiskPeriod(90000, 100000), true);
+    assert.equal(isCashRiskPeriod(110000, 100000), false);
+
+    const ownerWeeks = generateDeterministicWeeklyForecast(explicitDrivers, 2, 1, 1000000);
+    assert.equal(ownerWeeks.length, 2);
+    assert.equal(
+      ownerWeeks.every((week) => week.isRiskPeriod === week.endingBalance < 1000000),
+      true
+    );
+
+    const negativeMonths = aggregateMonthlyForecast(
+      [
+        {
+          week: 1,
+          weekStart: "2026-01-05",
+          weekEnd: "2026-01-11",
+          startingBalance: 10000,
+          inflows: 0,
+          outflows: 20000,
+          endingBalance: -10000,
+          isRiskPeriod: true,
+        },
+      ]
+    );
+    assert.equal(negativeMonths[0].isRiskPeriod, true);
+
+    const ownerMonths = aggregateMonthlyForecast(
+      [
+        {
+          week: 1,
+          weekStart: "2026-01-05",
+          weekEnd: "2026-01-11",
+          startingBalance: 200000,
+          inflows: 10000,
+          outflows: 80000,
+          endingBalance: 130000,
+          isRiskPeriod: false,
+        },
+      ],
+      150000
+    );
+    assert.equal(ownerMonths[0].isRiskPeriod, true);
+
+    const ownerScenario = applyForecastScenario(
+      [
+        {
+          week: 1,
+          weekStart: "2026-01-05",
+          weekEnd: "2026-01-11",
+          startingBalance: 140000,
+          inflows: 10000,
+          outflows: 20000,
+          endingBalance: 130000,
+          isRiskPeriod: false,
+        },
+      ],
+      "worst",
+      200000
+    );
+    assert.equal(ownerScenario[0].isRiskPeriod, ownerScenario[0].endingBalance < 200000);
+  });
+
+  it("empty tenant still has no invented 150000 forecast risk", () => {
+    const empty = getTenantData("org-summit");
+    const display = summarizeWeeklyForecastDisplay(empty.cashForecastWeeks);
+    assert.deepEqual(empty.cashForecastWeeks, []);
+    assert.equal(display.provenance, INSUFFICIENT_DATA);
+    assert.equal(display.riskWeekCount, 0);
+    assert.doesNotMatch(display.riskCopy, /\$150K|150000/);
+    assert.equal(JSON.stringify(empty).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(empty).includes("Apex Construction"), false);
   });
 });
 

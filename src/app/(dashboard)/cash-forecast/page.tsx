@@ -86,11 +86,7 @@ export default function CashForecastPage() {
         <MetricCard
           title="Ending Cash (Wk 13)"
           value={endingWeek13}
-          variant={
-            typeof display.minCash === "number" && display.minCash < 150000
-              ? "warning"
-              : "default"
-          }
+          variant={display.riskWeekCount > 0 ? "warning" : "default"}
         />
         <MetricCard
           title="Minimum Cash Point"
