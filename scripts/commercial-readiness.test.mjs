@@ -36,6 +36,8 @@ import {
   resolveForecastInsightBanner,
   resolveFounderJourney,
   resolveImportSuccessHandoff,
+  resolveValueCreationInsightBanner,
+  valueCreationBannerDoesNotInventFinancials,
 } from "../src/lib/journey/founder";
 
 describe("forecast compute", () => {
@@ -1265,6 +1267,65 @@ describe("forecast-page import-success insight banner", () => {
 
   it("does not claim commercial import-success on the forecast page for Apex demo", () => {
     const banner = resolveForecastInsightBanner({
+      organizationId: APEX_DEMO_ORGANIZATION_ID,
+      onboardingComplete: true,
+      dataProvenance: "imported",
+    });
+    assert.equal(banner.status, "demo_seeded");
+    assert.deepEqual(banner.destinations, []);
+    assert.equal(JSON.stringify(banner).includes("487250"), false);
+    assert.equal(apexPinnedCashUnchanged(), true);
+  });
+});
+
+describe("value-creation-page import-success insight banner", () => {
+  it("shows remaining insight destinations after landing on value-creation", () => {
+    const banner = resolveValueCreationInsightBanner({
+      organizationId: "org-hvcg",
+      onboardingComplete: true,
+      dataProvenance: "imported",
+    });
+    assert.equal(banner.status, "import_success");
+    assert.deepEqual(
+      banner.destinations.map((d) => d.href),
+      ["/cash-forecast", "/dashboard"],
+    );
+    assert.equal(banner.destinations.some((d) => d.href === "/value-creation"), false);
+    assert.equal(banner.inventedFinancialValues, false);
+    assert.equal(valueCreationBannerDoesNotInventFinancials(banner), true);
+    assert.equal("currentCash" in banner, false);
+    assert.equal(JSON.stringify(banner).includes("487250"), false);
+  });
+
+  it("hands computed SOURCE-DERIVED workspace to the same remaining destinations", () => {
+    const banner = resolveValueCreationInsightBanner({
+      organizationId: "org-summit",
+      onboardingComplete: true,
+      dataProvenance: "computed",
+    });
+    assert.equal(banner.status, "import_success");
+    assert.equal(banner.destinations.length, 2);
+    assert.equal(banner.destinations[0].href, "/cash-forecast");
+    assert.equal(banner.destinations[1].href, "/dashboard");
+    assert.equal(valueCreationBannerDoesNotInventFinancials(banner), true);
+  });
+
+  it("does not show the value-creation banner for an empty tenant", () => {
+    const banner = resolveValueCreationInsightBanner({
+      organizationId: "org-acme-services",
+      onboardingComplete: true,
+      dataProvenance: "empty",
+    });
+    assert.equal(banner.status, "not_ready");
+    assert.deepEqual(banner.destinations, []);
+    assert.equal(valueCreationBannerDoesNotInventFinancials(banner), true);
+    assert.equal(JSON.stringify(banner).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(banner).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(banner).includes("487250"), false);
+  });
+
+  it("does not claim commercial import-success on value-creation for Apex demo", () => {
+    const banner = resolveValueCreationInsightBanner({
       organizationId: APEX_DEMO_ORGANIZATION_ID,
       onboardingComplete: true,
       dataProvenance: "imported",
