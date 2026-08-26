@@ -830,3 +830,69 @@ describe("leftover Apex demo KPI targets 32/12/45/40/35/30/28/24/1.5 honesty", (
     assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
   });
 });
+
+describe("leftover seed.sql org-apex KPI target honesty", () => {
+  const seedSql = fs.readFileSync(new URL("../supabase/seed.sql", import.meta.url), "utf8");
+  const executable = seedSql
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("--"))
+    .join("\n");
+  const invented = [10, 32, 12, 45, 40, 35, 30, 28, 24, 1.5, 6];
+
+  it("does not invent leftover seed.sql org-apex KPI targets 10/32/12/45/40/35/30/28/24/1.5/6", () => {
+    assert.match(executable, /\('org-apex', 'revenue_growth', 'Revenue Growth', 12\.4, 'percent', 2\.1, 'vs last month', NULL\)/);
+    assert.match(executable, /\('org-apex', 'gross_margin', 'Gross Margin', 35\.9, 'percent', -1\.2, 'vs last month', NULL\)/);
+    assert.match(executable, /\('org-apex', 'net_margin', 'Net Margin', 13\.0, 'percent', 0\.8, 'vs last month', NULL\)/);
+    assert.match(executable, /\('org-apex', 'cash_conversion', 'Cash Conversion Cycle', 42, 'days', -3, 'vs last quarter', NULL\)/);
+    assert.match(executable, /\('org-apex', 'ar_days', 'AR Days', 48, 'days', 5, 'vs last month', NULL\)/);
+    assert.match(executable, /\('org-apex', 'ap_days', 'AP Days', 32, 'days', -2, 'vs last month', NULL\)/);
+    assert.match(executable, /\('org-apex', 'close_rate', 'Sales Close Rate', 34, 'percent', 4, 'vs last quarter', NULL\)/);
+    assert.match(executable, /\('org-apex', 'job_profit', 'Job Profitability', 26\.8, 'percent', -2\.4, 'vs estimate', NULL\)/);
+    assert.match(executable, /\('org-apex', 'opex_ratio', 'Operating Expense Ratio', 22\.9, 'percent', -0\.5, 'vs last month', NULL\)/);
+    assert.match(executable, /\('org-apex', 'dscr', 'Debt Service Coverage', 1\.8, 'number', -0\.2, 'vs last quarter', NULL\)/);
+    assert.match(executable, /\('org-apex', 'runway', 'Runway', 3\.4, 'number', -0\.3, 'months', NULL\)/);
+    assert.doesNotMatch(executable, /'vs last month', 10\)/);
+    assert.doesNotMatch(executable, /'vs last month', 32\)/);
+    assert.doesNotMatch(executable, /'vs last month', 12\)/);
+    assert.doesNotMatch(executable, /'vs last quarter', 45\)/);
+    assert.doesNotMatch(executable, /'vs last month', 40\)/);
+    assert.doesNotMatch(executable, /'vs last month', 35\)/);
+    assert.doesNotMatch(executable, /'vs last quarter', 30\)/);
+    assert.doesNotMatch(executable, /'vs estimate', 28\)/);
+    assert.doesNotMatch(executable, /'vs last month', 24\)/);
+    assert.doesNotMatch(executable, /'vs last quarter', 1\.5\)/);
+    assert.doesNotMatch(executable, /'months', 6\)/);
+    for (const value of invented) {
+      assert.doesNotMatch(
+        executable,
+        new RegExp(`'org-apex', '[^']+', '[^']+', [^,]+, '[^']+', [^,]+, '[^']+', ${String(value).replace(".", "\\.")}\\)`)
+      );
+    }
+  });
+
+  it("keeps owner-set leftover seed.sql KPI targets SOURCE-DERIVED", () => {
+    assert.equal(resolveKpiTarget(10), 10);
+    assert.equal(resolveKpiTarget("32"), 32);
+    assert.equal(resolveKpiTarget(6), 6);
+    assert.equal(resolveKpiTarget(1.5), 1.5);
+    assert.equal(resolveKpiTarget(undefined), undefined);
+    assert.equal(resolveKpiTarget(null), undefined);
+    assert.equal(resolveKpiTarget(0), undefined);
+  });
+
+  it("empty tenant still has no Apex leak after leftover seed.sql KPI target honesty", () => {
+    const summit = getTenantData("org-summit");
+    const provisioned = getTenantData("org-acme-services");
+    const apex = getTenantData(APEX_DEMO_ORGANIZATION_ID);
+
+    assert.equal(apex.organization.settings.cashAlertThreshold, 150000);
+    assert.equal(apex.financialSnapshot.currentCash, FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(summit.kpis.length, 0);
+    assert.equal(provisioned.kpis.length, 0);
+    assert.equal(summit.financialSnapshot.currentCash, EMPTY_FINANCIAL_SNAPSHOT.currentCash);
+    assert.equal(provisioned.financialSnapshot.currentCash, 0);
+    assert.equal(JSON.stringify(provisioned).includes("Harbor View"), false);
+    assert.equal(JSON.stringify(provisioned).includes("Apex Construction"), false);
+    assert.equal(JSON.stringify(summit).includes("Apex Construction"), false);
+  });
+});
