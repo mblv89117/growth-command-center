@@ -109,7 +109,7 @@ export default function SettingsPage() {
     <div>
       <PageHeader
         title="Settings"
-        description="Organization settings, forecast assumptions, thresholds, and billing"
+        description={`Settings for ${organization.name}`}
       />
 
       {!canManageSettings && (
@@ -144,7 +144,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Organization Profile</CardTitle>
-              <CardDescription>Basic information about your company</CardDescription>
+              <CardDescription>{`Organization profile for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -187,7 +187,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Forecast Settings</CardTitle>
-              <CardDescription>Default assumptions for cash forecasting</CardDescription>
+              <CardDescription>{`Forecast settings for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -203,14 +203,14 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">Include sales pipeline in forecast</p>
-                  <p className="text-sm text-muted-foreground">Weight open deals into revenue projections</p>
+                  <p className="text-sm text-muted-foreground">{`Sales pipeline forecast setting for ${organization.name}`}</p>
                 </div>
                 <Switch defaultChecked />
               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">Include job billing schedule</p>
-                  <p className="text-sm text-muted-foreground">Project cash from active job milestones</p>
+                  <p className="text-sm text-muted-foreground">{`Job billing schedule setting for ${organization.name}`}</p>
                 </div>
                 <Switch defaultChecked />
               </div>
@@ -238,7 +238,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Alert Thresholds</CardTitle>
-              <CardDescription>Configure when financial alerts are triggered</CardDescription>
+              <CardDescription>{`Alert thresholds for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -255,7 +255,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">AR aging alerts</p>
-                  <p className="text-sm text-muted-foreground">Alert when invoices exceed 30 days</p>
+                  <p className="text-sm text-muted-foreground">{`AR aging alert setting for ${organization.name}`}</p>
                 </div>
                 <Switch defaultChecked />
               </div>
@@ -287,7 +287,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Subscription & Billing</CardTitle>
-              <CardDescription>Manage your Growth Command Center plan via Stripe</CardDescription>
+              <CardDescription>{`Billing settings for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent>
               {billingNotice && (
