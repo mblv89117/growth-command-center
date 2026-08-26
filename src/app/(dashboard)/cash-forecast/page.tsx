@@ -191,7 +191,7 @@ export default function CashForecastPage() {
           <Card>
             <CardHeader>
               <CardTitle>Forecast Assumptions</CardTitle>
-              <CardDescription>Inputs driving the cash forecast model</CardDescription>
+              <CardDescription>{`Forecast assumptions for ${organization.name}`}</CardDescription>
             </CardHeader>
             <CardContent>
               <DataTable
