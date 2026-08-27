@@ -314,3 +314,57 @@ describe("domain routing", () => {
     assert.equal(url, `${appUrl}/signup?utm_source=360&utm_campaign=gcc-launch`);
   });
 });
+
+describe("entitlements and billing", () => {
+  it("grants HVCG included access without billing", async () => {
+    const { resolveEntitlement } = await import("../src/lib/entitlements/index.ts");
+    const result = resolveEntitlement({
+      access_type: "hvcg_included",
+      hvcg_engagement_active: true,
+      subscription_status: "active",
+    });
+    assert.equal(result.hasAccess, true);
+    assert.equal(result.showBilling, false);
+    assert.equal(result.accessType, "hvcg_included");
+  });
+
+  it("allows standalone active and trialing subscriptions", async () => {
+    const { resolveEntitlement } = await import("../src/lib/entitlements/index.ts");
+    const active = resolveEntitlement({
+      access_type: "standalone",
+      subscription_status: "active",
+    });
+    const trialing = resolveEntitlement({
+      access_type: "standalone",
+      subscription_status: "trialing",
+    });
+    assert.equal(active.hasAccess, true);
+    assert.equal(trialing.hasAccess, true);
+    assert.equal(active.showBilling, true);
+  });
+
+  it("maps Stripe subscription states to GCC access types", async () => {
+    const { mapStripeSubscriptionStatus } = await import("../src/lib/billing/stripe-sync.ts");
+    assert.equal(mapStripeSubscriptionStatus("active").accessType, "standalone");
+    assert.equal(mapStripeSubscriptionStatus("trialing").accessType, "standalone");
+    assert.equal(mapStripeSubscriptionStatus("canceled").accessType, "inactive");
+    assert.equal(mapStripeSubscriptionStatus("unpaid").hasPaidAccess, false);
+  });
+
+  it("uses standalone starter plan as default commercial price tier", async () => {
+    const { STRIPE_PLANS, STANDALONE_PLAN_KEY } = await import("../src/lib/stripe/config.ts");
+    assert.equal(STANDALONE_PLAN_KEY, "starter");
+    assert.equal(STRIPE_PLANS.starter.price, 14900);
+  });
+
+  it("extracts subscription id from Stripe invoice parent details", async () => {
+    const { getInvoiceSubscriptionId } = await import("../src/lib/billing/stripe-sync.ts");
+    const invoice = {
+      parent: {
+        type: "subscription_details",
+        subscription_details: { subscription: "sub_123" },
+      },
+    };
+    assert.equal(getInvoiceSubscriptionId(invoice), "sub_123");
+  });
+});

@@ -1,5 +1,6 @@
 import { ORGANIZATIONS } from "@/lib/mock-data";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveEntitlement } from "@/lib/entitlements";
 import type { Organization, OrganizationSettings } from "@/lib/types";
 
 const DEFAULT_SETTINGS: OrganizationSettings = {
@@ -15,6 +16,14 @@ function isPlan(value: unknown): value is Organization["plan"] {
 
 export function mapOrganizationRow(row: Record<string, unknown>): Organization {
   const settings = (row.settings as Record<string, unknown> | null) ?? {};
+  const entitlement = resolveEntitlement({
+    access_type: row.access_type as string | null,
+    subscription_status: row.subscription_status as string | null,
+    trial_ends_at: row.trial_ends_at as string | null,
+    hvcg_engagement_active: row.hvcg_engagement_active as boolean | null,
+    plan: row.plan as string | null,
+  });
+
   return {
     id: String(row.id),
     name: String(row.name ?? "Organization"),
@@ -27,6 +36,16 @@ export function mapOrganizationRow(row: Record<string, unknown>): Organization {
       forecastHorizonWeeks: Number(settings.forecastHorizonWeeks ?? DEFAULT_SETTINGS.forecastHorizonWeeks),
       fiscalYearStart: Number(settings.fiscalYearStart ?? DEFAULT_SETTINGS.fiscalYearStart),
       currency: String(settings.currency ?? DEFAULT_SETTINGS.currency),
+    },
+    billing: {
+      accessType: entitlement.accessType,
+      subscriptionStatus: entitlement.subscriptionStatus,
+      trialEndsAt: entitlement.trialEndsAt,
+      hvcgEngagementActive: Boolean(row.hvcg_engagement_active),
+      stripeCustomerId: (row.stripe_customer_id as string | null) ?? null,
+      showBilling: entitlement.showBilling,
+      entitlementReason: entitlement.reason,
+      hasAccess: entitlement.hasAccess,
     },
   };
 }
