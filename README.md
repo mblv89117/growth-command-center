@@ -89,12 +89,27 @@ Open [http://localhost:3000](http://localhost:3000) — click **Enter Demo Mode*
 
 **After setup:**
 
-1. Add API keys to `.env.local` or Vercel
+1. Add API keys to `.env.local` or your hosting platform (Azure Container Apps secrets)
 2. Configure Auth URLs (Site URL + `/auth/callback` redirect)
 3. Configure SMTP for team invites (see Production Deployment)
 4. Create a `platform_admin` user if you need `/admin` access
 
-## Production Deployment (Vercel)
+## Production Deployment (Azure Container Apps)
+
+**Primary hosting:** Azure Container Apps (see `docs/azure-hosting-migration.md`).
+
+```bash
+az login
+./scripts/azure/deploy-infra.sh
+./scripts/azure/build-push-deploy.sh
+ENV_FILE=.env.production ./scripts/azure/configure-secrets.sh
+```
+
+Docker image uses Next.js `standalone` output (`Dockerfile`). CI/CD: `.github/workflows/azure-production.yml`.
+
+### Legacy / rollback (Vercel)
+
+Vercel remains available as rollback until DNS cutover is certified. See `vercel.json` for prior cron config (replaced by `.github/workflows/azure-health-ping.yml` on Azure).
 
 1. Push to GitHub and import the project in [Vercel](https://vercel.com)
 2. Set **required** environment variables (see below)
@@ -111,13 +126,14 @@ These four are **required** for a production-ready deployment:
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client-side Supabase auth |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server admin ops (settings persist, team invites, webhooks) |
-| `NEXT_PUBLIC_APP_URL` | Canonical production URL (OAuth, invite links, Stripe returns) |
+| `NEXT_PUBLIC_APP_URL` | Canonical app URL (`https://app.growthcommandcenter.com`) |
+| `NEXT_PUBLIC_MARKETING_URL` | Marketing apex URL (`https://growthcommandcenter.com`) |
 
 Additional variables for integrations are listed in `.env.example` (QuickBooks, Stripe, Plaid).
 
 ### Demo mode in production
 
-**Leave `ALLOW_DEMO_MODE` unset in Vercel production.**
+**Leave `ALLOW_DEMO_MODE` unset in production** (Azure or Vercel).
 
 Demo mode is disabled automatically when `NODE_ENV=production` unless `ALLOW_DEMO_MODE=true` is explicitly set. Do not enable demo mode in production.
 
@@ -197,7 +213,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SMOKE_BASE_URL/api/auth/demo"
 ### Pre-deploy checklist
 
 - [ ] `supabase/setup.sql` run in Supabase SQL Editor
-- [ ] Core env vars set in Vercel (never commit `.env.local`)
+- [ ] Core env vars set in Azure Container Apps secrets (or Vercel during rollback)
 - [ ] `ALLOW_DEMO_MODE` **not** set in production
 - [ ] Supabase Auth URLs + SMTP configured
 - [ ] `platform_admin` user created (if using `/admin`)

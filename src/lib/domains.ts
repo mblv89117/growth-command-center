@@ -1,4 +1,4 @@
-/** Commercial domain configuration — do not guess DNS; configure in Vercel dashboard */
+/** Commercial domain configuration — configure DNS in GoDaddy; host on Azure Container Apps (see docs/azure-hosting-migration.md) */
 
 export const COMMERCIAL_DOMAIN = "growthcommandcenter.com";
 export const COMMERCIAL_WWW = `www.${COMMERCIAL_DOMAIN}`;

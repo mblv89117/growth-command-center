@@ -1,0 +1,15 @@
+name: Azure Health Ping
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping production health endpoint
+        run: |
+          BASE="${SMOKE_BASE_URL:-https://app.growthcommandcenter.com}"
+          curl -fsS "${BASE}/api/health" | head -c 500

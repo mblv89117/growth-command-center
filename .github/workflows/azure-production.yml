@@ -1,0 +1,269 @@
+name: Azure Production Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-production-deploy
+  cancel-in-progress: false
+
+env:
+  AZURE_RESOURCE_GROUP: rg-gcc-prod
+  AZURE_LOCATION: eastus
+  IMAGE_NAME: gcc-web
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.repository == 'mblv89117/growth-command-center'
+    outputs:
+      acr_name: ${{ steps.infra.outputs.acr_name }}
+      app_name: ${{ steps.infra.outputs.app_name }}
+      fqdn: ${{ steps.infra.outputs.fqdn }}
+      azure_url: ${{ steps.infra.outputs.azure_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Register Azure resource providers
+        run: |
+          set -euo pipefail
+          for ns in \
+            Microsoft.App \
+            Microsoft.ContainerRegistry \
+            Microsoft.OperationalInsights \
+            Microsoft.ManagedIdentity \
+            Microsoft.Resources \
+            Microsoft.Authorization; do
+            state=$(az provider show --namespace "$ns" --query registrationState -o tsv 2>/dev/null || echo "NotRegistered")
+            echo "$ns: $state"
+            if [ "$state" != "Registered" ]; then
+              az provider register --namespace "$ns" --wait
+            fi
+          done
+
+      - name: Ensure resource group
+        run: |
+          if ! az group show --name "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then
+            az group create --name "$AZURE_RESOURCE_GROUP" --location "$AZURE_LOCATION" \
+              --tags product=gcc environment=production
+          fi
+
+      - name: Deploy infrastructure (Bicep)
+        id: infra
+        run: |
+          set -euo pipefail
+          DEPLOY_NAME="gcc-infra-${{ github.run_id }}"
+          az deployment group create \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$DEPLOY_NAME" \
+            --template-file infra/azure/main.bicep \
+            --parameters "@infra/azure/main.parameters.json" \
+            --parameters location="$AZURE_LOCATION" \
+            --output json > /tmp/gcc-infra-out.json
+
+          ACR_NAME=$(jq -r '.properties.outputs.acrName.value' /tmp/gcc-infra-out.json)
+          APP_NAME=$(jq -r '.properties.outputs.containerAppName.value' /tmp/gcc-infra-out.json)
+          FQDN=$(jq -r '.properties.outputs.containerAppFqdn.value' /tmp/gcc-infra-out.json)
+          AZURE_URL=$(jq -r '.properties.outputs.containerAppUrl.value' /tmp/gcc-infra-out.json)
+
+          echo "acr_name=${ACR_NAME}" >> "$GITHUB_OUTPUT"
+          echo "app_name=${APP_NAME}" >> "$GITHUB_OUTPUT"
+          echo "fqdn=${FQDN}" >> "$GITHUB_OUTPUT"
+          echo "azure_url=${AZURE_URL}" >> "$GITHUB_OUTPUT"
+
+          echo "Infrastructure deployed:"
+          echo "  ACR: ${ACR_NAME}"
+          echo "  Container App: ${APP_NAME}"
+          echo "  FQDN: ${FQDN}"
+
+      - name: Login to ACR
+        run: az acr login --name ${{ steps.infra.outputs.acr_name }}
+
+      - name: Build and push Docker image
+        run: |
+          set -euo pipefail
+          TAG="${{ github.sha }}"
+          IMAGE="${{ steps.infra.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:${TAG}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Configure Container App secrets and env
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_STARTER_PRICE_ID: ${{ secrets.STRIPE_STARTER_PRICE_ID }}
+          STRIPE_GROWTH_PRICE_ID: ${{ secrets.STRIPE_GROWTH_PRICE_ID }}
+          STRIPE_ENTERPRISE_PRICE_ID: ${{ secrets.STRIPE_ENTERPRISE_PRICE_ID }}
+          QUICKBOOKS_CLIENT_ID: ${{ secrets.QUICKBOOKS_CLIENT_ID }}
+          QUICKBOOKS_CLIENT_SECRET: ${{ secrets.QUICKBOOKS_CLIENT_SECRET }}
+          QUICKBOOKS_REDIRECT_URI: ${{ secrets.QUICKBOOKS_REDIRECT_URI }}
+          QUICKBOOKS_ENV: ${{ secrets.QUICKBOOKS_ENV }}
+          PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
+          PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
+          PLAID_ENV: ${{ secrets.PLAID_ENV }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+        run: |
+          set -euo pipefail
+          APP="${{ steps.infra.outputs.app_name }}"
+          RG="$AZURE_RESOURCE_GROUP"
+
+          required=(NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY)
+          for key in "${required[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              echo "Missing required GitHub secret: $key" >&2
+              exit 1
+            fi
+          done
+
+          secret_args=()
+          env_args=(
+            "NODE_ENV=production"
+            "PORT=3000"
+            "HOSTNAME=0.0.0.0"
+            "NEXT_PUBLIC_APP_URL=https://app.growthcommandcenter.com"
+            "NEXT_PUBLIC_MARKETING_URL=https://growthcommandcenter.com"
+            "NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}"
+            "NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}"
+          )
+
+          add_secret() {
+            local name="$1"
+            local value="$2"
+            [ -z "$value" ] && return 0
+            secret_args+=("${name}=${value}")
+            env_args+=("${name}=secretref:${name}")
+          }
+
+          add_secret SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY"
+          add_secret ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
+          add_secret STRIPE_SECRET_KEY "$STRIPE_SECRET_KEY"
+          add_secret STRIPE_WEBHOOK_SECRET "$STRIPE_WEBHOOK_SECRET"
+          add_secret STRIPE_STARTER_PRICE_ID "$STRIPE_STARTER_PRICE_ID"
+          add_secret STRIPE_GROWTH_PRICE_ID "$STRIPE_GROWTH_PRICE_ID"
+          add_secret STRIPE_ENTERPRISE_PRICE_ID "$STRIPE_ENTERPRISE_PRICE_ID"
+          add_secret QUICKBOOKS_CLIENT_ID "$QUICKBOOKS_CLIENT_ID"
+          add_secret QUICKBOOKS_CLIENT_SECRET "$QUICKBOOKS_CLIENT_SECRET"
+          add_secret QUICKBOOKS_REDIRECT_URI "$QUICKBOOKS_REDIRECT_URI"
+          add_secret QUICKBOOKS_ENV "$QUICKBOOKS_ENV"
+          add_secret PLAID_CLIENT_ID "$PLAID_CLIENT_ID"
+          add_secret PLAID_SECRET "$PLAID_SECRET"
+          add_secret PLAID_ENV "$PLAID_ENV"
+          add_secret GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
+          add_secret GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
+          add_secret GOOGLE_REDIRECT_URI "$GOOGLE_REDIRECT_URI"
+
+          if [ "${#secret_args[@]}" -gt 0 ]; then
+            az containerapp secret set \
+              --name "$APP" \
+              --resource-group "$RG" \
+              --secrets "${secret_args[@]}"
+          fi
+
+          az containerapp update \
+            --name "$APP" \
+            --resource-group "$RG" \
+            --image "$IMAGE" \
+            --set-env-vars "${env_args[@]}"
+
+      - name: Wait for healthy revision
+        run: |
+          set -euo pipefail
+          APP="${{ steps.infra.outputs.app_name }}"
+          FQDN="${{ steps.infra.outputs.fqdn }}"
+          for i in $(seq 1 30); do
+            if curl -fsS "https://${FQDN}/api/health" >/dev/null 2>&1; then
+              curl -fsS "https://${FQDN}/api/health"
+              exit 0
+            fi
+            echo "Waiting for healthy revision (${i}/30)..."
+            sleep 20
+          done
+          echo "Container App did not become healthy in time" >&2
+          az containerapp revision list --name "$APP" --resource-group "$AZURE_RESOURCE_GROUP" -o table
+          exit 1
+
+      - name: Report deployment outputs
+        run: |
+          APP="${{ steps.infra.outputs.app_name }}"
+          REV=$(az containerapp revision list \
+            --name "$APP" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --query "[?properties.active].name | [0]" -o tsv)
+          echo "AZURE_CONTAINER_APP_NAME=${APP}"
+          echo "AZURE_CONTAINER_APP_REVISION=${REV}"
+          echo "AZURE_PUBLIC_URL=https://${{ steps.infra.outputs.fqdn }}"
+
+  pre-cutover-uat:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: github.repository == 'mblv89117/growth-command-center'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Azure pre-cutover go-live UAT
+        env:
+          SMOKE_BASE_URL: https://${{ needs.deploy.outputs.fqdn }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: npm run uat:golive
+
+      - name: Host routing smoke (via Host header on Azure FQDN)
+        env:
+          AZURE_FQDN: ${{ needs.deploy.outputs.fqdn }}
+        run: |
+          set -euo pipefail
+          marketing=$(curl -sI -H "Host: growthcommandcenter.com" "https://${AZURE_FQDN}/" | head -1)
+          app_root=$(curl -sI -H "Host: app.growthcommandcenter.com" "https://${AZURE_FQDN}/" | head -1)
+          www=$(curl -sI -H "Host: www.growthcommandcenter.com" "https://${AZURE_FQDN}/" | head -1)
+          privacy=$(curl -sI -H "Host: growthcommandcenter.com" "https://${AZURE_FQDN}/privacy" | head -1)
+          terms=$(curl -sI -H "Host: growthcommandcenter.com" "https://${AZURE_FQDN}/terms" | head -1)
+          echo "marketing /: $marketing"
+          echo "app /: $app_root"
+          echo "www /: $www"
+          echo "privacy: $privacy"
+          echo "terms: $terms"
+          echo "$marketing" | grep -q "200"
+          echo "$app_root" | grep -Eq "30[27]"
+          echo "$www" | grep -Eq "30[28]"
+          echo "$privacy" | grep -q "200"
+          echo "$terms" | grep -q "200"
+
+      - name: QuickBooks route smoke
+        env:
+          AZURE_FQDN: ${{ needs.deploy.outputs.fqdn }}
+        run: |
+          set -euo pipefail
+          cb=$(curl -sI "https://${AZURE_FQDN}/api/integrations/quickbooks/callback" | head -1)
+          echo "callback: $cb"
+          echo "$cb" | grep -Eq "30[27]"
