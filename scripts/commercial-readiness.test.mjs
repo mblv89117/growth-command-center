@@ -308,6 +308,33 @@ describe("domain routing", () => {
     assert.equal(target, `${marketingUrl}/pricing`);
   });
 
+  it("keeps legal pages on marketing domain", async () => {
+    const { MARKETING_ONLY_PATHS, resolveMarketingToAppRedirectTarget } = await import(
+      "../src/lib/domains/routing.ts"
+    );
+    assert.ok(MARKETING_ONLY_PATHS.has("/privacy"));
+    assert.ok(MARKETING_ONLY_PATHS.has("/terms"));
+
+    const privacyRedirect = resolveMarketingToAppRedirectTarget(
+      mockRequest({ host: "growthcommandcenter.com", pathname: "/privacy" })
+    );
+    assert.equal(privacyRedirect, null);
+  });
+
+  it("redirects app legal pages to marketing canonical URLs", async () => {
+    const { resolveAppHostRedirectTarget } = await import("../src/lib/domains/routing.ts");
+    const privacy = resolveAppHostRedirectTarget(
+      mockRequest({ host: "app.growthcommandcenter.com", pathname: "/privacy" }),
+      false
+    );
+    const terms = resolveAppHostRedirectTarget(
+      mockRequest({ host: "app.growthcommandcenter.com", pathname: "/terms" }),
+      false
+    );
+    assert.equal(privacy, `${marketingUrl}/privacy`);
+    assert.equal(terms, `${marketingUrl}/terms`);
+  });
+
   it("builds signup URLs on the app domain with UTM params", async () => {
     const { appSignupUrl } = await import("../src/lib/domains/links.ts");
     const url = appSignupUrl({ utm_source: "360", utm_campaign: "gcc-launch" });

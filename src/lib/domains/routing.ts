@@ -10,7 +10,7 @@ import {
 } from "@/lib/domains";
 
 /** Paths served only on the public marketing domain */
-export const MARKETING_ONLY_PATHS = new Set(["/", "/pricing"]);
+export const MARKETING_ONLY_PATHS = new Set(["/", "/pricing", "/privacy", "/terms"]);
 
 /** Marketing SEO/static assets that should not live on the app subdomain */
 const MARKETING_CANONICAL_PATHS = new Set(["/sitemap.xml", "/robots.txt"]);
@@ -79,7 +79,12 @@ export function resolveAppHostRedirectTarget(
     return isAuthenticated ? "/dashboard" : "/login";
   }
 
-  if (pathname === "/pricing" || MARKETING_CANONICAL_PATHS.has(pathname)) {
+  if (
+    pathname === "/pricing" ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
+    MARKETING_CANONICAL_PATHS.has(pathname)
+  ) {
     const marketingBase = getPrimaryPublicUrl();
     const target = new URL(pathname === "/" ? "/" : pathname, marketingBase);
     target.search = request.nextUrl.search;
