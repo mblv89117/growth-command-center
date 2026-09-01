@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Building2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { STANDALONE_PRICE_MONTHLY } from "@/lib/entitlements";
 import { appLoginUrl, appSignupUrl } from "@/lib/domains/links";
 import { attributionFromSearchParams } from "@/lib/gtm/attribution";
@@ -131,6 +132,8 @@ export default async function PricingPage({
           </Card>
         </div>
       </main>
+
+      <MarketingFooter />
     </div>
   );
 }

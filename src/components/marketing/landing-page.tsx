@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, BarChart3, Shield, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MarketingFooter } from "@/components/marketing/marketing-footer";
 
 const features = [
   {
@@ -143,9 +144,7 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t py-8 text-center text-sm text-muted-foreground">
-        <p>© {new Date().getFullYear()} Growth Command Center · High Value Capital Group LLC</p>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }
