@@ -1,0 +1,66 @@
+name: Azure Production Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_RESOURCE_GROUP: rg-gcc-prod
+  IMAGE_NAME: gcc-web
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.repository == 'mblv89117/growth-command-center'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve ACR and Container App names
+        id: azure
+        run: |
+          ACR_NAME=$(az deployment group list \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --query "[0].properties.outputs.acrName.value" -o tsv)
+          APP_NAME=$(az deployment group list \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --query "[0].properties.outputs.containerAppName.value" -o tsv)
+          echo "acr_name=${ACR_NAME}" >> "$GITHUB_OUTPUT"
+          echo "app_name=${APP_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to ACR
+        run: az acr login --name ${{ steps.azure.outputs.acr_name }}
+
+      - name: Build and push Docker image
+        run: |
+          TAG="${{ github.sha }}"
+          IMAGE="${{ steps.azure.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:${TAG}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Update Container App
+        run: |
+          az containerapp update \
+            --name "${{ steps.azure.outputs.app_name }}" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --image "$IMAGE"
+
+      - name: Smoke health endpoint
+        run: |
+          FQDN=$(az containerapp show \
+            --name "${{ steps.azure.outputs.app_name }}" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          curl -fsS "https://${FQDN}/api/health" | head -c 500
