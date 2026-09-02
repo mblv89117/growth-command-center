@@ -27,10 +27,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const loginHint =
-    request.nextUrl.searchParams.get("login_hint") ??
-    request.nextUrl.searchParams.get("login_hint") ??
-    undefined;
+  const loginHint = request.nextUrl.searchParams.get("login_hint") ?? undefined;
   const next = request.nextUrl.searchParams.get("next") ?? "/dashboard";
   const { verifier, challenge } = createPkcePair();
   const state = createOAuthState();
