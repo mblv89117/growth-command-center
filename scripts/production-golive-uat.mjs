@@ -7,6 +7,14 @@
  * session persistence, and tenant isolation.
  */
 import { createClient } from "@supabase/supabase-js";
+import ws from "ws";
+
+function sbClient(url, key) {
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    realtime: { transport: ws },
+  });
+}
 import { buildImportPreview, commitImport } from "../src/lib/imports/commit.ts";
 import { recomputeTenantFinancials } from "../src/lib/pipeline/recompute.ts";
 import { generateDeterministicWeeklyForecast, buildForecastInputFromSnapshot } from "../src/lib/forecast/compute.ts";
@@ -359,7 +367,7 @@ async function main() {
     return;
   }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+  const admin = sbClient(SUPABASE_URL, SERVICE_KEY);
 
   const { data: authUser, error: createError } = await admin.auth.admin.createUser({
     email: UAT_EMAIL,
@@ -386,7 +394,7 @@ async function main() {
     return;
   }
 
-  const anon = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } });
+  const anon = sbClient(SUPABASE_URL, ANON_KEY);
   const { data: session, error: signInError } = await anon.auth.signInWithPassword({
     email: UAT_EMAIL,
     password: UAT_PASSWORD,
