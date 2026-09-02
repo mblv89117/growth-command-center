@@ -5,9 +5,6 @@
     "location": {
       "value": "eastus"
     },
-    "resourceToken": {
-      "value": ""
-    },
     "containerImage": {
       "value": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
     },
