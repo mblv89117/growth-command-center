@@ -8,11 +8,11 @@
  * Does not print secret values.
  */
 
-const SUPABASE_URL = (
+import { normalizeSupabaseUrl } from "./lib/normalize-supabase-url.mjs";
+
+const SUPABASE_URL = normalizeSupabaseUrl(
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://igyaebtymornywjeidrl.supabase.co"
-)
-  .replace(/\/$/, "")
-  .replace(/\/rest\/v1$/i, "");
+);
 const REST_BASE = `${SUPABASE_URL}/rest/v1`;
 
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -82,13 +82,29 @@ async function testAnonymousDenied() {
   let anyRead = false;
   let anyWrite = false;
 
+  let postgrestOk = false;
   for (const table of SERVER_ONLY_TABLES) {
-    const { status, data } = await rest(ANON_KEY, "GET", table);
+    const { status, data, text } = await rest(ANON_KEY, "GET", table);
+    // PostgREST must answer — HTML/Next 404 means URL is not Supabase.
+    if (typeof text === "string" && text.trimStart().startsWith("<!DOCTYPE")) {
+      fail(`ANON_READ_${table}`, `non-PostgREST HTML response (status=${status}) — check NEXT_PUBLIC_SUPABASE_URL`);
+      anyRead = true;
+      continue;
+    }
+    if (status === 200 || status === 401 || status === 403 || status === 406) {
+      postgrestOk = true;
+    }
     if (status === 404 || status === 406) continue; // absent / not exposed
     if (Array.isArray(data) && data.length > 0) {
       anyRead = true;
       fail(`ANON_READ_${table}`, `${data.length} rows returned`);
     }
+  }
+  if (!postgrestOk) {
+    fail(
+      "ANON_TENANT_ACCESS",
+      "No PostgREST responses observed — NEXT_PUBLIC_SUPABASE_URL may not point at Supabase"
+    );
   }
 
   const insertProbes = [

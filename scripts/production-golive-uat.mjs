@@ -8,13 +8,11 @@
  */
 import { createClient } from "@supabase/supabase-js";
 import ws from "ws";
-
-function sbClient(url, key) {
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    realtime: { transport: ws },
-  });
-}
+import {
+  normalizeSupabaseUrl,
+  describeSupabaseUrl,
+  describeKeyKind,
+} from "./lib/normalize-supabase-url.mjs";
 import { buildImportPreview, commitImport } from "../src/lib/imports/commit.ts";
 import { recomputeTenantFinancials } from "../src/lib/pipeline/recompute.ts";
 import { generateDeterministicWeeklyForecast, buildForecastInputFromSnapshot } from "../src/lib/forecast/compute.ts";
@@ -22,14 +20,64 @@ import { computeKpis } from "../src/lib/kpi/catalog.ts";
 import { computeDashboardDeltas, computeWorkingCapital } from "../src/lib/financial/deltas.ts";
 import { analyzeValueCreation } from "../src/lib/value-creation/analyze.ts";
 
+function sbClient(url, key, { realtime = true } = {}) {
+  const options = {
+    auth: { persistSession: false, autoRefreshToken: false },
+  };
+  // Admin Auth calls do not need Realtime; avoid WS transport side effects in CI.
+  if (realtime) {
+    options.realtime = { transport: ws };
+  }
+  return createClient(url, key, options);
+}
+
+async function adminCreateUser(baseUrl, serviceKey, payload) {
+  const res = await fetch(`${baseUrl}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  let body = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = { raw: text.slice(0, 200) };
+  }
+  if (!res.ok) {
+    const msg =
+      body?.msg ||
+      body?.error_description ||
+      body?.message ||
+      body?.error ||
+      `HTTP ${res.status}`;
+    return { user: null, error: { message: String(msg), status: res.status, body } };
+  }
+  return { user: body, error: null };
+}
+
 const BASE = process.env.SMOKE_BASE_URL ?? "https://growth-command-center-lbnt.vercel.app";
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://igyaebtymornywjeidrl.supabase.co";
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const DEFAULT_SUPABASE_URL = "https://igyaebtymornywjeidrl.supabase.co";
+let SUPABASE_URL;
+try {
+  SUPABASE_URL = normalizeSupabaseUrl(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? DEFAULT_SUPABASE_URL
+  );
+} catch (e) {
+  console.error(`BLOCKER: ${e instanceof Error ? e.message : String(e)}`);
+  process.exit(2);
+}
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim().replace(/^Bearer\s+/i, "") || undefined;
 const ANON_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlneWFlYnR5bW9ybnl3amVpZHJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3ODQ4NTEsImV4cCI6MjA5NDM2MDg1MX0.Sc513VMEzqvVj6ET_2CIVtnPaTQxddWPIAygt4fxvh0";
 
-const UAT_EMAIL = `gcc-golive-cert-${Date.now()}@gcc-uat.invalid`;
+// Use example.com — reserved .invalid addresses are rejected by some GoTrue validators.
+const UAT_EMAIL = `gcc-golive-cert-${Date.now()}@example.com`;
 const UAT_PASSWORD = "GccGoliveCert2026!Secure";
 const UAT_COMPANY = "GCC Go-Live Cert UAT 2026";
 
@@ -367,22 +415,59 @@ async function main() {
     return;
   }
 
-  const admin = sbClient(SUPABASE_URL, SERVICE_KEY);
+  const urlInfo = describeSupabaseUrl(SUPABASE_URL);
+  const serviceKind = describeKeyKind(SERVICE_KEY);
+  const anonKind = describeKeyKind(ANON_KEY);
+  console.log(
+    `Supabase target host=${urlInfo.host} service_key_kind=${serviceKind} anon_key_kind=${anonKind}`
+  );
+  if (serviceKind !== "jwt") {
+    fail(
+      "NEW_TENANT_PROVISION_UAT",
+      `SUPABASE_SERVICE_ROLE_KEY must be legacy JWT service_role (got kind=${serviceKind}). Use Project Settings → API → Legacy keys — do not paste Management API tokens or sb_secret keys.`
+    );
+    printReport();
+    return;
+  }
 
-  const { data: authUser, error: createError } = await admin.auth.admin.createUser({
+  const admin = sbClient(SUPABASE_URL, SERVICE_KEY, { realtime: false });
+
+  // Probe Auth Admin path directly for actionable diagnostics (no secret values logged).
+  const probeRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1`, {
+    method: "GET",
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+    },
+  });
+  if (!probeRes.ok) {
+    const probeBody = (await probeRes.text()).slice(0, 180);
+    fail(
+      "NEW_TENANT_PROVISION_UAT",
+      `Auth Admin probe HTTP ${probeRes.status} host=${urlInfo.host} body=${probeBody}`
+    );
+    printReport();
+    return;
+  }
+
+  // Prefer direct Admin API (avoids supabase-js URL joining edge cases).
+  const { user: created, error: createError } = await adminCreateUser(SUPABASE_URL, SERVICE_KEY, {
     email: UAT_EMAIL,
     password: UAT_PASSWORD,
     email_confirm: true,
     user_metadata: { full_name: "GCC UAT Cert", company_name: UAT_COMPANY, role: "founder" },
   });
 
-  if (createError || !authUser.user) {
-    fail("NEW_TENANT_PROVISION_UAT", createError?.message ?? "createUser failed");
+  if (createError || !created?.id) {
+    fail(
+      "NEW_TENANT_PROVISION_UAT",
+      `${createError?.message ?? "createUser failed"} (host=${urlInfo.host}, key_kind=${serviceKind}, status=${createError?.status ?? "n/a"})`
+    );
     printReport();
     return;
   }
 
-  const userId = authUser.user.id;
+  const userId = created.id;
 
   // Wait for trigger to provision org
   await new Promise((r) => setTimeout(r, 1500));

@@ -4,10 +4,11 @@
  * Does not print secret values.
  */
 import { loadLocalEnv } from "./load-local-env.mjs";
+import { normalizeSupabaseUrl } from "./lib/normalize-supabase-url.mjs";
 
 loadLocalEnv();
 
-const URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+const URL = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL || "");
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

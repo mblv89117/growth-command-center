@@ -226,6 +226,29 @@ jobs:
             fi
           done
 
+          # Normalize Project URL (strip /rest/v1|/auth/v1|trailing slash). Never echo secret values.
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%"${NEXT_PUBLIC_SUPABASE_URL##*[![:space:]]}"}"
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL#"${NEXT_PUBLIC_SUPABASE_URL%%[![:space:]]*}"}"
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/rest/v1}"
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/auth/v1}"
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
+          host="$(echo "$NEXT_PUBLIC_SUPABASE_URL" | sed -E 's|https?://([^/]+).*|\1|')"
+          echo "Supabase URL host: $host"
+          if [[ ! "$host" =~ \.supabase\.(co|in)$ ]] && [[ "$host" != "localhost" ]] && [[ "$host" != "127.0.0.1" ]]; then
+            echo "BLOCKER: NEXT_PUBLIC_SUPABASE_URL must be https://<ref>.supabase.co (got host=$host)" >&2
+            exit 1
+          fi
+          if [[ "$NEXT_PUBLIC_SUPABASE_URL" =~ /rest/v1|/auth/v1 ]]; then
+            echo "BLOCKER: NEXT_PUBLIC_SUPABASE_URL still contains API path after normalize" >&2
+            exit 1
+          fi
+
+          # Trim accidental whitespace / Bearer prefix on service role (never print value)
+          SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY#"${SUPABASE_SERVICE_ROLE_KEY%%[![:space:]]*}"}"
+          SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY%"${SUPABASE_SERVICE_ROLE_KEY##*[![:space:]]}"}"
+          SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY#Bearer }"
+
           secret_args=()
           env_args=(
             "NODE_ENV=production"
@@ -323,6 +346,25 @@ jobs:
 
       - name: Unit tests
         run: npm run test
+
+      - name: Diagnose Supabase URL/key kinds (no secret values)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node --input-type=module <<'EOF'
+          import {
+            normalizeSupabaseUrl,
+            describeSupabaseUrl,
+            describeKeyKind,
+          } from "./scripts/lib/normalize-supabase-url.mjs";
+          const raw = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+          console.log("URL_DIAG", JSON.stringify(describeSupabaseUrl(raw)));
+          console.log("ANON_KEY_KIND", describeKeyKind(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
+          console.log("SERVICE_KEY_KIND", describeKeyKind(process.env.SUPABASE_SERVICE_ROLE_KEY));
+          console.log("URL_NORMALIZED_HOST", new URL(normalizeSupabaseUrl(raw)).host);
+          EOF
 
       - name: Azure pre-cutover go-live UAT
         env:
