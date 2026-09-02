@@ -20,6 +20,24 @@ jobs:
 
       - run: npm ci
 
+      - name: Report secret presence (names only)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for key in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!key:-}" ]; then missing+=("$key"); else echo "PRESENT: $key"; fi
+          done
+          [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] && echo "PRESENT: SUPABASE_ACCESS_TOKEN" || echo "ABSENT: SUPABASE_ACCESS_TOKEN"
+          [ -n "${SUPABASE_DB_PASSWORD:-}${SUPABASE_DATABASE_URL:-}" ] && echo "PRESENT: DB credentials" || echo "ABSENT: DB credentials"
+          if [ "${#missing[@]}" -gt 0 ]; then echo "MISSING_REQUIRED_SECRETS=${missing[*]}" >&2; exit 1; fi
+
       - name: Apply RLS (Management API — preferred)
         id: rls_api
         env:
@@ -38,10 +56,17 @@ jobs:
 
       - name: Verify RLS
         env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        run: node scripts/run-supabase-sql.mjs verify-rls
+        run: |
+          set -euo pipefail
+          if [ -n "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            node scripts/apply-supabase-rls-via-api.mjs --verify-only
+          else
+            node scripts/run-supabase-sql.mjs verify-rls
+          fi
 
       - name: RLS security tests
         env:
