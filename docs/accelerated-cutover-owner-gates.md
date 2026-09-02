@@ -1,113 +1,141 @@
 # GCC Accelerated Cutover — Owner Gates
 
-**Mission:** `GCC-AZURE-NATIVE-CUTOVER-AND-SUPABASE-EXIT-001`
+**Mission:** `GCC-AZURE-NATIVE-CUTOVER-AND-SUPABASE-EXIT-001`  
+**Repo:** https://github.com/mblv89117/growth-command-center
 
-The agent cannot read or write GitHub Actions secrets (API returns 403). Azure OIDC secrets appear configured (workflows authenticate), but **Supabase production secrets are missing** from the deploy workflow environment (confirmed in run `33578985385`).
-
-Complete **one owner session** (~15 minutes) to unblock Stages 1–2, then run the automated pipeline.
+Agent cannot read/write GitHub Actions secret **values** (API 403). Presence is verified only by workflow runs.
 
 ---
 
-## Step 1 — GitHub Actions secrets
+## Current certification status (2026-09-02, run `33605754558`)
 
-Open: **https://github.com/mblv89117/growth-command-center/settings/secrets/actions**
+| Gate | Status |
+|------|--------|
+| Required Supabase secrets present | **PASS** (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ACCESS_TOKEN`) |
+| `SUPABASE_DB_PASSWORD` / `SUPABASE_DATABASE_URL` | ABSENT (OK — Management API path used) |
+| `SUPABASE_KEY_COMPATIBILITY` (legacy anon/service_role) | **PASS** |
+| `RLS_MIGRATION_APPLIED` | **PASS** |
+| Anonymous tenant / server table access | **DENIED** |
+| Cross-tenant leakage | **0** |
+| Azure Container App | **LIVE_GCC** `azapprngzn` (not helloworld) |
+| Environment | `azcaerngzn` |
+| Revision | `azapprngzn--0000013` ready; `azapprngzn--0000015` created |
+| Default FQDN health | **PASS** — https://azapprngzn.nicecoast-be020962.eastus.azurecontainerapps.io/api/health |
+| Pre-cutover UAT | **PASS** (`GCC_COMMERCIAL_GOLIVE_CERTIFICATION = PASS`) |
+| Host-header domain smoke | **DEFERRED** until custom domains bound |
+| Vercel rollback | **AVAILABLE** (DNS still on Vercel) |
 
-Click **New repository secret** for each:
+---
 
-### Required (Stage 1 + 2)
+## Owner action NOW — Stage 2b DNS
 
-| Secret name | Where to get value |
-|-------------|-------------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → anon public |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → service_role (Reveal) |
-| `SUPABASE_ACCESS_TOKEN` | https://supabase.com/dashboard/account/tokens → Create token with **database_write** |
-| `SUPABASE_DB_PASSWORD` | Supabase → Project Settings → Database → Database password |
+Do **not** invent DNS values. Run the binder workflow, then apply only printed records.
 
-Alternative to `SUPABASE_DB_PASSWORD`: set `SUPABASE_DATABASE_URL` to the full connection string from Supabase → Database → Connection string (URI, Session mode).
+### 1) Run binder
 
-### Already required for Azure (likely present)
+1. Open: https://github.com/mblv89117/growth-command-center/actions/workflows/azure-bind-custom-domains.yml
+2. **Run workflow** → branch `main` (after merge) → Run
+3. Download artifact `gcc-azure-dns-records` or copy from job summary
 
-| Secret name | Where to get value |
-|-------------|-------------------|
-| `AZURE_CLIENT_ID` | Entra app registration for GitHub OIDC |
-| `AZURE_TENANT_ID` | Azure Portal → Microsoft Entra ID → Overview |
-| `AZURE_SUBSCRIPTION_ID` | Azure Portal → Subscriptions |
+### 2) Add GoDaddy records (exact values from Azure output)
 
-### Optional (integrations — copy from Vercel Production)
+```
+HOST = asuid
+TYPE = TXT
+VALUE = <CUSTOM_DOMAIN_VERIFICATION_ID from workflow>
+TTL = 600
+PURPOSE = Azure domain verification (apex)
 
-`ANTHROPIC_API_KEY`, `STRIPE_*`, `QUICKBOOKS_*`, `PLAID_*`, `GOOGLE_*`, `HUBSPOT_CLIENT_ID`, `GUSTO_CLIENT_ID`, `SALESFORCE_CLIENT_ID`
+HOST = asuid.www
+TYPE = TXT
+VALUE = <same verification id>
+TTL = 600
+PURPOSE = Azure domain verification (www)
 
-Or run locally (never commit output):
+HOST = asuid.app
+TYPE = TXT
+VALUE = <same verification id>
+TTL = 600
+PURPOSE = Azure domain verification (app)
 
-```bash
-VERCEL_TOKEN=... node scripts/sync-production-secrets.mjs
+HOST = @
+TYPE = A
+VALUE = <ENVIRONMENT_STATIC_IP from workflow>
+TTL = 600
+PURPOSE = Apex → Azure Container Apps
+
+HOST = www
+TYPE = CNAME
+VALUE = azapprngzn.nicecoast-be020962.eastus.azurecontainerapps.io
+TTL = 600
+PURPOSE = www → Azure default FQDN
+
+HOST = app
+TYPE = CNAME
+VALUE = azapprngzn.nicecoast-be020962.eastus.azurecontainerapps.io
+TTL = 600
+PURPOSE = app → Azure default FQDN
 ```
 
----
+### 3) Records to remove/replace at cutover (current Vercel)
 
-## Step 2 — Run accelerated cutover workflow
+```
+HOST = @
+TYPE = A
+VALUE = 216.150.1.1
+PURPOSE = REPLACE — Vercel apex
 
-Open: **https://github.com/mblv89117/growth-command-center/actions/workflows/gcc-accelerated-cutover.yml**
+HOST = www
+TYPE = CNAME
+VALUE = growthcommandcenter.com
+PURPOSE = REPLACE — currently aliases apex/Vercel
 
-Click **Run workflow** → branch `main` → Run.
-
-This executes in order:
-
-1. Apply Supabase RLS hardening (`20260902000000_rls_hardening.sql`)
-2. Verify RLS + `npm run test:rls`
-3. Security incident review (probe row cleanup)
-4. Trigger **Azure Production Deploy** (build, push, configure secrets, health check, UAT)
-
----
-
-## Step 3 — Verify Stage 1 (before DNS)
-
-Confirm workflow logs show:
-
-- `RLS security tests` — all PASS
-- `ANONYMOUS_TENANT_ACCESS = DENIED`
-- Supabase Security Advisor — re-check in dashboard; `rls_disabled_in_public` resolved
-
----
-
-## Step 4 — Verify Stage 2 (Azure hosting)
-
-After **Azure Production Deploy** succeeds:
-
-- Container App `azapprngzn` running GCC image (not helloworld)
-- Health: `https://azapprngzn.nicecoast-be020962.eastus.azurecontainerapps.io/api/health`
-- Pre-cutover UAT job passed
-
----
-
-## Step 5 — Custom domains + DNS (owner)
-
-Only after UAT passes:
-
-```bash
-# Owner machine with az login
-CONTAINER_APP_NAME=azapprngzn ./scripts/azure/bind-custom-domains.sh
+HOST = app
+TYPE = CNAME
+VALUE = c180f1d2697e4ac8.vercel-dns-017.com
+PURPOSE = REPLACE — Vercel app hostname
 ```
 
-Apply **only** the DNS records Azure returns for certificate validation. Do not cut DNS until bindings show **Provisioned**.
+### Cutover order
+
+1. Create TXT `asuid*` first; wait for Azure hostname = Succeeded/Provisioned
+2. Switch A/CNAME traffic
+3. Re-run Host-header smoke against `https://app.growthcommandcenter.com`
+4. Keep Vercel project live until Azure production is stable
 
 ---
 
-## Stage 3 — Supabase exit (separate owner gates)
+## Stage 3 — Supabase exit (after DNS)
 
-Requires additional setup documented in:
+### 3a. Azure PostgreSQL
 
-- `docs/entra-external-id-setup.md` — Microsoft Entra External ID tenant
-- `infra/azure/postgres.bicep` — Azure PostgreSQL Flexible Server
-- `scripts/migrate-supabase-to-azure-pg.mjs` — schema/data migration
+1. https://github.com/mblv89117/growth-command-center/settings/secrets/actions → **New repository secret**
+2. Name: `AZURE_POSTGRES_ADMIN_PASSWORD`
+3. Value: 32+ char password (do not paste in chat)
+4. Run workflow **Azure PostgreSQL Stage 3 Provision** with confirm=`PROVISION`
+5. Add `AZURE_DATABASE_URL` from printed FQDN (GitHub UI only)
 
-Stage 3 cannot complete until Stage 1–2 are certified on production domains.
+### 3b. Entra External ID
+
+Follow click-by-click: `docs/entra-external-id-setup.md`
+
+Secrets to create (values only in GitHub UI):
+
+- `ENTRA_EXTERNAL_TENANT_ID`
+- `ENTRA_EXTERNAL_CLIENT_ID`
+- `ENTRA_EXTERNAL_CLIENT_SECRET`
+- `ENTRA_EXTERNAL_REDIRECT_URI` = `https://app.growthcommandcenter.com/auth/callback`
+
+### 3c. Identity migration
+
+`npm run export:identity-map` exports email + user id only.  
+`PLAINTEXT_PASSWORDS_HANDLED = 0`
 
 ---
 
 ## Do not
 
 - Paste secret values in chat or commits
-- Cut DNS before Azure UAT passes
-- Decommission Supabase or Vercel until Azure-native parity is certified
+- Cut DNS before Azure hostname bindings are Provisioned
+- Decommission Supabase or Vercel until Azure-native UAT PASS
+- Switch to Supabase `sb_publishable` / `sb_secret` keys during this cutover
