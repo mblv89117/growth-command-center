@@ -17,6 +17,7 @@ import {
 } from "@/lib/gtm/attribution";
 import { isMarketingHost, getAppUrl } from "@/lib/domains";
 import {
+  getRequestHost,
   resolveAppHostRedirectTarget,
   resolveMarketingToAppRedirectTarget,
   resolveWwwRedirectTarget,
@@ -32,7 +33,7 @@ function withAttributionCookie(
   response: NextResponse,
   request: NextRequest
 ): NextResponse {
-  const host = request.headers.get("host") ?? "";
+  const host = getRequestHost(request);
   const attribution = captureAttributionFromRequest(request);
   const hasUtm = UTM_PARAM_KEYS.some((key) => Boolean(attribution[key]));
   const shouldSet =
@@ -89,7 +90,7 @@ async function getAuthenticatedUser(request: NextRequest): Promise<boolean> {
 
 export async function handleDomainRouting(request: NextRequest): Promise<NextResponse | null> {
   try {
-    const host = request.headers.get("host") ?? "";
+    const host = getRequestHost(request);
     if (!shouldApplyCommercialDomainRouting(host)) return null;
 
     const wwwTarget = resolveWwwRedirectTarget(request);
