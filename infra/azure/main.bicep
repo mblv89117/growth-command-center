@@ -4,7 +4,7 @@ param location string = resourceGroup().location
 @description('Short environment token (lowercase alphanumeric, max 5 chars)')
 @maxLength(5)
 @minLength(3)
-param resourceToken string = uniqueString(resourceGroup().id, location)[0:5]
+param resourceToken string = substring(uniqueString(resourceGroup().id, location), 0, 5)
 
 @description('Container image (ACR loginServer/repo:tag) — set after first image push')
 param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
