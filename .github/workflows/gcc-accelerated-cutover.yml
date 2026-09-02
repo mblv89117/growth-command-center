@@ -1,26 +1,47 @@
-name: Supabase RLS Apply
+name: GCC Accelerated Cutover
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_rls:
+        description: "Skip Supabase RLS apply (if already applied)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      skip_azure_deploy:
+        description: "Skip Azure Container App deploy trigger"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 permissions:
+  id-token: write
   contents: read
+  actions: write
+
+concurrency:
+  group: gcc-accelerated-cutover
+  cancel-in-progress: false
 
 jobs:
-  apply-rls:
+  stage1-rls:
+    if: inputs.skip_rls != 'true'
     runs-on: ubuntu-latest
-    if: github.repository == 'mblv89117/growth-command-center'
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
-
       - run: npm ci
 
-      - name: Apply RLS (Management API — preferred)
+      - name: Apply RLS (Management API)
         id: rls_api
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -36,7 +57,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
         run: node scripts/run-supabase-sql.mjs rls
 
-      - name: Verify RLS
+      - name: Verify RLS SQL
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -56,3 +77,18 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/security-incident-review.mjs
+
+  stage2-trigger-azure:
+    needs: stage1-rls
+    if: |
+      always() &&
+      (needs.stage1-rls.result == 'success' || needs.stage1-rls.result == 'skipped') &&
+      inputs.skip_azure_deploy != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Azure Production Deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run "Azure Production Deploy" --ref main --repo "${{ github.repository }}"
+          echo "Azure Production Deploy triggered. Monitor Actions tab for deploy + pre-cutover-uat jobs."
