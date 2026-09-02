@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { isDemoModeAllowed, isProduction, isSupabaseConfigured } from "@/lib/config";
+import { isDemoModeAllowed, isEntraClientEnabled, isProduction, isSupabaseConfigured } from "@/lib/config";
 import { GccLogo } from "@/components/brand/gcc-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,8 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const authReady = isSupabaseConfigured();
+  const entraEnabled = isEntraClientEnabled();
+  const authReady = isSupabaseConfigured() || entraEnabled;
   const allowDemo = isDemoModeAllowed();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -29,6 +30,14 @@ export function LoginForm() {
     setLoading(true);
     setError(null);
     setMessage(null);
+
+    if (entraEnabled) {
+      const params = new URLSearchParams();
+      params.set("next", redirect);
+      if (email.trim()) params.set("login_hint", email.trim());
+      window.location.href = `/api/auth/entra/login?${params.toString()}`;
+      return;
+    }
 
     const supabase = createClient();
     if (!supabase) {
@@ -119,6 +128,7 @@ export function LoginForm() {
                   autoComplete="email"
                 />
               </div>
+              {!entraEnabled && (
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -130,8 +140,10 @@ export function LoginForm() {
                   autoComplete="current-password"
                 />
               </div>
+              )}
               {error && <p className="text-sm text-destructive">{error}</p>}
               {message && <p className="text-sm text-muted-foreground">{message}</p>}
+              {!entraEnabled && (
               <div className="text-right">
                 <button
                   type="button"
@@ -142,9 +154,10 @@ export function LoginForm() {
                   Forgot password?
                 </button>
               </div>
+              )}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Sign In
+                {entraEnabled ? "Continue with Microsoft" : "Sign In"}
               </Button>
             </form>
           ) : (
