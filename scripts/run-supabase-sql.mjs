@@ -71,10 +71,25 @@ async function main() {
       console.log("setup.sql: PASS");
     }
 
+    if (mode === "rls" || mode === "all") {
+      const rlsPath = path.join(root, "supabase/migrations/20260902000000_rls_hardening.sql");
+      await runFile(client, rlsPath);
+      console.log("rls_hardening.sql: PASS");
+    }
+
     if (mode === "verify" || mode === "all") {
       const verifyPath = path.join(root, "supabase/verify-setup.sql");
       const result = await runVerify(client, verifyPath);
       console.log("verify-setup.sql:");
+      for (const row of result.rows ?? []) {
+        console.log(`${row.check}\t${row.result}\t${row.detail ?? ""}`);
+      }
+    }
+
+    if (mode === "verify-rls" || mode === "rls") {
+      const verifyRlsPath = path.join(root, "supabase/verify-rls.sql");
+      const result = await runVerify(client, verifyRlsPath);
+      console.log("verify-rls.sql:");
       for (const row of result.rows ?? []) {
         console.log(`${row.check}\t${row.result}\t${row.detail ?? ""}`);
       }
