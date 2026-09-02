@@ -1,7 +1,10 @@
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserRole } from "@/lib/types";
+import { isEntraAuthEnabled } from "@/lib/auth/entra/config";
+import { ENTRA_SESSION_COOKIE, unsealSession } from "@/lib/auth/entra/oidc";
+import { resolveProfileForEntra } from "@/lib/auth/entra/identity";
 
 export interface AuthContext {
   userId: string;
@@ -32,12 +35,36 @@ async function resolveProfile(
   return { organizationId, role };
 }
 
+async function getEntraAuthContext(): Promise<AuthContext | null> {
+  const jar = await cookies();
+  const token = jar.get(ENTRA_SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const session = await unsealSession(token);
+  if (!session) return null;
+  const linked = await resolveProfileForEntra(session);
+  if (!linked) return null;
+  return {
+    userId: linked.userId,
+    email: linked.email,
+    role: linked.role as UserRole,
+    organizationId: linked.organizationId,
+  };
+}
+
 /**
  * Resolve the caller from:
- * 1) Authorization: Bearer <access_token> (API / UAT clients)
- * 2) Supabase SSR cookie session (browser)
+ * 1) Entra session cookie when AUTH_PROVIDER=entra
+ * 2) Authorization: Bearer <access_token> (API / UAT clients) via Supabase JWT (legacy)
+ * 3) Supabase SSR cookie session (browser)
  */
 export async function getAuthContext(): Promise<AuthContext | null> {
+  if (isEntraAuthEnabled()) {
+    const entra = await getEntraAuthContext();
+    if (entra) return entra;
+    // Fail closed for browser sessions when Entra is the provider.
+    // Bearer tokens still allowed during dual-run cutover below.
+  }
+
   const headerStore = await headers();
   const authHeader = headerStore.get("authorization");
 
@@ -64,6 +91,10 @@ export async function getAuthContext(): Promise<AuthContext | null> {
         }
       }
     }
+  }
+
+  if (isEntraAuthEnabled()) {
+    return null;
   }
 
   const supabase = await createClient();

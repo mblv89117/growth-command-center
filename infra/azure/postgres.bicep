@@ -39,7 +39,7 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' =
       storageSizeGB: storageSizeGB
     }
     backup: {
-      backupRetentionDays: 7
+      backupRetentionDays: 14
       geoRedundantBackup: 'Disabled'
     }
     highAvailability: {
@@ -79,3 +79,13 @@ output postgresServerName string = postgresServer.name
 output postgresFqdn string = postgresServer.properties.fullyQualifiedDomainName
 output postgresDatabaseName string = gccDatabase.name
 output postgresConnectionHint string = 'postgresql://${postgresAdminLogin}@${postgresServer.properties.fullyQualifiedDomainName}:5432/${gccDatabase.name}?sslmode=require'
+
+
+resource requireTls 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  parent: postgresServer
+  name: 'require_secure_transport'
+  properties: {
+    value: 'on'
+    source: 'user-override'
+  }
+}

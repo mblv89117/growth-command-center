@@ -9,6 +9,8 @@ import {
   isSupabaseConfigured,
 } from "@/lib/config";
 import { getSupabaseUrl } from "@/lib/supabase/url";
+import { isEntraAuthEnabled } from "@/lib/auth/entra/config";
+import { ENTRA_SESSION_COOKIE } from "@/lib/auth/entra/oidc";
 import {
   captureAttributionFromRequest,
   attributionCookieOptions,
@@ -49,7 +51,11 @@ function withAttributionCookie(
 function hasLikelyAuthSession(request: NextRequest): boolean {
   return request.cookies.getAll().some((cookie) => {
     const name = cookie.name.toLowerCase();
-    return name.includes("auth-token") || name.includes("access-token");
+    return (
+      name.includes("auth-token") ||
+      name.includes("access-token") ||
+      name === "gcc_entra_session"
+    );
   });
 }
 
@@ -155,6 +161,19 @@ export async function updateSession(request: NextRequest) {
   }
 
   const demoMode = isDemoModeAllowed() && request.cookies.get(DEMO_MODE_COOKIE)?.value === "1";
+
+  // Entra External ID dual-mode: accept sealed session cookie when AUTH_PROVIDER=entra.
+  if (isEntraAuthEnabled()) {
+    const entraSession = request.cookies.get(ENTRA_SESSION_COOKIE)?.value;
+    if (entraSession || demoMode) {
+      return supabaseResponse;
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(url);
+  }
+
 
   if (!isSupabaseConfigured()) {
     if (!demoMode) {
