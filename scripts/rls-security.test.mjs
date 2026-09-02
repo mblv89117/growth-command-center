@@ -10,7 +10,11 @@
 
 const SUPABASE_URL = (
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://igyaebtymornywjeidrl.supabase.co"
-).replace(/\/$/, "");
+)
+  .replace(/\/$/, "")
+  .replace(/\/rest\/v1$/i, "");
+const REST_BASE = `${SUPABASE_URL}/rest/v1`;
+
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -34,7 +38,7 @@ function fail(key, detail = "") {
 }
 
 async function rest(key, method, table, { query = "select=*&limit=5", body } = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+  const res = await fetch(`${REST_BASE}/${table}?${query}`, {
     method,
     headers: {
       apikey: key,
@@ -143,14 +147,31 @@ async function testServiceRoleAccess() {
     return;
   }
 
-  const { status, data } = await rest(SERVICE_KEY, "GET", "gcc_organizations", {
-    query: "select=id&limit=1",
-  });
+  // Probe known tables; schema naming has drifted across migrations.
+  const candidates = [
+    "gcc_organizations",
+    "organizations",
+    "gcc_profiles",
+    "gcc_import_jobs",
+    "gcc_ai_conversations",
+  ];
 
-  if (status >= 400) {
-    fail("SERVICE_ROLE_ACCESS", `status=${status}`);
-  } else {
-    pass("SERVICE_ROLE_ACCESS", `status=${status}`);
+  let ok = false;
+  let lastStatus = 0;
+  for (const table of candidates) {
+    const { status } = await rest(SERVICE_KEY, "GET", table, {
+      query: "select=*&limit=1",
+    });
+    lastStatus = status;
+    if (status >= 200 && status < 300) {
+      pass("SERVICE_ROLE_ACCESS", `table=${table} status=${status}`);
+      ok = true;
+      break;
+    }
+  }
+
+  if (!ok) {
+    fail("SERVICE_ROLE_ACCESS", `no candidate table reachable; lastStatus=${lastStatus}`);
   }
 
   // Cleanup rls-probe rows if any were created
