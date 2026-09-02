@@ -374,18 +374,18 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: npm run uat:golive
 
-      - name: Host routing smoke (via X-Forwarded-Host on Azure FQDN)
+      - name: Host routing smoke (via x-gcc-test-host on Azure FQDN)
         env:
           AZURE_FQDN: ${{ needs.deploy.outputs.fqdn }}
         run: |
           set -euo pipefail
-          # Azure Container Apps returns platform 404 for mismatched Host headers.
-          # Pre-cutover UAT simulates custom domains with X-Forwarded-Host instead.
-          marketing=$(curl -sI -H "X-Forwarded-Host: growthcommandcenter.com" -H "X-Forwarded-Proto: https" "https://${AZURE_FQDN}/" | head -1)
-          app_root=$(curl -sI -H "X-Forwarded-Host: app.growthcommandcenter.com" -H "X-Forwarded-Proto: https" "https://${AZURE_FQDN}/" | head -1)
-          www=$(curl -sI -H "X-Forwarded-Host: www.growthcommandcenter.com" -H "X-Forwarded-Proto: https" "https://${AZURE_FQDN}/" | head -1)
-          privacy=$(curl -sI -H "X-Forwarded-Host: growthcommandcenter.com" -H "X-Forwarded-Proto: https" "https://${AZURE_FQDN}/privacy" | head -1)
-          terms=$(curl -sI -H "X-Forwarded-Host: growthcommandcenter.com" -H "X-Forwarded-Proto: https" "https://${AZURE_FQDN}/terms" | head -1)
+          # Azure Container Apps: mismatched Host → platform 404; X-Forwarded-Host is overwritten.
+          # Pre-cutover uses x-gcc-test-host (honored only on *.azurecontainerapps.io).
+          marketing=$(curl -sI -H "x-gcc-test-host: growthcommandcenter.com" "https://${AZURE_FQDN}/" | head -1)
+          app_root=$(curl -sI -H "x-gcc-test-host: app.growthcommandcenter.com" "https://${AZURE_FQDN}/" | head -1)
+          www=$(curl -sI -H "x-gcc-test-host: www.growthcommandcenter.com" "https://${AZURE_FQDN}/" | head -1)
+          privacy=$(curl -sI -H "x-gcc-test-host: growthcommandcenter.com" "https://${AZURE_FQDN}/privacy" | head -1)
+          terms=$(curl -sI -H "x-gcc-test-host: growthcommandcenter.com" "https://${AZURE_FQDN}/terms" | head -1)
           echo "marketing /: $marketing"
           echo "app /: $app_root"
           echo "www /: $www"

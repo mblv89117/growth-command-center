@@ -25,11 +25,26 @@ export function normalizeHost(host: string | null): string {
  * mismatched Host headers at the ingress (platform 404) before Next.js runs.
  */
 export function getRequestHost(request: NextRequest): string {
+  const host = normalizeHost(request.headers.get("host"));
+
+  // Pre-cutover only: Azure Container Apps rejects mismatched Host and overwrites
+  // X-Forwarded-Host. Allow an explicit test header when traffic is still on the
+  // default *.azurecontainerapps.io FQDN (removed from use after DNS cutover).
+  const isAzureDefaultFqdn = host.endsWith(".azurecontainerapps.io");
+  if (isAzureDefaultFqdn) {
+    const testHost =
+      request.headers.get("x-gcc-test-host") ??
+      request.nextUrl.searchParams.get("gcc_test_host");
+    if (testHost) {
+      return normalizeHost(testHost.split(",")[0]?.trim() ?? "");
+    }
+  }
+
   const forwarded = request.headers.get("x-forwarded-host");
   if (forwarded) {
     return normalizeHost(forwarded.split(",")[0]?.trim() ?? "");
   }
-  return normalizeHost(request.headers.get("host"));
+  return host;
 }
 
 export function shouldApplyCommercialDomainRouting(host: string): boolean {
