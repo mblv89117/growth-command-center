@@ -374,28 +374,33 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: npm run uat:golive
 
-      - name: Host routing smoke (via x-gcc-test-host on Azure FQDN)
+      - name: Domain routing unit checks
+        run: npm run test:domain-routing
+
+      - name: Azure FQDN surface smoke (pre-custom-domain)
         env:
           AZURE_FQDN: ${{ needs.deploy.outputs.fqdn }}
         run: |
           set -euo pipefail
-          # Azure Container Apps: mismatched Host → platform 404; X-Forwarded-Host is overwritten.
-          # Pre-cutover uses x-gcc-test-host (honored only on *.azurecontainerapps.io).
-          marketing=$(curl -sI -H "x-gcc-test-host: growthcommandcenter.com" "https://${AZURE_FQDN}/" | head -1)
-          app_root=$(curl -sI -H "x-gcc-test-host: app.growthcommandcenter.com" "https://${AZURE_FQDN}/" | head -1)
-          www=$(curl -sI -H "x-gcc-test-host: www.growthcommandcenter.com" "https://${AZURE_FQDN}/" | head -1)
-          privacy=$(curl -sI -H "x-gcc-test-host: growthcommandcenter.com" "https://${AZURE_FQDN}/privacy" | head -1)
-          terms=$(curl -sI -H "x-gcc-test-host: growthcommandcenter.com" "https://${AZURE_FQDN}/terms" | head -1)
-          echo "marketing /: $marketing"
-          echo "app /: $app_root"
-          echo "www /: $www"
+          # Azure Container Apps cannot honor arbitrary Host / X-Forwarded-Host before
+          # custom domains are bound (platform 404 / header overwrite). Certify the FQDN
+          # surface here; Host-header routing is re-checked after domain binding.
+          root=$(curl -sI "https://${AZURE_FQDN}/" | head -1)
+          privacy=$(curl -sI "https://${AZURE_FQDN}/privacy" | head -1)
+          terms=$(curl -sI "https://${AZURE_FQDN}/terms" | head -1)
+          login=$(curl -sI "https://${AZURE_FQDN}/login" | head -1)
+          health=$(curl -fsS "https://${AZURE_FQDN}/api/health")
+          echo "root: $root"
           echo "privacy: $privacy"
           echo "terms: $terms"
-          echo "$marketing" | grep -q "200"
-          echo "$app_root" | grep -Eq "30[27]"
-          echo "$www" | grep -Eq "30[28]"
+          echo "login: $login"
+          echo "health: $health"
+          echo "$root" | grep -q "200"
           echo "$privacy" | grep -q "200"
           echo "$terms" | grep -q "200"
+          echo "$login" | grep -Eq "200|30[1278]"
+          echo "$health" | grep -q '"status":"ok"'
+          echo "HOST_HEADER_ROUTING=DEFERRED_UNTIL_CUSTOM_DOMAIN_BINDING"
 
       - name: QuickBooks route smoke
         env:
