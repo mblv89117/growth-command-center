@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 /**
- * Post-RLS security incident review — checks probe rows and anon access.
+ * Post-RLS security incident review via PostgREST (no Realtime / WebSocket).
  * Does not print secret values.
  */
-import { createClient } from "@supabase/supabase-js";
 import { loadLocalEnv } from "./load-local-env.mjs";
 
 loadLocalEnv();
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -17,23 +16,24 @@ if (!URL || !ANON) {
   process.exit(2);
 }
 
-const anon = createClient(URL, ANON, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
-
-const PROBE_TABLES = [
-  "gcc_import_jobs",
-  "gcc_job_runs",
-  "gcc_forecast_versions",
-  "gcc_ai_messages",
-];
-
-const PROBE_FILTERS = {
-  gcc_import_jobs: { column: "file_name", values: ["probe.csv", "rls-probe.csv"] },
-  gcc_job_runs: { column: "job_type", values: ["probe", "rls-probe"] },
-  gcc_forecast_versions: { column: "version_num", values: [99999] },
-  gcc_ai_messages: { column: "content", values: ["probe", "rls-probe"] },
-};
+async function rest(key, method, table, query = "select=*&limit=3") {
+  const res = await fetch(`${URL}/rest/v1/${table}?${query}`, {
+    method,
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Prefer: "count=exact",
+    },
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  return { status: res.status, data, countHeader: res.headers.get("content-range") };
+}
 
 async function checkAnonAccess() {
   let leaked = false;
@@ -45,9 +45,9 @@ async function checkAnonAccess() {
     "gcc_forecast_versions",
     "gcc_integration_connections",
   ]) {
-    const { data, error } = await anon.from(table).select("*").limit(3);
-    if (error?.code === "PGRST205") continue;
-    if ((data?.length ?? 0) > 0) {
+    const { status, data } = await rest(ANON, "GET", table);
+    if (status === 404) continue;
+    if (Array.isArray(data) && data.length > 0) {
       console.log(`ANON_LEAK: ${table} returned ${data.length} row(s)`);
       leaked = true;
     }
@@ -61,20 +61,26 @@ async function checkProbeRows() {
     return null;
   }
 
-  const admin = createClient(URL, SERVICE, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const probes = [
+    ["gcc_import_jobs", "file_name", ["probe.csv", "rls-probe.csv"]],
+    ["gcc_job_runs", "job_type", ["probe", "rls-probe"]],
+    ["gcc_forecast_versions", "version_num", ["99999"]],
+    ["gcc_ai_messages", "content", ["probe", "rls-probe"]],
+  ];
 
   let remaining = 0;
-  for (const table of PROBE_TABLES) {
-    const filter = PROBE_FILTERS[table];
-    for (const val of filter.values) {
-      const { count } = await admin
-        .from(table)
-        .select("*", { count: "exact", head: true })
-        .eq(filter.column, val);
-      if (count && count > 0) {
-        console.log(`PROBE_REMAINING: ${table}.${filter.column}=${val} count=${count}`);
+  for (const [table, column, values] of probes) {
+    for (const val of values) {
+      const { status, data } = await rest(
+        SERVICE,
+        "GET",
+        table,
+        `select=id&${column}=eq.${encodeURIComponent(val)}&limit=5`
+      );
+      if (status >= 400) continue;
+      const count = Array.isArray(data) ? data.length : 0;
+      if (count > 0) {
+        console.log(`PROBE_REMAINING: ${table}.${column}=${val} count=${count}`);
         remaining += count;
       }
     }
@@ -84,8 +90,12 @@ async function checkProbeRows() {
 
 async function main() {
   console.log("SECURITY_INCIDENT_REVIEW");
-  console.log("EXPOSURE_SCOPE: Confirmed pre-RLS anonymous read/write on server-only tables (audit probes)");
-  console.log("ACTUAL_UNAUTHORIZED_ACCESS_EVIDENCE: INSUFFICIENT_LOG_RETENTION — no Supabase audit log API in agent scope");
+  console.log(
+    "EXPOSURE_SCOPE: Confirmed pre-RLS anonymous read/write on server-only tables (audit probes)"
+  );
+  console.log(
+    "ACTUAL_UNAUTHORIZED_ACCESS_EVIDENCE: INSUFFICIENT_LOG_RETENTION — no Supabase audit log API in agent scope"
+  );
 
   const anonOk = await checkAnonAccess();
   console.log(`ANONYMOUS_ACCESS_AFTER_RLS: ${anonOk ? "DENIED" : "FAIL"}`);
@@ -99,4 +109,7 @@ async function main() {
   process.exit(anonOk ? 0 : 1);
 }
 
-main();
+main().catch((err) => {
+  console.error(`FAIL: ${err.message}`);
+  process.exit(1);
+});
