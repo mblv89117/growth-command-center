@@ -20,8 +20,6 @@ var caeName = 'azcae${resourceToken}'
 var appName = 'azapp${resourceToken}'
 var logName = 'azlog${resourceToken}'
 var identityName = 'azid${resourceToken}'
-var acrPullRole = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: identityName
   location: location
@@ -45,18 +43,8 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
     name: 'Basic'
   }
   properties: {
-    adminUserEnabled: false
+    adminUserEnabled: true
     publicNetworkAccess: 'Enabled'
-  }
-}
-
-resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(acr.id, managedIdentity.id, acrPullRole)
-  scope: acr
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRole)
-    principalId: managedIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
   }
 }
 
@@ -87,6 +75,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     managedEnvironmentId: containerAppsEnvironment.id
     configuration: {
       activeRevisionsMode: 'Single'
+      secrets: [
+        {
+          name: 'acr-password'
+          value: acr.listCredentials().passwords[0].value
+        }
+      ]
       ingress: {
         external: true
         targetPort: 3000
@@ -114,7 +108,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       registries: [
         {
           server: acr.properties.loginServer
-          identity: managedIdentity.id
+          username: acr.listCredentials().username
+          passwordSecretRef: 'acr-password'
         }
       ]
     }
@@ -191,9 +186,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       }
     }
   }
-  dependsOn: [
-    acrPullAssignment
-  ]
 }
 
 output containerAppName string = containerApp.name
