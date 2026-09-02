@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { isSupabaseConfigured } from "@/lib/config";
+import { getSupabaseUrl } from "@/lib/supabase/url";
 
 export function createAdminClient() {
   if (!isSupabaseConfigured()) return null;
@@ -9,9 +10,10 @@ export function createAdminClient() {
     return null;
   }
 
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    serviceKey,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+  const url = getSupabaseUrl();
+  if (!url) return null;
+
+  return createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
