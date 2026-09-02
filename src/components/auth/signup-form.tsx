@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { TrendingUp, Loader2, Mail } from "lucide-react";
+import { Loader2, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { GccLogo } from "@/components/brand/gcc-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -163,12 +164,14 @@ export function SignupForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <TrendingUp className="h-6 w-6 text-primary-foreground" />
+        <CardHeader className="space-y-4 text-center">
+          <div className="mx-auto flex justify-center">
+            <GccLogo priority className="max-w-[240px]" />
           </div>
-          <CardTitle className="text-2xl">Create Account</CardTitle>
-          <CardDescription>Start your Growth Command Center workspace</CardDescription>
+          <div className="space-y-1">
+            <CardTitle className="text-2xl">Create Account</CardTitle>
+            <CardDescription>Start your Growth Command Center workspace</CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignup} className="space-y-4">
