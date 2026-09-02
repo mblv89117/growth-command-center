@@ -1,0 +1,112 @@
+name: Azure PostgreSQL Stage 3 Provision
+
+# Stage 3 — provision Azure Database for PostgreSQL Flexible Server.
+# Requires owner secret AZURE_POSTGRES_ADMIN_PASSWORD (never asked for in chat).
+# Does not migrate data or switch AUTH_PROVIDER until Entra + schema parity PASS.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type PROVISION to deploy Azure PostgreSQL Flexible Server"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-postgres-stage3
+  cancel-in-progress: false
+
+env:
+  AZURE_RESOURCE_GROUP: rg-gcc-prod
+  AZURE_LOCATION: eastus
+
+jobs:
+  provision-postgres:
+    runs-on: ubuntu-latest
+    if: github.repository == 'mblv89117/growth-command-center' && inputs.confirm == 'PROVISION'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Require admin password secret (presence only)
+        env:
+          AZURE_POSTGRES_ADMIN_PASSWORD: ${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AZURE_POSTGRES_ADMIN_PASSWORD:-}" ]; then
+            echo "MISSING_GITHUB_SECRET=AZURE_POSTGRES_ADMIN_PASSWORD" >&2
+            echo "OWNER_ACTION: GitHub → Settings → Secrets → Actions → New repository secret" >&2
+            echo "  Name: AZURE_POSTGRES_ADMIN_PASSWORD" >&2
+            echo "  Value: generate a 32+ char password (do not paste in chat)" >&2
+            exit 1
+          fi
+          echo "PRESENT: AZURE_POSTGRES_ADMIN_PASSWORD"
+          len=${#AZURE_POSTGRES_ADMIN_PASSWORD}
+          if [ "$len" -lt 16 ]; then
+            echo "BLOCKER: AZURE_POSTGRES_ADMIN_PASSWORD length < 16" >&2
+            exit 1
+          fi
+          echo "PASSWORD_LENGTH_OK=PASS"
+
+      - name: Register Microsoft.DBforPostgreSQL provider
+        run: |
+          set -euo pipefail
+          state=$(az provider show --namespace Microsoft.DBforPostgreSQL --query registrationState -o tsv 2>/dev/null || echo NotRegistered)
+          echo "Microsoft.DBforPostgreSQL: $state"
+          if [ "$state" != "Registered" ]; then
+            az provider register --namespace Microsoft.DBforPostgreSQL --wait
+          fi
+
+      - name: Deploy postgres.bicep
+        id: pg
+        env:
+          AZURE_POSTGRES_ADMIN_PASSWORD: ${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          DEPLOY_NAME="gcc-postgres-${{ github.run_id }}"
+          az deployment group create \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$DEPLOY_NAME" \
+            --template-file infra/azure/postgres.bicep \
+            --parameters postgresAdminPassword="$AZURE_POSTGRES_ADMIN_PASSWORD" \
+            --parameters location="$AZURE_LOCATION" \
+            --output json > /tmp/gcc-pg-out.json
+
+          SERVER=$(jq -r '.properties.outputs.postgresServerName.value' /tmp/gcc-pg-out.json)
+          FQDN=$(jq -r '.properties.outputs.postgresFqdn.value' /tmp/gcc-pg-out.json)
+          DB=$(jq -r '.properties.outputs.postgresDatabaseName.value' /tmp/gcc-pg-out.json)
+          echo "server=${SERVER}" >> "$GITHUB_OUTPUT"
+          echo "fqdn=${FQDN}" >> "$GITHUB_OUTPUT"
+          echo "database=${DB}" >> "$GITHUB_OUTPUT"
+          echo "AZURE_POSTGRES_INFRA=PASS"
+          echo "SERVER=${SERVER}"
+          echo "FQDN=${FQDN}"
+          echo "DATABASE=${DB}"
+          echo "Next: set GitHub secret AZURE_DATABASE_URL (do not paste in chat), then run migrate workflow."
+
+      - name: Summary
+        run: |
+          {
+            echo "## Azure PostgreSQL provisioned"
+            echo ""
+            echo "- Server: \`${{ steps.pg.outputs.server }}\`"
+            echo "- FQDN: \`${{ steps.pg.outputs.fqdn }}\`"
+            echo "- Database: \`${{ steps.pg.outputs.database }}\`"
+            echo ""
+            echo "### Owner next secrets (names only)"
+            echo "1. \`AZURE_DATABASE_URL\` = postgresql://gccadmin@\`${{ steps.pg.outputs.fqdn }}\`:5432/gcc?sslmode=require"
+            echo "2. Keep \`SUPABASE_DATABASE_URL\` or \`SUPABASE_DB_PASSWORD\` for one-time migration source"
+            echo "3. Complete Entra External ID gates in docs/entra-external-id-setup.md"
+            echo ""
+            echo "Do **not** set AUTH_PROVIDER=entra or remove Supabase until Stage 3 UAT PASS."
+          } >> "$GITHUB_STEP_SUMMARY"

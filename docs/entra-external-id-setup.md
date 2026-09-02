@@ -1,79 +1,106 @@
 # Microsoft Entra External ID — GCC Stage 3 Setup
 
-**Mission:** `GCC-AZURE-NATIVE-CUTOVER-AND-SUPABASE-EXIT-001`
+**Mission:** `GCC-AZURE-NATIVE-CUTOVER-AND-SUPABASE-EXIT-001`  
+**Goal:** Replace Supabase Auth for customer login with **Microsoft Entra External ID (CIAM)**.  
+Do **not** use workforce Entra ID as a substitute unless architecture explicitly requires it.
 
-Customer authentication target for GCC (replaces Supabase Auth). This is **workforce Entra ID** vs **Entra External ID (CIAM)** — use External ID for client tenants.
-
----
-
-## 1. Create External ID tenant
-
-1. Open [Microsoft Entra admin center](https://entra.microsoft.com/)
-2. **Identity** → **Overview** → **Manage your tenant** → **Create**
-3. Choose **Customer** (External ID / CIAM)
-4. Record **Tenant ID** → `ENTRA_EXTERNAL_TENANT_ID`
+Code scaffold: `src/lib/auth/entra/config.ts`  
+Keep `AUTH_PROVIDER=supabase` until Entra UAT passes.
 
 ---
 
-## 2. Register application
+## Owner gate A — Create External ID (CIAM) tenant
 
-1. **Applications** → **App registrations** → **New registration**
-2. Name: `Growth Command Center`
-3. Supported account types: **Accounts in this organizational directory only** (External ID users)
-4. Redirect URI (Web): `https://app.growthcommandcenter.com/auth/callback`
-5. Record **Application (client) ID** → `ENTRA_EXTERNAL_CLIENT_ID`
-
-Create client secret → **Certificates & secrets** → `ENTRA_EXTERNAL_CLIENT_SECRET`
-
----
-
-## 3. User flows
-
-1. **External Identities** → **User flows**
-2. Create **Sign up and sign in** flow
-3. Enable email signup, password reset
-4. Link application to user flow
+1. Open https://entra.microsoft.com/  
+2. Sign in with the HVCG Microsoft account that can create tenants.  
+3. Top-right directory switcher → **Create a tenant** (or **Identity** → **Overview** → **Manage tenants** → **Create**).  
+4. Select **Customer** (this is External ID / CIAM — not Workforce).  
+5. Organization name: `Growth Command Center Customers`  
+6. Domain name: choose an available `*.onmicrosoft.com` (example pattern: `growthcommandcentercustomers`).  
+7. Complete create; wait until the tenant is ready.  
+8. Switch into the **new Customer tenant**.  
+9. **Identity** → **Overview** → copy **Tenant ID**.  
+10. GitHub → https://github.com/mblv89117/growth-command-center/settings/secrets/actions → **New repository secret**  
+    - Name: `ENTRA_EXTERNAL_TENANT_ID`  
+    - Value: paste Tenant ID (only in GitHub UI)
 
 ---
 
-## 4. Identity migration (from Supabase)
+## Owner gate B — Register the GCC web app
 
-Do **not** export plaintext passwords.
+Still in the **External ID customer tenant**:
 
-1. Export Supabase users (email, id, created_at) via service role / SQL
-2. Create `gcc_identity_links` table mapping `supabase_user_id` → `entra_object_id`
-3. Send **account activation** email via Entra invitation API
-4. On first Entra login, link profile in `gcc_profiles`
-
----
-
-## 5. Application configuration
-
-Set in Azure Container App secrets / GitHub Actions:
-
-| Variable | Purpose |
-|----------|---------|
-| `AUTH_PROVIDER` | Set to `entra` when ready (default `supabase`) |
-| `ENTRA_EXTERNAL_TENANT_ID` | CIAM tenant GUID |
-| `ENTRA_EXTERNAL_CLIENT_ID` | App registration client ID |
-| `ENTRA_EXTERNAL_CLIENT_SECRET` | Client secret |
-| `ENTRA_EXTERNAL_REDIRECT_URI` | OAuth callback |
-| `DATABASE_URL` | Azure PostgreSQL connection string |
-
-Code scaffold: `src/lib/auth/entra/config.ts`
+1. **Applications** → **App registrations** → **New registration**  
+2. Name: `Growth Command Center`  
+3. Supported account types: **Accounts in this organizational directory only**  
+4. Redirect URI:  
+   - Platform: **Web**  
+   - URI: `https://app.growthcommandcenter.com/auth/callback`  
+5. Register.  
+6. Copy **Application (client) ID** → GitHub secret `ENTRA_EXTERNAL_CLIENT_ID`  
+7. **Certificates & secrets** → **New client secret**  
+   - Description: `gcc-prod`  
+   - Expires: 24 months (or org policy)  
+   - **Add** → copy the **Value** once → GitHub secret `ENTRA_EXTERNAL_CLIENT_SECRET`  
+8. GitHub secret `ENTRA_EXTERNAL_REDIRECT_URI` = `https://app.growthcommandcenter.com/auth/callback`  
+9. (Optional) Authentication → Front-channel logout URL: `https://app.growthcommandcenter.com/login`
 
 ---
 
-## 6. Rollback
+## Owner gate C — User flow (sign-up / sign-in / reset)
 
-Keep `AUTH_PROVIDER=supabase` until Entra UAT passes. Dual-auth period max 2 weeks recommended.
+1. In External ID tenant: **External Identities** → **User flows** (wording may show **User flows** under CIAM).  
+2. **New user flow** → **Sign up and sign in**  
+3. Name: `gcc_signup_signin`  
+4. Identity providers: **Email with password**  
+5. User attributes: collect **Email**; return **Email**, **Display Name**  
+6. Create flow → **Applications** → **Add application** → select `Growth Command Center`  
+7. Confirm **Password reset** / self-service reset is enabled for the flow (or create a Reset password flow and link the same app)
 
 ---
 
-## 7. Owner interactive gates
+## Owner gate D — API permissions / admin consent
 
-- External ID tenant creation (requires Microsoft account with billing)
-- Admin consent for app permissions
-- Custom domain for branded login (optional)
+1. App registration → **API permissions**  
+2. Ensure Microsoft Graph delegated permissions needed for sign-in are present (typically `openid`, `offline_access`, `profile`, and any CIAM-required defaults).  
+3. Click **Grant admin consent for \<tenant\>**  
+4. Status must show granted (green)
 
-Agent cannot complete these without owner Microsoft portal access.
+---
+
+## Owner gate E — Return values to GitHub (names only in chat)
+
+| GitHub secret name | Portal field |
+|--------------------|--------------|
+| `ENTRA_EXTERNAL_TENANT_ID` | Tenant ID |
+| `ENTRA_EXTERNAL_CLIENT_ID` | Application (client) ID |
+| `ENTRA_EXTERNAL_CLIENT_SECRET` | Client secret **Value** |
+| `ENTRA_EXTERNAL_REDIRECT_URI` | `https://app.growthcommandcenter.com/auth/callback` |
+
+Also set Azure Container App secret / env when cutting auth:
+
+| Name | Value |
+|------|-------|
+| `AUTH_PROVIDER` | `entra` (only after UAT) |
+| `ENTRA_EXTERNAL_AUTHORITY` | usually `https://<tenant-id>.ciamlogin.com/<tenant-id>` |
+
+---
+
+## Identity migration (agent-automated; no passwords)
+
+1. Export map: `npm run export:identity-map` (email + supabase user id only).  
+2. Table `gcc_identity_links`: `supabase_user_id` → `entra_object_id`.  
+3. Invite/activate users via Entra invitation / first-login link.  
+4. **PLAINTEXT_PASSWORDS_HANDLED = 0** — never migrate password hashes/plaintext.
+
+---
+
+## Rollback
+
+Keep Supabase Auth credentials and `AUTH_PROVIDER=supabase` until:
+
+- Entra login/logout/session PASS  
+- Owner/admin + client role parity PASS  
+- Tenant isolation PASS  
+
+Dual-auth window: max ~2 weeks, then remove Supabase Auth dependency.

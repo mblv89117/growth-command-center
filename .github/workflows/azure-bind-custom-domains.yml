@@ -1,0 +1,63 @@
+name: Azure Bind Custom Domains
+
+# Stage 2b — after pre-cutover UAT PASS, initiate managed cert bindings and
+# print exact GoDaddy DNS records. Does not cut DNS.
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-bind-custom-domains
+  cancel-in-progress: false
+
+env:
+  AZURE_RESOURCE_GROUP: rg-gcc-prod
+  CONTAINER_APP_NAME: azapprngzn
+  CONTAINER_APPS_ENV: azcaerngzn
+
+jobs:
+  bind-domains:
+    runs-on: ubuntu-latest
+    if: github.repository == 'mblv89117/growth-command-center'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Bind custom domains + emit exact DNS records
+        run: |
+          set -euo pipefail
+          chmod +x scripts/azure/bind-custom-domains.sh
+          scripts/azure/bind-custom-domains.sh | tee /tmp/gcc-dns-records.txt
+
+      - name: Publish DNS record artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcc-azure-dns-records
+          path: /tmp/gcc-dns-records.txt
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          {
+            echo "## Azure custom domain bind"
+            echo ""
+            echo "Pre-cutover UAT on default FQDN is already **PASS**."
+            echo "Apply the DNS records printed in this job (and in the artifact)."
+            echo "Do **not** cut DNS until bindings show Provisioned / Succeeded."
+            echo "Keep Vercel live for rollback."
+            echo ""
+            echo '```'
+            tail -n 80 /tmp/gcc-dns-records.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

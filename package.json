@@ -33,7 +33,9 @@
     "smtp:check-resend": "node scripts/check-resend-domain.mjs",
     "smtp:resend-dns": "node scripts/resend-domain-dns.mjs",
     "smtp:configure-resend": "SMTP_PROVIDER=resend node scripts/configure-supabase-smtp.mjs",
-    "test:domain-routing": "node --import tsx scripts/domain-routing.test.mjs"
+    "test:domain-routing": "node --import tsx scripts/domain-routing.test.mjs",
+    "export:identity-map": "node scripts/export-identity-map-for-entra.mjs",
+    "azure:bind-domains": "bash scripts/azure/bind-custom-domains.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
