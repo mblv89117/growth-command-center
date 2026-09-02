@@ -8,6 +8,7 @@ import {
   isPublicApiRoute,
   isSupabaseConfigured,
 } from "@/lib/config";
+import { getSupabaseUrl } from "@/lib/supabase/url";
 import {
   captureAttributionFromRequest,
   attributionCookieOptions,
@@ -59,8 +60,10 @@ async function getAuthenticatedUser(request: NextRequest): Promise<boolean> {
   }
 
   try {
+    const supabaseUrl = getSupabaseUrl();
+    if (!supabaseUrl) return false;
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      supabaseUrl,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
@@ -160,8 +163,13 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
+  const supabaseUrl = getSupabaseUrl();
+  if (!supabaseUrl) {
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {

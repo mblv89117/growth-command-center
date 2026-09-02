@@ -12,6 +12,13 @@ function parseNumber(value: string | number | undefined): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
+
+function assertNoError(error: { message: string } | null, context: string) {
+  if (error) {
+    throw new Error(`${context}: ${error.message}`);
+  }
+}
+
 export function buildImportPreview(
   templateType: ImportTemplateType,
   fileName: string,
@@ -84,23 +91,26 @@ export async function commitImport(
   try {
     if (preview.templateType === "financial_snapshot") {
       const row = validRows[0].data;
-      await admin.from("gcc_financial_snapshots").upsert(
-        {
-          organization_id: organizationId,
-          current_cash: Number(row.current_cash ?? 0),
-          revenue_mtd: Number(row.revenue_mtd ?? 0),
-          revenue_ytd: Number(row.revenue_ytd ?? 0),
-          gross_profit: Number(row.gross_profit ?? 0),
-          net_profit: Number(row.net_profit ?? 0),
-          operating_expenses: Number(row.operating_expenses ?? 0),
-          accounts_receivable: Number(row.accounts_receivable ?? 0),
-          accounts_payable: Number(row.accounts_payable ?? 0),
-          payroll_obligations: Number(row.payroll_obligations ?? 0),
-          ebitda: Number(row.ebitda ?? 0),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "organization_id" }
-      );
+      {
+        const { error } = await admin.from("gcc_financial_snapshots").upsert(
+          {
+            organization_id: organizationId,
+            current_cash: Number(row.current_cash ?? 0),
+            revenue_mtd: Number(row.revenue_mtd ?? 0),
+            revenue_ytd: Number(row.revenue_ytd ?? 0),
+            gross_profit: Number(row.gross_profit ?? 0),
+            net_profit: Number(row.net_profit ?? 0),
+            operating_expenses: Number(row.operating_expenses ?? 0),
+            accounts_receivable: Number(row.accounts_receivable ?? 0),
+            accounts_payable: Number(row.accounts_payable ?? 0),
+            payroll_obligations: Number(row.payroll_obligations ?? 0),
+            ebitda: Number(row.ebitda ?? 0),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "organization_id" }
+        );
+        assertNoError(error, "gcc_financial_snapshots upsert");
+      }
     } else if (preview.templateType === "monthly_trends") {
       for (let i = 0; i < validRows.length; i++) {
         const row = validRows[i].data;
@@ -108,58 +118,71 @@ export async function commitImport(
         const expenses = Number(row.expenses ?? revenue * 0.7);
         const profit = Number(row.profit ?? revenue - expenses);
         const cash = Number(row.cash ?? 0);
-        await admin.from("gcc_monthly_trends").upsert(
-          {
-            organization_id: organizationId,
-            month: String(row.month),
-            revenue,
-            expenses,
-            profit,
-            cash,
-            sort_order: i + 1,
-          },
-          { onConflict: "organization_id,month" }
-        );
+        {
+          const { error } = await admin.from("gcc_monthly_trends").upsert(
+            {
+              organization_id: organizationId,
+              month: String(row.month),
+              revenue,
+              expenses,
+              profit,
+              cash,
+              sort_order: i + 1,
+            },
+            { onConflict: "organization_id,month" }
+          );
+          assertNoError(error, "gcc_monthly_trends upsert");
+        }
       }
     } else if (preview.templateType === "transactions") {
       for (const row of validRows) {
         const data = row.data;
         const amount = Number(data.amount ?? 0);
         const type = String(data.type ?? (amount >= 0 ? "income" : "expense"));
-        await admin.from("gcc_transactions").upsert(
-          {
-            organization_id: organizationId,
-            txn_key: `import-${row.rowNum}-${String(data.date)}`,
-            txn_date: String(data.date),
-            description: String(data.description ?? ""),
-            category: String(data.category ?? "imported"),
-            amount: Math.abs(amount),
-            txn_type: type,
-          },
-          { onConflict: "organization_id,txn_key" }
-        );
+        {
+          const { error } = await admin.from("gcc_transactions").upsert(
+            {
+              organization_id: organizationId,
+              txn_key: `import-${row.rowNum}-${String(data.date)}`,
+              txn_date: String(data.date),
+              description: String(data.description ?? ""),
+              category: String(data.category ?? "imported"),
+              amount: Math.abs(amount),
+              txn_type: type,
+            },
+            { onConflict: "organization_id,txn_key" }
+          );
+          assertNoError(error, "gcc_transactions upsert");
+        }
       }
     }
 
-    await admin.from("gcc_import_jobs").insert({
-      organization_id: organizationId,
-      template_type: preview.templateType,
-      file_name: preview.fileName,
-      status: "completed",
-      row_count: validRows.length,
-      error_count: preview.errorCount,
-      mapping: preview.mapping,
-      source_provenance: "csv_xlsx_import",
-      created_by: userId ?? null,
-      completed_at: new Date().toISOString(),
-    });
+    {
+      const { error } = await admin.from("gcc_import_jobs").insert({
+        organization_id: organizationId,
+        template_type: preview.templateType,
+        file_name: preview.fileName,
+        status: "completed",
+        row_count: validRows.length,
+        error_count: preview.errorCount,
+        mapping: preview.mapping,
+        source_provenance: "csv_xlsx_import",
+        created_by: userId ?? null,
+        completed_at: new Date().toISOString(),
+      });
+      assertNoError(error, "gcc_import_jobs insert");
+    }
 
     await admin
       .from("gcc_organizations")
       .update({ data_source: "imported" })
       .eq("id", organizationId);
 
-    await recomputeTenantFinancials(organizationId);
+    const recompute = await recomputeTenantFinancials(organizationId);
+    if (!recompute.success) {
+      await completeJobRun(jobId, "failed", recompute.error ?? "recompute failed");
+      return { success: false, rowsCommitted: 0, error: recompute.error ?? "recompute failed" };
+    }
     await completeJobRun(jobId, "success");
     return { success: true, rowsCommitted: validRows.length };
   } catch (error) {

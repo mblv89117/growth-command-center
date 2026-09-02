@@ -239,7 +239,13 @@ async function runAuthenticatedUat(admin, orgId, userId, accessToken) {
 
   // Import via server lib (same path as API)
   const csv = `current_cash,revenue_mtd,revenue_ytd,gross_profit,net_profit,operating_expenses,accounts_receivable,accounts_payable,payroll_obligations,ebitda\n${Object.values(UAT_SNAPSHOT).join(",")}`;
-  const preview = buildImportPreview("financial_snapshot", "uat-snapshot.csv", csv.split("\n")[0].split(","), csv.split("\n").slice(1));
+  const headers = csv.split("\n")[0].split(",");
+  const dataRows = csv
+    .split("\n")
+    .slice(1)
+    .filter((line) => line.trim().length > 0)
+    .map((line) => line.split(","));
+  const preview = buildImportPreview("financial_snapshot", "uat-snapshot.csv", headers, dataRows);
 
   for (const row of UAT_TRENDS) {
     await admin.from("gcc_monthly_trends").upsert(
