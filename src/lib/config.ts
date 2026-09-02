@@ -59,6 +59,8 @@ export const PROTECTED_PREFIXES = [
 export const ADMIN_ROUTES = ["/admin"];
 
 export const PUBLIC_API_ROUTES = [
+  "/api/auth/entra/login",
+  "/api/auth/entra/logout",
   "/api/health",
   "/api/auth/demo",
   "/auth/callback",
@@ -93,4 +95,9 @@ export function validateProductionEnv(): string[] {
   if (!process.env.NEXT_PUBLIC_MARKETING_URL) missing.push("NEXT_PUBLIC_MARKETING_URL");
 
   return missing;
+}
+
+/** Browser-visible auth provider flag (set NEXT_PUBLIC_AUTH_PROVIDER=entra only after UAT). */
+export function isEntraClientEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_AUTH_PROVIDER === "entra";
 }
