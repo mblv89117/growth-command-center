@@ -81,6 +81,9 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           value: acr.listCredentials().passwords[0].value
         }
       ]
+      // NOTE: Omitting customDomains here causes ARM to clear previously bound
+      // hostnames on each deploy. scripts/azure/bind-custom-domains.sh must run
+      // after every infrastructure deployment to restore managed cert bindings.
       ingress: {
         external: true
         targetPort: 3000

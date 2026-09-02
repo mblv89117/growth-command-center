@@ -432,46 +432,45 @@ jobs:
           echo "$health" | grep -q '"status":"ok"'
           echo "HOST_HEADER_ROUTING=DEFERRED_UNTIL_CUSTOM_DOMAIN_BINDING"
 
-      - name: Production login auth + branding smoke
+      - name: Production login auth + branding smoke (FQDN)
         env:
-          APP_URL: https://app.growthcommandcenter.com
           AZURE_FQDN: ${{ needs.deploy.outputs.fqdn }}
         run: |
           set -euo pipefail
-          # Prefer ACA FQDN (guaranteed new revision), then custom domain.
-          for base in "https://${AZURE_FQDN}" "$APP_URL"; do
-            echo "Checking $base/login"
-            html=$(curl -fsS "$base/login")
-            echo "$html" | grep -qi "Growth Command Center"
-            if echo "$html" | grep -qi "credentials are not configured"; then
-              echo "FAIL: production login still shows missing-credentials message at $base" >&2
+          # FQDN only — custom domains are rebound after Bicep (which clears customDomains).
+          base="https://${AZURE_FQDN}"
+          echo "Checking ${base}/login"
+          html=$(curl -fsS "${base}/login")
+          echo "$html" | grep -qi "Growth Command Center"
+          if echo "$html" | grep -qi "Sign-in is temporarily unavailable"; then
+            echo "FAIL: production login shows auth-unavailable banner at ${base}" >&2
+            exit 1
+          fi
+          if echo "$html" | grep -qi "credentials are not configured"; then
+            echo "FAIL: production login still shows missing-credentials message at ${base}" >&2
+            exit 1
+          fi
+          if echo "$html" | grep -qi "Enter Demo Mode"; then
+            echo "FAIL: production login still advertises demo fallback at ${base}" >&2
+            exit 1
+          fi
+          echo "$html" | grep -E -q '/brand/gcc-logo.png|/favicon\.ico'
+          chunk=$(echo "$html" | tr '"' '\n' | grep -F '/_next/static/chunks/' | grep -F 'login' | grep '\.js$' | head -1 || true)
+          if [ -n "$chunk" ]; then
+            js=$(curl -fsS "${base}${chunk}")
+            if echo "$js" | grep -q 'env\.NEXT_PUBLIC_SUPABASE_URL'; then
+              echo "FAIL: login chunk still references env.NEXT_PUBLIC_SUPABASE_URL (build-time inline missing)" >&2
               exit 1
             fi
-            if echo "$html" | grep -qi "demo mode to explore"; then
-              echo "FAIL: production login still advertises demo fallback at $base" >&2
+            if ! echo "$js" | grep -q 'supabase\.co'; then
+              echo "FAIL: login chunk missing inlined supabase.co host" >&2
               exit 1
             fi
-            echo "$html" | grep -E -q '/brand/gcc-logo|/favicon\\.ico'
-            chunk=$(echo "$html" | grep -oE '/_next/static/chunks/[^"]*login[^"]*\\.js' | head -1 || true)
-            if [ -z "$chunk" ]; then
-              chunk=$(echo "$html" | grep -oE '/_next/static/chunks/app/\\(auth\\)/login/[^"]+\\.js' | head -1 || true)
-            fi
-            if [ -n "$chunk" ]; then
-              js=$(curl -fsS "${base}${chunk}")
-              if echo "$js" | grep -q 'env\\.NEXT_PUBLIC_SUPABASE_URL'; then
-                echo "FAIL: login chunk still references env.NEXT_PUBLIC_SUPABASE_URL (build-time inline missing)" >&2
-                exit 1
-              fi
-              if ! echo "$js" | grep -q 'supabase\\.co'; then
-                echo "FAIL: login chunk missing inlined supabase.co host" >&2
-                exit 1
-              fi
-              echo "NEXT_PUBLIC_BUILD_INLINE=PASS chunk=$chunk"
-            else
-              echo "WARN: login chunk path not found in HTML; HTML checks passed"
-            fi
-            echo "AZURE_APP_AUTH_CONFIG=PASS base=$base"
-          done
+            echo "NEXT_PUBLIC_BUILD_INLINE=PASS chunk=$chunk"
+          else
+            echo "WARN: login chunk path not found in HTML; HTML checks passed"
+          fi
+          echo "AZURE_APP_AUTH_CONFIG=PASS base=$base"
 
       - name: QuickBooks route smoke
         env:
@@ -483,8 +482,9 @@ jobs:
           echo "$cb" | grep -Eq "30[27]"
 
 
+  # Bicep ingress replace clears customDomains; rebind before custom-domain certification.
   bind-custom-domains:
-    needs: pre-cutover-uat
+    needs: deploy
     runs-on: ubuntu-latest
     if: github.repository == 'mblv89117/growth-command-center'
     permissions:
@@ -522,11 +522,63 @@ jobs:
           {
             echo "## Azure custom domain bind"
             echo ""
-            echo "Apply **only** the DNS records below in GoDaddy."
-            echo "Do not cut traffic until Azure hostname status is Provisioned."
-            echo "Keep Vercel for rollback."
+            echo "Bicep redeploys clear Container App customDomains; this job restores them."
+            echo "DNS must already match Azure-emitted records (do not invent values)."
+            echo "Keep Vercel for rollback until hostnames show Succeeded."
             echo ""
             echo '```'
-            cat /tmp/gcc-dns-records.txt
+            tail -n 80 /tmp/gcc-dns-records.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  certify-custom-domains:
+    needs: [deploy, bind-custom-domains, pre-cutover-uat]
+    runs-on: ubuntu-latest
+    if: github.repository == 'mblv89117/growth-command-center'
+    steps:
+      - name: Custom domain login auth + branding smoke
+        env:
+          APP_URL: https://app.growthcommandcenter.com
+          MARKETING_URL: https://growthcommandcenter.com
+          WWW_URL: https://www.growthcommandcenter.com
+        run: |
+          set -euo pipefail
+          check_login() {
+            local base="$1"
+            local html=""
+            local attempt=1
+            while [ "$attempt" -le 12 ]; do
+              if html=$(curl -fsS --connect-timeout 10 --max-time 30 "$base/login" 2>/dev/null); then
+                break
+              fi
+              echo "Retry $attempt/12 for $base/login (waiting for managed cert)..."
+              sleep 20
+              attempt=$((attempt + 1))
+            done
+            if [ -z "$html" ]; then
+              echo "FAIL: could not fetch $base/login after retries" >&2
+              exit 1
+            fi
+            echo "$html" | grep -qi "Growth Command Center"
+            if echo "$html" | grep -qi "Sign-in is temporarily unavailable"; then
+              echo "FAIL: auth-unavailable banner at $base" >&2
+              exit 1
+            fi
+            if echo "$html" | grep -qi "credentials are not configured"; then
+              echo "FAIL: credentials warning at $base" >&2
+              exit 1
+            fi
+            if echo "$html" | grep -qi "Enter Demo Mode"; then
+              echo "FAIL: demo fallback at $base" >&2
+              exit 1
+            fi
+            echo "$html" | grep -E -q '/brand/gcc-logo.png|/favicon\.ico'
+            echo "CUSTOM_DOMAIN_AUTH_BRANDING=PASS base=$base"
+          }
+          check_login "$APP_URL"
+          for base in "$MARKETING_URL" "$WWW_URL"; do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 "$base/" || echo "000")
+            echo "$base -> HTTP $code"
+            echo "$code" | grep -Eq '200|301|302|307|308'
+          done
+          echo "PUBLIC_URL_CONTRACT=PASS"
