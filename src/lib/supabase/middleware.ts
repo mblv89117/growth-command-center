@@ -126,7 +126,8 @@ export async function handleDomainRouting(request: NextRequest): Promise<NextRes
     }
 
     return null;
-  } catch {
+  } catch (error) {
+    console.error("handleDomainRouting failed", error);
     return null;
   }
 }
