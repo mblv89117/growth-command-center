@@ -19,6 +19,19 @@ export function normalizeHost(host: string | null): string {
   return (host ?? "").toLowerCase().replace(/:\d+$/, "");
 }
 
+/**
+ * Prefer X-Forwarded-Host when present so pre-cutover UAT can simulate
+ * custom domains against the Azure Container Apps FQDN. Azure rejects
+ * mismatched Host headers at the ingress (platform 404) before Next.js runs.
+ */
+export function getRequestHost(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-host");
+  if (forwarded) {
+    return normalizeHost(forwarded.split(",")[0]?.trim() ?? "");
+  }
+  return normalizeHost(request.headers.get("host"));
+}
+
 export function shouldApplyCommercialDomainRouting(host: string): boolean {
   const normalized = normalizeHost(host);
   if (!normalized || normalized === "localhost" || normalized.startsWith("127.0.0.1")) {
@@ -41,8 +54,8 @@ export function isApiOrNextInternalPath(pathname: string): boolean {
 }
 
 export function resolveWwwRedirectTarget(request: NextRequest): string | null {
-  const host = request.headers.get("host");
-  if (!isWwwHost(host ?? "")) return null;
+  const host = getRequestHost(request);
+  if (!isWwwHost(host)) return null;
 
   const marketingBase = getPrimaryPublicUrl();
   const target = new URL(request.nextUrl.pathname, marketingBase);
@@ -53,8 +66,8 @@ export function resolveWwwRedirectTarget(request: NextRequest): string | null {
 export function resolveMarketingToAppRedirectTarget(
   request: NextRequest
 ): string | null {
-  const host = request.headers.get("host");
-  if (!isMarketingHost(host ?? "")) return null;
+  const host = getRequestHost(request);
+  if (!isMarketingHost(host)) return null;
 
   const { pathname } = request.nextUrl;
   if (MARKETING_ONLY_PATHS.has(pathname)) return null;
@@ -70,8 +83,8 @@ export function resolveAppHostRedirectTarget(
   request: NextRequest,
   isAuthenticated: boolean
 ): string | null {
-  const host = request.headers.get("host");
-  if (!isAppHost(host ?? "")) return null;
+  const host = getRequestHost(request);
+  if (!isAppHost(host)) return null;
 
   const { pathname } = request.nextUrl;
 
