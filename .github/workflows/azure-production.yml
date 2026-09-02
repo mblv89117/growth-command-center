@@ -410,3 +410,52 @@ jobs:
           cb=$(curl -sI "https://${AZURE_FQDN}/api/integrations/quickbooks/callback" | head -1)
           echo "callback: $cb"
           echo "$cb" | grep -Eq "30[27]"
+
+
+  bind-custom-domains:
+    needs: pre-cutover-uat
+    runs-on: ubuntu-latest
+    if: github.repository == 'mblv89117/growth-command-center'
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Bind custom domains + emit exact DNS records
+        env:
+          AZURE_RESOURCE_GROUP: ${{ env.AZURE_RESOURCE_GROUP }}
+          CONTAINER_APP_NAME: azapprngzn
+          CONTAINER_APPS_ENV: azcaerngzn
+        run: |
+          set -euo pipefail
+          chmod +x scripts/azure/bind-custom-domains.sh
+          scripts/azure/bind-custom-domains.sh | tee /tmp/gcc-dns-records.txt
+
+      - name: Upload DNS record artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcc-azure-dns-records
+          path: /tmp/gcc-dns-records.txt
+          retention-days: 30
+
+      - name: Job summary
+        run: |
+          {
+            echo "## Azure custom domain bind"
+            echo ""
+            echo "Apply **only** the DNS records below in GoDaddy."
+            echo "Do not cut traffic until Azure hostname status is Provisioned."
+            echo "Keep Vercel for rollback."
+            echo ""
+            echo '```'
+            cat /tmp/gcc-dns-records.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
