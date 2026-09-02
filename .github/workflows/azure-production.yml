@@ -238,11 +238,14 @@ jobs:
           )
 
           add_secret() {
-            local name="$1"
+            local env_name="$1"
             local value="$2"
             [ -z "$value" ] && return 0
-            secret_args+=("${name}=${value}")
-            env_args+=("${name}=secretref:${name}")
+            # Azure Container Apps secret names must be lowercase alphanumeric + '-'
+            local secret_name
+            secret_name=$(echo "$env_name" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            secret_args+=("${secret_name}=${value}")
+            env_args+=("${env_name}=secretref:${secret_name}")
           }
 
           add_secret SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY"
