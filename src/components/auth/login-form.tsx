@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { TrendingUp, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { isSupabaseConfigured } from "@/lib/config";
+import { isDemoModeAllowed, isProduction, isSupabaseConfigured } from "@/lib/config";
+import { GccLogo } from "@/components/brand/gcc-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,8 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const authReady = isSupabaseConfigured();
+  const allowDemo = isDemoModeAllowed();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +32,11 @@ export function LoginForm() {
 
     const supabase = createClient();
     if (!supabase) {
-      setError("Supabase is not configured.");
+      setError(
+        isProduction
+          ? "Authentication is temporarily unavailable. Please try again shortly."
+          : "Supabase is not configured."
+      );
       setLoading(false);
       return;
     }
@@ -56,7 +63,11 @@ export function LoginForm() {
 
     const supabase = createClient();
     if (!supabase) {
-      setError("Supabase is not configured.");
+      setError(
+        isProduction
+          ? "Authentication is temporarily unavailable. Please try again shortly."
+          : "Supabase is not configured."
+      );
       setLoading(false);
       return;
     }
@@ -74,6 +85,7 @@ export function LoginForm() {
   };
 
   const handleDemoMode = async () => {
+    if (!allowDemo) return;
     setLoading(true);
     await fetch("/api/auth/demo", { method: "POST" });
     router.push("/dashboard");
@@ -81,17 +93,19 @@ export function LoginForm() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <TrendingUp className="h-6 w-6 text-primary-foreground" />
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-100 via-background to-background p-4 dark:from-slate-900">
+      <Card className="w-full max-w-md border-border/60 shadow-lg">
+        <CardHeader className="space-y-4 text-center">
+          <div className="mx-auto flex justify-center">
+            <GccLogo priority className="max-w-[260px]" />
           </div>
-          <CardTitle className="text-2xl">Growth Command Center</CardTitle>
-          <CardDescription>Sign in to your CFO intelligence platform</CardDescription>
+          <div className="space-y-1">
+            <CardTitle className="text-2xl tracking-tight">Growth Command Center</CardTitle>
+            <CardDescription>Sign in to your CFO intelligence platform</CardDescription>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isSupabaseConfigured() ? (
+          {authReady ? (
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -102,6 +116,7 @@ export function LoginForm() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoComplete="email"
                 />
               </div>
               <div className="space-y-2">
@@ -112,6 +127,7 @@ export function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete="current-password"
                 />
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
@@ -132,13 +148,29 @@ export function LoginForm() {
               </Button>
             </form>
           ) : (
-            <div className="rounded-lg border bg-muted/50 p-4 text-sm text-muted-foreground">
-              Supabase credentials are not configured. Use demo mode to explore the full application
-              with sample construction company data.
+            <div
+              className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-foreground"
+              role="alert"
+            >
+              {isProduction ? (
+                <>
+                  <p className="font-medium">Sign-in is temporarily unavailable.</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Production authentication is not fully configured. Please retry shortly or contact
+                    support. Demo mode is disabled in production.
+                  </p>
+                </>
+              ) : (
+                <p className="text-muted-foreground">
+                  Supabase credentials are not configured in this environment. Configure{" "}
+                  <code className="text-xs">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+                  <code className="text-xs">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> for local development.
+                </p>
+              )}
             </div>
           )}
 
-          {process.env.NODE_ENV === "development" && (
+          {allowDemo && (
             <>
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -156,7 +188,7 @@ export function LoginForm() {
             </>
           )}
 
-          {isSupabaseConfigured() && (
+          {authReady && (
             <p className="text-center text-sm text-muted-foreground">
               No account?{" "}
               <Link href="/signup" className="font-medium text-primary hover:underline">

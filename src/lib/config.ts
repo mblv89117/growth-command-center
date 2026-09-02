@@ -15,10 +15,13 @@ export function isQuickBooksConfigured(): boolean {
   );
 }
 
-/** Demo mode is development-only unless explicitly enabled */
+/**
+ * Demo mode is never enabled in production deployments.
+ * Local/dev may opt in via ALLOW_DEMO_MODE=true; production fails closed.
+ */
 export function isDemoModeAllowed(): boolean {
-  if (!isProduction) return true;
-  return process.env.ALLOW_DEMO_MODE === "true";
+  if (isProduction) return false;
+  return process.env.ALLOW_DEMO_MODE === "true" || process.env.NODE_ENV === "development";
 }
 
 export function getAppUrl(): string {

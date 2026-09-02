@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, BarChart3, Shield, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { ArrowRight, BarChart3, Shield, Sparkles, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
+import { GccLogo } from "@/components/brand/gcc-logo";
 
 const features = [
   {
@@ -32,12 +33,9 @@ export function LandingPage() {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <TrendingUp className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold">Growth Command Center</span>
-          </div>
+          <Link href="/" className="flex items-center">
+            <GccLogo className="max-w-[200px]" />
+          </Link>
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild>
               <Link href="/login">Sign in</Link>

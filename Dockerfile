@@ -10,7 +10,23 @@ RUN npm ci
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# NEXT_PUBLIC_* must be present at `next build` so the browser bundle is inlined.
+# Do NOT pass SUPABASE_SERVICE_ROLE_KEY (or any server secret) as a build arg.
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_APP_URL=https://app.growthcommandcenter.com
+ARG NEXT_PUBLIC_MARKETING_URL=https://growthcommandcenter.com
+
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_MARKETING_URL=$NEXT_PUBLIC_MARKETING_URL
+
+RUN test -n "$NEXT_PUBLIC_SUPABASE_URL" || (echo "BLOCKER: NEXT_PUBLIC_SUPABASE_URL build-arg missing" >&2; exit 1)
+RUN test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" || (echo "BLOCKER: NEXT_PUBLIC_SUPABASE_ANON_KEY build-arg missing" >&2; exit 1)
+
 RUN npm run build
 
 FROM base AS runner
@@ -19,7 +35,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-RUN addgroup --system --gid 1001 nodejs \
+RUN apk add --no-cache wget \
+  && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public

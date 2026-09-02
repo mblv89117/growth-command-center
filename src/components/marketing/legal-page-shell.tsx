@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { appLoginUrl, appSignupUrl } from "@/lib/domains/links";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
+import { GccLogo } from "@/components/brand/gcc-logo";
 
 export function LegalPageShell({
   title,
@@ -20,11 +20,8 @@ export function LegalPageShell({
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <TrendingUp className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold">Growth Command Center</span>
+          <Link href="/" className="flex items-center">
+            <GccLogo className="max-w-[200px]" />
           </Link>
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild>

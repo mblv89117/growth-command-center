@@ -184,13 +184,43 @@ jobs:
         run: az acr login --name ${{ steps.infra.outputs.acr_name }}
 
       - name: Build and push Docker image
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
           TAG="${{ github.sha }}"
           IMAGE="${{ steps.infra.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:${TAG}"
-          docker build -t "$IMAGE" .
+
+          if [ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" ] || [ -z "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
+            echo "Missing required GitHub secret for Docker build: NEXT_PUBLIC_SUPABASE_URL and/or NEXT_PUBLIC_SUPABASE_ANON_KEY" >&2
+            exit 1
+          fi
+
+          # Normalize Project URL for build-time inlining (never echo secret values).
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%"${NEXT_PUBLIC_SUPABASE_URL##*[![:space:]]}"}"
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL#"${NEXT_PUBLIC_SUPABASE_URL%%[![:space:]]*}"}"
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/rest/v1}"
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/auth/v1}"
+          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
+          host="$(echo "$NEXT_PUBLIC_SUPABASE_URL" | sed -E 's|https?://([^/]+).*|\1|')"
+          echo "Docker build-arg Supabase host: $host"
+
+          # NEXT_PUBLIC_* must be build-args so Next.js inlines them into the browser bundle.
+          # SUPABASE_SERVICE_ROLE_KEY must NEVER be passed as a build-arg.
+          docker build \
+            --build-arg "NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}" \
+            --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}" \
+            --build-arg "NEXT_PUBLIC_APP_URL=https://app.growthcommandcenter.com" \
+            --build-arg "NEXT_PUBLIC_MARKETING_URL=https://growthcommandcenter.com" \
+            -t "$IMAGE" \
+            -t "${{ steps.infra.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:latest" \
+            .
           docker push "$IMAGE"
+          docker push "${{ steps.infra.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:latest"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          echo "DOCKER_BUILD_ENV_INJECTION=PASS"
 
       - name: Configure Container App secrets and env
         env:
@@ -401,6 +431,47 @@ jobs:
           echo "$login" | grep -Eq "200|30[1278]"
           echo "$health" | grep -q '"status":"ok"'
           echo "HOST_HEADER_ROUTING=DEFERRED_UNTIL_CUSTOM_DOMAIN_BINDING"
+
+      - name: Production login auth + branding smoke
+        env:
+          APP_URL: https://app.growthcommandcenter.com
+          AZURE_FQDN: ${{ needs.deploy.outputs.fqdn }}
+        run: |
+          set -euo pipefail
+          # Prefer ACA FQDN (guaranteed new revision), then custom domain.
+          for base in "https://${AZURE_FQDN}" "$APP_URL"; do
+            echo "Checking $base/login"
+            html=$(curl -fsS "$base/login")
+            echo "$html" | grep -qi "Growth Command Center"
+            if echo "$html" | grep -qi "credentials are not configured"; then
+              echo "FAIL: production login still shows missing-credentials message at $base" >&2
+              exit 1
+            fi
+            if echo "$html" | grep -qi "demo mode to explore"; then
+              echo "FAIL: production login still advertises demo fallback at $base" >&2
+              exit 1
+            fi
+            echo "$html" | grep -E -q '/brand/gcc-logo|/favicon\\.ico'
+            chunk=$(echo "$html" | grep -oE '/_next/static/chunks/[^"]*login[^"]*\\.js' | head -1 || true)
+            if [ -z "$chunk" ]; then
+              chunk=$(echo "$html" | grep -oE '/_next/static/chunks/app/\\(auth\\)/login/[^"]+\\.js' | head -1 || true)
+            fi
+            if [ -n "$chunk" ]; then
+              js=$(curl -fsS "${base}${chunk}")
+              if echo "$js" | grep -q 'env\\.NEXT_PUBLIC_SUPABASE_URL'; then
+                echo "FAIL: login chunk still references env.NEXT_PUBLIC_SUPABASE_URL (build-time inline missing)" >&2
+                exit 1
+              fi
+              if ! echo "$js" | grep -q 'supabase\\.co'; then
+                echo "FAIL: login chunk missing inlined supabase.co host" >&2
+                exit 1
+              fi
+              echo "NEXT_PUBLIC_BUILD_INLINE=PASS chunk=$chunk"
+            else
+              echo "WARN: login chunk path not found in HTML; HTML checks passed"
+            fi
+            echo "AZURE_APP_AUTH_CONFIG=PASS base=$base"
+          done
 
       - name: QuickBooks route smoke
         env:

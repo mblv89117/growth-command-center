@@ -16,6 +16,7 @@ import { CONNECTOR_REGISTRY } from "@/lib/connectors/registry";
 import { STANDALONE_PRICE_MONTHLY } from "@/lib/entitlements";
 import { appLoginUrl, appSignupUrl } from "@/lib/domains/links";
 import type { GtmAttribution } from "@/lib/gtm/attribution";
+import { GccLogo } from "@/components/brand/gcc-logo";
 
 const connectorEcosystem = [
   { name: "QuickBooks", status: "Coming Soon", category: "Accounting" },
@@ -38,11 +39,8 @@ export function GtmHomepage({ attribution = {} }: { attribution?: GtmAttribution
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <TrendingUp className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold">Growth Command Center</span>
+          <Link href="/" className="flex items-center">
+            <GccLogo className="max-w-[200px]" />
           </Link>
           <nav className="hidden items-center gap-6 text-sm md:flex">
             <Link href="#how-it-works" className="text-muted-foreground hover:text-foreground">
