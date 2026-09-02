@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserRole } from "@/lib/types";
@@ -9,16 +10,10 @@ export interface AuthContext {
   organizationId: string;
 }
 
-export async function getAuthContext(): Promise<AuthContext | null> {
-  const supabase = await createClient();
-  if (!supabase) return null;
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const metadata = user.user_metadata ?? {};
+async function resolveProfile(
+  userId: string,
+  metadata: Record<string, unknown>
+): Promise<{ organizationId: string; role: UserRole }> {
   let organizationId = (metadata.organization_id as string) ?? "org-apex";
   let role = (metadata.role as UserRole) ?? "founder";
 
@@ -27,12 +22,62 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     const { data: profile } = await admin
       .from("gcc_profiles")
       .select("organization_id, role")
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle();
 
     if (profile?.organization_id) organizationId = profile.organization_id;
     if (profile?.role) role = profile.role as UserRole;
   }
+
+  return { organizationId, role };
+}
+
+/**
+ * Resolve the caller from:
+ * 1) Authorization: Bearer <access_token> (API / UAT clients)
+ * 2) Supabase SSR cookie session (browser)
+ */
+export async function getAuthContext(): Promise<AuthContext | null> {
+  const headerStore = await headers();
+  const authHeader = headerStore.get("authorization");
+
+  if (authHeader?.toLowerCase().startsWith("bearer ")) {
+    const token = authHeader.slice(7).trim();
+    if (token) {
+      const admin = createAdminClient();
+      if (admin) {
+        const {
+          data: { user },
+          error,
+        } = await admin.auth.getUser(token);
+        if (!error && user) {
+          const { organizationId, role } = await resolveProfile(
+            user.id,
+            (user.user_metadata ?? {}) as Record<string, unknown>
+          );
+          return {
+            userId: user.id,
+            email: user.email ?? "",
+            role,
+            organizationId,
+          };
+        }
+      }
+    }
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return null;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { organizationId, role } = await resolveProfile(
+    user.id,
+    (user.user_metadata ?? {}) as Record<string, unknown>
+  );
 
   return {
     userId: user.id,
