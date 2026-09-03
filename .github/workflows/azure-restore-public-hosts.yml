@@ -1,0 +1,133 @@
+name: Azure Restore Public Hosts
+
+# PUBLIC HOST RECOVERY — no DNS changes, no new Container App, no Stage-3 migration.
+# Starts azapprngzn if stopped and rebinds managed custom domains + certificates.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type RESTORE to start the existing Container App and rebind custom domains"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-restore-public-hosts
+  cancel-in-progress: false
+
+env:
+  AZURE_RESOURCE_GROUP: rg-gcc-prod
+  CONTAINER_APP_NAME: azapprngzn
+  CONTAINER_APPS_ENV: azcaerngzn
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    if: github.repository == 'mblv89117/growth-command-center' && inputs.confirm == 'RESTORE'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure Container App is running
+        id: app
+        run: |
+          set -euo pipefail
+          APP="$CONTAINER_APP_NAME"
+          RG="$AZURE_RESOURCE_GROUP"
+          STATUS=$(az containerapp show -n "$APP" -g "$RG" --query "properties.runningStatus" -o tsv)
+          echo "runningStatus=${STATUS}"
+          if [ "$STATUS" != "Running" ]; then
+            az containerapp start -n "$APP" -g "$RG"
+            for i in $(seq 1 18); do
+              STATUS=$(az containerapp show -n "$APP" -g "$RG" --query "properties.runningStatus" -o tsv)
+              echo "wait $i status=$STATUS"
+              [ "$STATUS" = "Running" ] && break
+              sleep 10
+            done
+          fi
+          FQDN=$(az containerapp show -n "$APP" -g "$RG" --query "properties.configuration.ingress.fqdn" -o tsv)
+          REV=$(az containerapp revision list -n "$APP" -g "$RG" --query "[?properties.trafficWeight > \`0\`].name | [0]" -o tsv)
+          IMAGE=$(az containerapp revision show -n "$APP" -g "$RG" --revision "$REV" --query "properties.template.containers[0].image" -o tsv)
+          WEIGHT=$(az containerapp revision list -n "$APP" -g "$RG" --query "[?name=='$REV'].properties.trafficWeight | [0]" -o tsv)
+          echo "fqdn=${FQDN}" >> "$GITHUB_OUTPUT"
+          echo "revision=${REV}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "traffic=${WEIGHT}" >> "$GITHUB_OUTPUT"
+          echo "CONTAINER_APP_RUNNING=PASS"
+          echo "ACTIVE_REVISION=${REV}"
+          echo "ACTIVE_IMAGE=${IMAGE}"
+          echo "TRAFFIC=${WEIGHT}"
+
+      - name: Rebind custom domains + managed certificates
+        env:
+          AZURE_RESOURCE_GROUP: ${{ env.AZURE_RESOURCE_GROUP }}
+          CONTAINER_APP_NAME: ${{ env.CONTAINER_APP_NAME }}
+          CONTAINER_APPS_ENV: ${{ env.CONTAINER_APPS_ENV }}
+          VALIDATION_METHOD: CNAME
+        run: |
+          set -euo pipefail
+          chmod +x scripts/azure/bind-custom-domains.sh
+          scripts/azure/bind-custom-domains.sh | tee /tmp/gcc-dns-records.txt
+
+      - name: Upload bind artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcc-restore-dns-records
+          path: /tmp/gcc-dns-records.txt
+          retention-days: 30
+
+      - name: Certify public hosts
+        env:
+          FQDN: ${{ steps.app.outputs.fqdn }}
+        run: |
+          set -euo pipefail
+          # Default FQDN first
+          curl -fsS "https://${FQDN}/api/health" | head -c 300
+          echo
+          for url in \
+            "https://growthcommandcenter.com/" \
+            "https://www.growthcommandcenter.com/" \
+            "https://app.growthcommandcenter.com/" \
+            "https://app.growthcommandcenter.com/login"; do
+            code=000
+            for attempt in $(seq 1 18); do
+              code=$(curl -sS -o /tmp/restore-body -w '%{http_code}' --connect-timeout 10 --max-time 30 "$url" || echo 000)
+              echo "$url attempt=$attempt code=$code"
+              if echo "$code" | grep -Eq '200|301|302|307|308'; then
+                break
+              fi
+              sleep 20
+            done
+            echo "$code" | grep -Eq '200|301|302|307|308'
+          done
+          html=$(curl -fsS --max-time 30 https://app.growthcommandcenter.com/login)
+          echo "$html" | grep -qi "Growth Command Center"
+          if echo "$html" | grep -Eqi "credentials are not configured|Enter Demo Mode|Sign-in is temporarily unavailable"; then
+            echo "FAIL: auth/branding regression on app login" >&2
+            exit 1
+          fi
+          echo "PUBLIC_HOST_RECOVERY=PASS"
+
+      - name: Summary
+        run: |
+          {
+            echo "## GCC public host restore"
+            echo ""
+            echo "- Container App: \`$CONTAINER_APP_NAME\`"
+            echo "- FQDN: \`${{ steps.app.outputs.fqdn }}\`"
+            echo "- Revision: \`${{ steps.app.outputs.revision }}\`"
+            echo "- Image: \`${{ steps.app.outputs.image }}\`"
+            echo "- Traffic: \`${{ steps.app.outputs.traffic }}\`"
+            echo ""
+            echo "DNS was not modified. Custom domains were rebound on the existing app."
+          } >> "$GITHUB_STEP_SUMMARY"

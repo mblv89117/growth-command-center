@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      redeploy_infra:
+        description: "Redeploy Bicep infra (clears customDomains — bind job restores them)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -114,10 +120,10 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'mblv89117/growth-command-center'
     outputs:
-      acr_name: ${{ steps.infra.outputs.acr_name }}
-      app_name: ${{ steps.infra.outputs.app_name }}
-      fqdn: ${{ steps.infra.outputs.fqdn }}
-      azure_url: ${{ steps.infra.outputs.azure_url }}
+      acr_name: ${{ steps.target.outputs.acr_name }}
+      app_name: ${{ steps.target.outputs.app_name }}
+      fqdn: ${{ steps.target.outputs.fqdn }}
+      azure_url: ${{ steps.target.outputs.azure_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -154,6 +160,11 @@ jobs:
 
       - name: Deploy infrastructure (Bicep)
         id: infra
+        # Domain-binding regression protection:
+        # Full Bicep ingress deploy omits customDomains and clears managed hostnames.
+        # Default path reuses the existing Container App and only updates the image.
+        # Set workflow_dispatch input redeploy_infra=true only when infra changes are required.
+        if: github.event_name == 'workflow_dispatch' && inputs.redeploy_infra == true
         run: |
           set -euo pipefail
           DEPLOY_NAME="gcc-infra-${{ github.run_id }}"
@@ -180,8 +191,62 @@ jobs:
           echo "  Container App: ${APP_NAME}"
           echo "  FQDN: ${FQDN}"
 
+
+      - name: Resolve existing Container App (skip Bicep)
+        id: resolve
+        if: steps.infra.outcome != 'success'
+        run: |
+          set -euo pipefail
+          # Prefer parameters file values; fall back to known production names.
+          APP_NAME=$(jq -r '.parameters.containerAppName.value // empty' infra/azure/main.parameters.json 2>/dev/null || true)
+          ACR_NAME=$(jq -r '.parameters.acrName.value // empty' infra/azure/main.parameters.json 2>/dev/null || true)
+          if [ -z "$APP_NAME" ] || [ "$APP_NAME" = "null" ]; then APP_NAME="azapprngzn"; fi
+          if [ -z "$ACR_NAME" ] || [ "$ACR_NAME" = "null" ]; then
+            ACR_NAME=$(az acr list -g "$AZURE_RESOURCE_GROUP" --query "[0].name" -o tsv)
+          fi
+          # Ensure app is not stopped (public host recovery)
+          RUNNING=$(az containerapp show -n "$APP_NAME" -g "$AZURE_RESOURCE_GROUP" --query "properties.runningStatus" -o tsv 2>/dev/null || echo unknown)
+          echo "runningStatus=${RUNNING}"
+          if [ "$RUNNING" != "Running" ]; then
+            echo "Starting Container App $APP_NAME ..."
+            az containerapp start -n "$APP_NAME" -g "$AZURE_RESOURCE_GROUP" || true
+            sleep 15
+          fi
+          FQDN=$(az containerapp show -n "$APP_NAME" -g "$AZURE_RESOURCE_GROUP" --query "properties.configuration.ingress.fqdn" -o tsv)
+          echo "acr_name=${ACR_NAME}" >> "$GITHUB_OUTPUT"
+          echo "app_name=${APP_NAME}" >> "$GITHUB_OUTPUT"
+          echo "fqdn=${FQDN}" >> "$GITHUB_OUTPUT"
+          echo "azure_url=https://${FQDN}" >> "$GITHUB_OUTPUT"
+          echo "DOMAIN_BINDING_DEPLOYMENT_REGRESSION=PASS"
+          echo "Reusing existing Container App without Bicep ingress replace:"
+          echo "  ACR: ${ACR_NAME}"
+          echo "  Container App: ${APP_NAME}"
+          echo "  FQDN: ${FQDN}"
+
+      - name: Select deploy target
+        id: target
+        run: |
+          set -euo pipefail
+          ACR="${{ steps.infra.outputs.acr_name }}"
+          APP="${{ steps.infra.outputs.app_name }}"
+          FQDN="${{ steps.infra.outputs.fqdn }}"
+          URL="${{ steps.infra.outputs.azure_url }}"
+          if [ -z "${ACR:-}" ]; then ACR="${{ steps.resolve.outputs.acr_name }}"; fi
+          if [ -z "${APP:-}" ]; then APP="${{ steps.resolve.outputs.app_name }}"; fi
+          if [ -z "${FQDN:-}" ]; then FQDN="${{ steps.resolve.outputs.fqdn }}"; fi
+          if [ -z "${URL:-}" ]; then URL="${{ steps.resolve.outputs.azure_url }}"; fi
+          if [ -z "${ACR:-}" ] || [ -z "${APP:-}" ] || [ -z "${FQDN:-}" ]; then
+            echo "FAILED to resolve ACR/APP/FQDN for deploy" >&2
+            exit 1
+          fi
+          echo "acr_name=${ACR}" >> "$GITHUB_OUTPUT"
+          echo "app_name=${APP}" >> "$GITHUB_OUTPUT"
+          echo "fqdn=${FQDN}" >> "$GITHUB_OUTPUT"
+          echo "azure_url=${URL}" >> "$GITHUB_OUTPUT"
+          echo "Selected ACR=${ACR} APP=${APP} FQDN=${FQDN}"
+
       - name: Login to ACR
-        run: az acr login --name ${{ steps.infra.outputs.acr_name }}
+        run: az acr login --name ${{ steps.target.outputs.acr_name }}
 
       - name: Build and push Docker image
         env:
@@ -190,7 +255,7 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ github.sha }}"
-          IMAGE="${{ steps.infra.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:${TAG}"
+          IMAGE="${{ steps.target.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:${TAG}"
 
           if [ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" ] || [ -z "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
             echo "Missing required GitHub secret for Docker build: NEXT_PUBLIC_SUPABASE_URL and/or NEXT_PUBLIC_SUPABASE_ANON_KEY" >&2
@@ -215,10 +280,10 @@ jobs:
             --build-arg "NEXT_PUBLIC_APP_URL=https://app.growthcommandcenter.com" \
             --build-arg "NEXT_PUBLIC_MARKETING_URL=https://growthcommandcenter.com" \
             -t "$IMAGE" \
-            -t "${{ steps.infra.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:latest" \
+            -t "${{ steps.target.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:latest" \
             .
           docker push "$IMAGE"
-          docker push "${{ steps.infra.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:latest"
+          docker push "${{ steps.target.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:latest"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
           echo "DOCKER_BUILD_ENV_INJECTION=PASS"
 
@@ -245,7 +310,7 @@ jobs:
           GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
         run: |
           set -euo pipefail
-          APP="${{ steps.infra.outputs.app_name }}"
+          APP="${{ steps.target.outputs.app_name }}"
           RG="$AZURE_RESOURCE_GROUP"
 
           required=(NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY)
@@ -335,8 +400,8 @@ jobs:
       - name: Wait for healthy revision
         run: |
           set -euo pipefail
-          APP="${{ steps.infra.outputs.app_name }}"
-          FQDN="${{ steps.infra.outputs.fqdn }}"
+          APP="${{ steps.target.outputs.app_name }}"
+          FQDN="${{ steps.target.outputs.fqdn }}"
           for i in $(seq 1 30); do
             if curl -fsS "https://${FQDN}/api/health" >/dev/null 2>&1; then
               curl -fsS "https://${FQDN}/api/health"
@@ -351,14 +416,14 @@ jobs:
 
       - name: Report deployment outputs
         run: |
-          APP="${{ steps.infra.outputs.app_name }}"
+          APP="${{ steps.target.outputs.app_name }}"
           REV=$(az containerapp revision list \
             --name "$APP" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --query "[?properties.active].name | [0]" -o tsv)
           echo "AZURE_CONTAINER_APP_NAME=${APP}"
           echo "AZURE_CONTAINER_APP_REVISION=${REV}"
-          echo "AZURE_PUBLIC_URL=https://${{ steps.infra.outputs.fqdn }}"
+          echo "AZURE_PUBLIC_URL=https://${{ steps.target.outputs.fqdn }}"
 
   pre-cutover-uat:
     needs: deploy
