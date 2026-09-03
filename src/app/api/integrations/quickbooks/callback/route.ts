@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
+import { getAppUrl } from "@/lib/domains";
 import { exchangeQuickBooksCode } from "@/lib/integrations/quickbooks";
 import { upsertConnection } from "@/lib/integrations/store";
 
+/**
+ * ACA sets HOSTNAME=0.0.0.0 for listen binding; never use request.url origin for redirects.
+ */
+function publicAppOrigin(): string {
+  return getAppUrl().replace(/\/$/, "");
+}
+
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const origin = publicAppOrigin();
   const code = searchParams.get("code");
   const realmId = searchParams.get("realmId");
   const state = searchParams.get("state");
