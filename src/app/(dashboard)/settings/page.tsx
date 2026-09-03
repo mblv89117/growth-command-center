@@ -13,7 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { useTenant } from "@/lib/tenant/context";
 import { hasPermission } from "@/lib/auth/permissions";
 import { formatCurrency } from "@/lib/utils";
-import { STRIPE_PLANS, type PlanKey } from "@/lib/stripe/config";
+import { STRIPE_PLANS, STANDALONE_PLAN_KEY, type PlanKey } from "@/lib/stripe/config";
+import { subscriptionStatusLabel } from "@/lib/entitlements";
 import { Loader2 } from "lucide-react";
 
 async function saveSettings(
@@ -45,7 +46,9 @@ export default function SettingsPage() {
     message: string;
     variant: "success" | "preview" | "error";
   } | null>(null);
-  const currentPlan = STRIPE_PLANS[organization.plan as PlanKey] ?? STRIPE_PLANS.growth;
+  const currentPlan = STRIPE_PLANS[organization.plan as PlanKey] ?? STRIPE_PLANS.starter;
+  const billing = organization.billing;
+  const showBilling = billing?.showBilling ?? true;
   const [billingNotice, setBillingNotice] = useState<string | null>(() => {
     if (searchParams.get("success")) return "Subscription updated successfully.";
     if (searchParams.get("cancelled")) return "Checkout was cancelled.";
@@ -287,57 +290,93 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Subscription & Billing</CardTitle>
-              <CardDescription>Manage your Growth Command Center plan via Stripe</CardDescription>
+              <CardDescription>
+                {showBilling
+                  ? "Manage your Growth Command Center standalone subscription via Stripe"
+                  : "Your GCC access is included with your active HVCG advisory engagement"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {billingNotice && (
                 <div className="mb-4 rounded-lg border bg-muted/50 p-3 text-sm">{billingNotice}</div>
               )}
 
-              <div className="mb-6 flex items-center justify-between rounded-xl border bg-primary/5 p-6">
-                <div>
+              {!showBilling ? (
+                <div className="rounded-xl border bg-primary/5 p-6">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-xl font-bold capitalize">{organization.plan} Plan</h3>
-                    <Badge>Active</Badge>
+                    <h3 className="text-xl font-bold">HVCG Client Access</h3>
+                    <Badge>Included</Badge>
                   </div>
-                  <p className="mt-1 text-muted-foreground">
-                    ${currentPlan.price / 100}/month
-                    · Up to {currentPlan.users} users
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {billing?.entitlementReason ??
+                      "Active High Value Capital Group clients receive GCC access as part of their qualifying advisory engagement at no additional software subscription charge while that engagement remains active."}
                   </p>
                 </div>
-                <Button variant="outline" onClick={openPortal} disabled={billingLoading === "portal"}>
-                  {billingLoading === "portal" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Manage Billing
-                </Button>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-3">
-                {(Object.entries(STRIPE_PLANS) as [PlanKey, typeof STRIPE_PLANS.starter][]).map(
-                  ([key, plan]) => (
-                    <div
-                      key={key}
-                      className={`rounded-xl border p-4 ${organization.plan === key ? "border-primary bg-primary/5" : ""}`}
+              ) : (
+                <>
+                  <div className="mb-6 flex items-center justify-between rounded-xl border bg-primary/5 p-6">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-bold">{currentPlan.name}</h3>
+                        <Badge
+                          variant={
+                            billing?.subscriptionStatus === "past_due" ? "destructive" : "default"
+                          }
+                        >
+                          {subscriptionStatusLabel(billing?.subscriptionStatus ?? "trial")}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-muted-foreground">
+                        ${currentPlan.price / 100}/month · 14-day trial · Up to {currentPlan.users} users
+                      </p>
+                      {billing?.trialEndsAt && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Trial ends {new Date(billing.trialEndsAt).toLocaleDateString()}
+                        </p>
+                      )}
+                      <p className="mt-1 text-sm text-muted-foreground">{billing?.entitlementReason}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={openPortal}
+                      disabled={billingLoading === "portal" || !billing?.stripeCustomerId}
                     >
-                      <h4 className="font-semibold">{plan.name}</h4>
-                      <p className="mt-1 text-2xl font-bold">${plan.price / 100}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
+                      {billingLoading === "portal" ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      Manage Billing
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-1">
+                    <div className="rounded-xl border p-4 border-primary bg-primary/5">
+                      <h4 className="font-semibold">{STRIPE_PLANS.starter.name}</h4>
+                      <p className="mt-1 text-2xl font-bold">
+                        ${STRIPE_PLANS.starter.price / 100}
+                        <span className="text-sm font-normal text-muted-foreground">/mo</span>
+                      </p>
                       <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
-                        {plan.features.map((f) => (
-                          <li key={f}>• {f}</li>
+                        {STRIPE_PLANS.starter.features.map((feature) => (
+                          <li key={feature}>• {feature}</li>
                         ))}
                       </ul>
                       <Button
                         className="mt-4 w-full"
-                        variant={organization.plan === key ? "outline" : "default"}
-                        disabled={organization.plan === key || billingLoading === key}
-                        onClick={() => startCheckout(key)}
+                        variant={organization.plan === STANDALONE_PLAN_KEY ? "outline" : "default"}
+                        disabled={
+                          organization.plan === STANDALONE_PLAN_KEY || billingLoading === STANDALONE_PLAN_KEY
+                        }
+                        onClick={() => startCheckout(STANDALONE_PLAN_KEY)}
                       >
-                        {billingLoading === key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {organization.plan === key ? "Current Plan" : `Upgrade to ${plan.name}`}
+                        {billingLoading === STANDALONE_PLAN_KEY ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : null}
+                        {billing?.stripeCustomerId ? "Manage Subscription" : "Start 14-Day Trial"}
                       </Button>
                     </div>
-                  )
-                )}
-              </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

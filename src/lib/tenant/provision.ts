@@ -52,6 +52,7 @@ export async function provisionTenantForUser(
     industry: input.industry ?? null,
     plan: "starter",
     subscription_status: "trial",
+    access_type: "trial",
     data_source: "empty",
     trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     utm_source: input.attribution?.utm_source ?? null,

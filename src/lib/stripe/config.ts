@@ -1,10 +1,19 @@
+export const STRIPE_TRIAL_DAYS = 14;
+export const STANDALONE_PLAN_KEY = "starter" as const;
+
 export const STRIPE_PLANS = {
   starter: {
-    name: "Starter",
+    name: "Growth Command Center",
     price: 14900,
-    priceId: process.env.STRIPE_STARTER_PRICE_ID ?? "",
+    priceId: process.env.STRIPE_STARTER_PRICE_ID ?? process.env.STRIPE_PRICE_ID ?? "",
     users: 5,
-    features: ["Dashboard", "Cash Forecast", "5 integrations"],
+    features: [
+      "Executive dashboard & 13-week cash forecast",
+      "CSV, Excel, and PDF financial import",
+      "AI CFO advisor with source-aware answers",
+      "KPI tracking and value-creation intelligence",
+      "Native connectors as certified",
+    ],
   },
   growth: {
     name: "Growth",
@@ -25,5 +34,9 @@ export const STRIPE_PLANS = {
 export type PlanKey = keyof typeof STRIPE_PLANS;
 
 export function isStripeConfigured(): boolean {
-  return Boolean(process.env.STRIPE_SECRET_KEY);
+  return Boolean(process.env.STRIPE_SECRET_KEY?.trim());
+}
+
+export function getStandalonePriceId(): string {
+  return STRIPE_PLANS.starter.priceId;
 }

@@ -39,6 +39,18 @@ export interface Organization {
   plan: "starter" | "growth" | "enterprise";
   createdAt: string;
   settings: OrganizationSettings;
+  billing?: OrganizationBilling;
+}
+
+export interface OrganizationBilling {
+  accessType: "trial" | "standalone" | "hvcg_included" | "inactive";
+  subscriptionStatus: string;
+  trialEndsAt?: string | null;
+  hvcgEngagementActive: boolean;
+  stripeCustomerId?: string | null;
+  showBilling: boolean;
+  entitlementReason: string;
+  hasAccess: boolean;
 }
 
 export interface OrganizationSettings {
