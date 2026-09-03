@@ -1,15 +1,74 @@
 name: Azure Health Ping
 
+# Availability monitoring for GCC public hosts + default ACA FQDN.
+# Fails loudly when custom-domain TLS / bindings regress while the app is still up.
+
 on:
   schedule:
-    - cron: "0 12 * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping production health endpoint
+      - name: Ping public hosts + default FQDN
+        env:
+          ACA_FQDN: azapprngzn.nicecoast-be020962.eastus.azurecontainerapps.io
         run: |
-          BASE="${SMOKE_BASE_URL:-https://app.growthcommandcenter.com}"
-          curl -fsS "${BASE}/api/health" | head -c 500
+          set -euo pipefail
+          fail=0
+
+          check_http() {
+            local label="$1" url="$2" expect_re="$3"
+            local code
+            code=$(curl -sS -o /tmp/gcc-health-body -w '%{http_code}' --connect-timeout 10 --max-time 30 "$url" || echo 000)
+            echo "$label $url -> HTTP $code"
+            if ! echo "$code" | grep -Eq "$expect_re"; then
+              echo "FAIL: $label expected $expect_re got $code" >&2
+              fail=1
+              return 1
+            fi
+            return 0
+          }
+
+          check_html_brand() {
+            local label="$1"
+            if ! grep -qi "Growth Command Center" /tmp/gcc-health-body; then
+              echo "FAIL: $label missing GCC branding" >&2
+              fail=1
+            fi
+            if grep -Eqi "credentials are not configured|Enter Demo Mode|Sign-in is temporarily unavailable" /tmp/gcc-health-body; then
+              echo "FAIL: $label auth/demo regression banner" >&2
+              fail=1
+            fi
+          }
+
+          # Default ACA hostname must stay healthy even if custom domains regress.
+          check_http ACA_FQDN "https://${ACA_FQDN}/" '200' && check_html_brand ACA_FQDN || true
+          check_http ACA_LOGIN "https://${ACA_FQDN}/login" '200' && check_html_brand ACA_LOGIN || true
+          check_http ACA_HEALTH "https://${ACA_FQDN}/api/health" '200' || true
+          if [ -f /tmp/gcc-health-body ] && ! grep -q '"status":"ok"' /tmp/gcc-health-body; then
+            # tolerate either status ok shape
+            if ! grep -Eqi '"status"[[:space:]]*:[[:space:]]*"ok"|ok' /tmp/gcc-health-body; then
+              echo "FAIL: ACA health payload unexpected" >&2
+              fail=1
+            fi
+          fi
+
+          # Public customer destinations (custom domains + managed TLS).
+          check_http APEX "https://growthcommandcenter.com/" '200|301|302|307|308' || true
+          check_http WWW "https://www.growthcommandcenter.com/" '200|301|302|307|308' || true
+          check_http APP "https://app.growthcommandcenter.com/" '200|301|302|307|308' || true
+          if check_http APP_LOGIN "https://app.growthcommandcenter.com/login" '200'; then
+            check_html_brand APP_LOGIN || true
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "AVAILABILITY_MONITORING=FAIL" >&2
+            echo "Likely cause: custom domain bindings/certs cleared, Container App stopped, or bad revision." >&2
+            echo "Recovery: Actions → Azure Restore Public Hosts → confirm RESTORE" >&2
+            echo "Or: Azure Bind Custom Domains / Azure Production Deploy (redeploy_infra=false)." >&2
+            exit 1
+          fi
+          echo "AVAILABILITY_MONITORING=PASS"

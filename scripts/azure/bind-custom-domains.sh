@@ -22,6 +22,18 @@ echo "RESOURCE_GROUP=${RESOURCE_GROUP}"
 echo "CONTAINER_APP=${APP_NAME}"
 echo "MANAGED_ENVIRONMENT=${ENV_NAME}"
 
+# Public-host recovery: never leave the app stopped while rebinding hostnames.
+RUNNING=$(az containerapp show \
+  --name "$APP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "properties.runningStatus" -o tsv 2>/dev/null || echo "Unknown")
+echo "RUNNING_STATUS=${RUNNING}"
+if [ "$RUNNING" != "Running" ]; then
+  echo "Starting Container App ${APP_NAME} before domain bind..."
+  az containerapp start --name "$APP_NAME" --resource-group "$RESOURCE_GROUP"
+  sleep 10
+fi
+
 FQDN=$(az containerapp show \
   --name "$APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
