@@ -54,3 +54,11 @@ GCC accepts structured value-creation signals when provided:
 - Dual-resolve required when both `clientCode` and `organizationId` are present
 - Auto-provision remains `false`
 - Additive mapping rows only — local `gcc_organizations.id` values are retained
+
+## Hub ingest (Wave 3)
+
+- Endpoint: `POST {hub}/api/modules/ingest`
+- Auth: module HMAC (`x-atlas-module-*`)
+- Envelope builder: `src/lib/atlas/hubIngest.ts`
+- Maturity target: `OBSERVATION_LIVE` (SYN01 / value signals)
+- `autoProvision` remains **false**
