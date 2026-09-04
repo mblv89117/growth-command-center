@@ -1,0 +1,11 @@
+---
+description: Atlas platform inheritance
+alwaysApply: true
+---
+
+Read `ATLAS.md` and `AGENTS.md` before material changes.
+Constitution HVCG-CONSTITUTION-2026-09-04-v1.0 controls.
+Canonical governance: mblv89117/hvcg-platform-governance
+Platform: Atlas (ONE_PLATFORM_MULTI_REPO)
+Role: ATLAS_FINANCIAL_INTELLIGENCE_MODULE
+Unknown ClientCode: fail closed.
