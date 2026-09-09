@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { STRIPE_PLANS, type PlanKey, isStripeConfigured } from "@/lib/stripe/config";
 import { getAppUrl } from "@/lib/config";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  fetchOrganizationBillingFields,
+  updateOrganizationBilling,
+} from "@/lib/data/active-runtime-plane";
+import { isPersistentDataBackendAvailable } from "@/lib/data/data-plane";
 import { requireAuth, authErrorResponse } from "@/lib/auth/api";
 
 export async function POST(request: Request) {
@@ -21,15 +25,10 @@ export async function POST(request: Request) {
     }
 
     const stripe = getStripe()!;
-    const admin = createAdminClient();
-
     let customerId: string | undefined;
-    if (admin) {
-      const { data: org } = await admin
-        .from("gcc_organizations")
-        .select("stripe_customer_id, name")
-        .eq("id", auth.organizationId)
-        .maybeSingle();
+
+    if (isPersistentDataBackendAvailable()) {
+      const org = await fetchOrganizationBillingFields(auth.organizationId);
       customerId = org?.stripe_customer_id ?? undefined;
 
       if (!customerId) {
@@ -39,10 +38,10 @@ export async function POST(request: Request) {
           metadata: { organizationId: auth.organizationId },
         });
         customerId = customer.id;
-        await admin
-          .from("gcc_organizations")
-          .update({ stripe_customer_id: customerId, plan })
-          .eq("id", auth.organizationId);
+        await updateOrganizationBilling(auth.organizationId, {
+          stripe_customer_id: customerId,
+          plan,
+        });
       }
     }
 

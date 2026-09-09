@@ -24,11 +24,17 @@ export function AuthProvider({
   initialSession?: Session | null;
   demoMode?: boolean;
 }) {
+  const entraClient = isEntraClientEnabled();
   const [session, setSession] = useState<Session | null>(initialSession ?? null);
-  const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
+  const [isLoading, setIsLoading] = useState(!entraClient && isSupabaseConfigured());
   const [isDemoMode, setIsDemoMode] = useState(demoMode);
 
   useEffect(() => {
+    if (entraClient) {
+      setIsLoading(false);
+      return;
+    }
+
     const supabase = createClient();
     if (!supabase) {
       setIsLoading(false);
@@ -43,7 +49,7 @@ export function AuthProvider({
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [entraClient]);
 
   const signOut = async () => {
     if (isDemoMode) {
@@ -53,7 +59,7 @@ export function AuthProvider({
       return;
     }
 
-    if (isEntraClientEnabled()) {
+    if (entraClient) {
       window.location.href = "/api/auth/entra/logout";
       return;
     }

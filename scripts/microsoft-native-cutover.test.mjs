@@ -347,6 +347,199 @@ test("entra session gate does not require Supabase URL", () => {
   );
 });
 
+test("connectors audit/provenance prefer azure backend when URL set", () => {
+  withEnv(
+    {
+      AZURE_DATABASE_URL: "postgresql://azure.example/gcc?sslmode=require",
+      NEXT_PUBLIC_SUPABASE_URL: undefined,
+      SUPABASE_SERVICE_ROLE_KEY: undefined,
+    },
+    () => {
+      __resetPgPoolForTests();
+      assert.equal(isAzureDataPlaneActive(), true);
+      assert.equal(resolveDataBackend(), "azure-postgres");
+    }
+  );
+});
+
+test("imports commit path selects azure backend when URL set", async () => {
+  const { resolveImportCommitBackend } = await import("../src/lib/imports/commit.ts");
+  withEnv(
+    {
+      AZURE_DATABASE_URL: "postgresql://azure.example/gcc?sslmode=require",
+    },
+    () => {
+      __resetPgPoolForTests();
+      assert.equal(resolveImportCommitBackend(), "azure-postgres");
+    }
+  );
+});
+
+test("team invite entra mode does not call supabase admin API", async () => {
+  const { resolveTeamInviteMode } = await import("../src/lib/data/team-invite.ts");
+  withEnv(
+    {
+      AUTH_PROVIDER: "entra",
+      AZURE_DATABASE_URL: "postgresql://azure.example/gcc?sslmode=require",
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+    },
+    () => {
+      __resetPgPoolForTests();
+      assert.equal(resolveTeamInviteMode(), "entra-token");
+    }
+  );
+});
+
+test("SUPABASE_DISABLED simulation: entra + azure resolves without supabase env", () => {
+  withEnv(
+    {
+      NODE_ENV: "production",
+      AUTH_PROVIDER: "entra",
+      NEXT_PUBLIC_AUTH_PROVIDER: "entra",
+      ENTRA_EXTERNAL_TENANT_ID: "tid",
+      ENTRA_EXTERNAL_CLIENT_ID: "cid",
+      ENTRA_EXTERNAL_CLIENT_SECRET: "csecret",
+      SESSION_SECRET: "x".repeat(32),
+      AZURE_DATABASE_URL: "postgresql://azure.example/gcc?sslmode=require",
+      NEXT_PUBLIC_APP_URL: "https://app.growthcommandcenter.com",
+      NEXT_PUBLIC_MARKETING_URL: "https://growthcommandcenter.com",
+      NEXT_PUBLIC_SUPABASE_URL: undefined,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined,
+      SUPABASE_SERVICE_ROLE_KEY: undefined,
+    },
+    () => {
+      __resetPgPoolForTests();
+      const snap = snapshotMicrosoftNativeRuntime();
+      assert.equal(snap.authProvider, "entra");
+      assert.equal(snap.dataPlane, "azure-postgres");
+      assert.equal(selectProductionAuthAndDb({ authProvider: "entra" }).dataPlane, "azure-postgres");
+      assert.equal(resolveDataBackend(), "azure-postgres");
+      assert.deepEqual(validateProductionEnv(), []);
+      assert.equal(
+        isEntraSessionGateSatisfied(
+          [{ name: "gcc_entra_session", value: "sealed-token" }],
+          {
+            entraSessionCookieName: "gcc_entra_session",
+            demoModeAllowed: false,
+            demoModeCookieName: "gcc_demo_mode",
+          }
+        ),
+        true
+      );
+    }
+  );
+});
+
+test("active-runtime-plane exports connector and job helpers", async () => {
+  const plane = await import("../src/lib/data/active-runtime-plane.ts");
+  for (const fn of [
+    "insertConnectorAuditEvent",
+    "fetchConnectorAuditLog",
+    "upsertProvenanceRecord",
+    "fetchProvenanceForOrg",
+    "insertJobRun",
+    "updateJobRun",
+    "selectImportCommitBackend",
+    "selectPdfImportBackend",
+    "insertPdfImportJob",
+    "updatePdfImportJob",
+    "fetchPdfImportJob",
+    "upsertFinancialSnapshotPatch",
+  ]) {
+    assert.equal(typeof plane[fn], "function", `${fn} should be exported`);
+  }
+});
+
+test("PDF import path selects azure backend when URL set", async () => {
+  const { selectPdfImportBackend } = await import("../src/lib/data/active-runtime-plane.ts");
+  withEnv(
+    {
+      AZURE_DATABASE_URL: "postgresql://azure.example/gcc?sslmode=require",
+      NEXT_PUBLIC_SUPABASE_URL: undefined,
+      SUPABASE_SERVICE_ROLE_KEY: undefined,
+    },
+    () => {
+      __resetPgPoolForTests();
+      assert.equal(selectPdfImportBackend(), "azure-postgres");
+    }
+  );
+});
+
+test("buildPdfSnapshotPatch maps confirmed fields and skips ignored", async () => {
+  const { buildPdfSnapshotPatch } = await import("../src/lib/imports/pdf-snapshot.ts");
+  const patch = buildPdfSnapshotPatch({
+    confirmedFields: {
+      revenue: 100_000,
+      grossProfit: 40_000,
+      currentCash: null,
+      netIncome: 12_000,
+    },
+    ignoredFields: ["netIncome"],
+  });
+  assert.deepEqual(patch, {
+    revenue_mtd: 100_000,
+    gross_profit: 40_000,
+  });
+});
+
+test("evaluateAdminRouteAccess fail-closes non-platform_admin on admin routes", async () => {
+  const { evaluateAdminRouteAccess, isPlatformAdminRole } = await import(
+    "../src/lib/auth/admin-gate.ts"
+  );
+
+  assert.equal(isPlatformAdminRole("platform_admin"), true);
+  assert.equal(isPlatformAdminRole("founder"), false);
+
+  assert.deepEqual(
+    evaluateAdminRouteAccess({
+      isAdminRoute: false,
+      demoMode: false,
+      role: "founder",
+    }),
+    { allowed: true }
+  );
+
+  assert.deepEqual(
+    evaluateAdminRouteAccess({
+      isAdminRoute: true,
+      demoMode: true,
+      role: "platform_admin",
+    }),
+    { allowed: false, redirectPath: "/dashboard" }
+  );
+
+  assert.deepEqual(
+    evaluateAdminRouteAccess({
+      isAdminRoute: true,
+      demoMode: false,
+      role: "founder",
+    }),
+    { allowed: false, redirectPath: "/dashboard" }
+  );
+
+  assert.deepEqual(
+    evaluateAdminRouteAccess({
+      isAdminRoute: true,
+      demoMode: false,
+      role: "platform_admin",
+    }),
+    { allowed: true }
+  );
+});
+
+test("Supabase Bearer auth blocked when AUTH_PROVIDER=entra", async () => {
+  const { isSupabaseBearerAuthAllowed } = await import("../src/lib/auth/bearer-policy.ts");
+
+  withEnv({ AUTH_PROVIDER: "entra" }, () => {
+    assert.equal(isSupabaseBearerAuthAllowed(), false);
+  });
+
+  withEnv({ AUTH_PROVIDER: "supabase" }, () => {
+    assert.equal(isSupabaseBearerAuthAllowed(), true);
+  });
+});
+
 test("production validateProductionEnv allows azure/entra selection without throw", () => {
   withEnv(
     {

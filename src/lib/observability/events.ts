@@ -1,4 +1,8 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  insertJobRun,
+  updateJobRun,
+} from "@/lib/data/active-runtime-plane";
+import { isPersistentDataBackendAvailable } from "@/lib/data/data-plane";
 
 export type JobType =
   | "import"
@@ -22,19 +26,9 @@ export async function startJobRun(
   jobType: JobType,
   metadata?: Record<string, unknown>
 ): Promise<string> {
-  const admin = createAdminClient();
-  if (admin) {
-    const { data, error } = await admin
-      .from("gcc_job_runs")
-      .insert({
-        organization_id: organizationId,
-        job_type: jobType,
-        status: "running",
-        metadata: metadata ?? {},
-      })
-      .select("id")
-      .single();
-    if (!error && data?.id) return data.id as string;
+  if (isPersistentDataBackendAvailable()) {
+    const id = await insertJobRun(organizationId, jobType, metadata);
+    if (id) return id;
   }
 
   memoryRuns.push({ organizationId, jobType, status: "running", metadata });
@@ -46,16 +40,8 @@ export async function completeJobRun(
   status: JobStatus,
   errorMessage?: string
 ): Promise<void> {
-  const admin = createAdminClient();
-  if (admin && !jobId.startsWith("mem-")) {
-    await admin
-      .from("gcc_job_runs")
-      .update({
-        status,
-        error_message: errorMessage ?? null,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", jobId);
+  if (isPersistentDataBackendAvailable() && !jobId.startsWith("mem-")) {
+    await updateJobRun(jobId, status, errorMessage);
     return;
   }
 

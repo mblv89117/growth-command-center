@@ -1,4 +1,17 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  countForecastVersions,
+  fetchFinancialSnapshotRow,
+  fetchKpiOverrideRows,
+  fetchMonthlyTrendRows,
+  fetchOrganizationSettingsJson,
+  insertForecastVersionRow,
+  updateFinancialSnapshotComputed,
+  updateOrganizationDataSource,
+  upsertCashForecastMonthRow,
+  upsertCashForecastWeekRow,
+  upsertKpiComputedRow,
+} from "@/lib/data/active-runtime-plane";
+import { isPersistentDataBackendAvailable } from "@/lib/data/data-plane";
 import {
   aggregateMonthlyForecast,
   buildForecastInputFromSnapshot,
@@ -25,15 +38,14 @@ export async function recomputeTenantFinancials(
   const jobId = await startJobRun(organizationId, "forecast_recompute");
 
   try {
-    const admin = createAdminClient();
-    if (!admin) {
+    if (!isPersistentDataBackendAvailable()) {
       return { success: false, forecastWeeks: 0, kpisUpdated: 0, error: "Database not configured" };
     }
 
-    const [{ data: snapshotRow }, { data: trendsRows }, { data: orgRow }] = await Promise.all([
-      admin.from("gcc_financial_snapshots").select("*").eq("organization_id", organizationId).maybeSingle(),
-      admin.from("gcc_monthly_trends").select("*").eq("organization_id", organizationId).order("sort_order"),
-      admin.from("gcc_organizations").select("settings").eq("id", organizationId).maybeSingle(),
+    const [snapshotRow, trendsRows, settings] = await Promise.all([
+      fetchFinancialSnapshotRow(organizationId),
+      fetchMonthlyTrendRows(organizationId),
+      fetchOrganizationSettingsJson(organizationId),
     ]);
 
     if (!snapshotRow) {
@@ -41,11 +53,10 @@ export async function recomputeTenantFinancials(
       return { success: false, forecastWeeks: 0, kpisUpdated: 0, error: "No financial snapshot" };
     }
 
-    const settings = (orgRow?.settings as Record<string, unknown>) ?? {};
     const cashAlertThreshold = options?.cashAlertThreshold ?? Number(settings.cashAlertThreshold ?? 150000);
 
     const snapshot = mapSnapshot(snapshotRow);
-    const trends: MonthlyTrend[] = (trendsRows ?? []).map((r) => ({
+    const trends: MonthlyTrend[] = trendsRows.map((r) => ({
       month: r.month as string,
       revenue: Number(r.revenue),
       expenses: Number(r.expenses),
@@ -61,100 +72,77 @@ export async function recomputeTenantFinancials(
     const runwayMonths = Math.round((runwayWeeks / 4.33) * 10) / 10;
     const forecastedCash = weeks[weeks.length - 1]?.endingBalance ?? snapshot.currentCash;
 
-    await admin
-      .from("gcc_financial_snapshots")
-      .update({
-        forecasted_cash: forecastedCash,
-        burn_rate: Math.round(weeklyBurn * 4.33),
-        runway: runwayMonths,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("organization_id", organizationId);
+    await updateFinancialSnapshotComputed(organizationId, {
+      forecasted_cash: forecastedCash,
+      burn_rate: Math.round(weeklyBurn * 4.33),
+      runway: runwayMonths,
+      updated_at: new Date().toISOString(),
+    });
 
     for (const week of weeks) {
-      await admin.from("gcc_cash_forecast_weeks").upsert(
-        {
-          organization_id: organizationId,
-          week_num: week.week,
-          week_start: week.weekStart,
-          week_end: week.weekEnd,
-          starting_balance: week.startingBalance,
-          inflows: week.inflows,
-          outflows: week.outflows,
-          ending_balance: week.endingBalance,
-          is_risk_period: week.isRiskPeriod,
-        },
-        { onConflict: "organization_id,week_num" }
-      );
+      await upsertCashForecastWeekRow(organizationId, {
+        week_num: week.week,
+        week_start: week.weekStart,
+        week_end: week.weekEnd,
+        starting_balance: week.startingBalance,
+        inflows: week.inflows,
+        outflows: week.outflows,
+        ending_balance: week.endingBalance,
+        is_risk_period: week.isRiskPeriod,
+      });
     }
 
     for (const month of months) {
-      await admin.from("gcc_cash_forecast_months").upsert(
-        {
-          organization_id: organizationId,
-          month_label: month.month,
-          inflows: month.inflows,
-          outflows: month.outflows,
-          ending_balance: month.endingBalance,
-          is_risk_period: month.isRiskPeriod,
-        },
-        { onConflict: "organization_id,month_label" }
-      );
+      await upsertCashForecastMonthRow(organizationId, {
+        month_label: month.month,
+        inflows: month.inflows,
+        outflows: month.outflows,
+        ending_balance: month.endingBalance,
+        is_risk_period: month.isRiskPeriod,
+      });
     }
 
-    const { data: existingKpis } = await admin
-      .from("gcc_kpis")
-      .select("kpi_key, manual_override, target, enabled")
-      .eq("organization_id", organizationId);
-
+    const existingKpis = await fetchKpiOverrideRows(organizationId);
     const manualKeys = new Set(
-      (existingKpis ?? []).filter((k) => k.manual_override).map((k) => k.kpi_key as string)
+      existingKpis.filter((k) => k.manual_override).map((k) => k.kpi_key)
     );
-    const enabledKeys = (existingKpis ?? [])
+    const enabledKeys = existingKpis
       .filter((k) => k.enabled !== false)
-      .map((k) => k.kpi_key as string);
+      .map((k) => k.kpi_key);
 
-    const computed = computeKpis({ snapshot: { ...snapshot, runway: runwayMonths }, trends }, enabledKeys.length ? enabledKeys : undefined);
+    const computed = computeKpis(
+      { snapshot: { ...snapshot, runway: runwayMonths }, trends },
+      enabledKeys.length ? enabledKeys : undefined
+    );
 
     let kpisUpdated = 0;
     for (const kpi of computed) {
       if (manualKeys.has(kpi.key)) continue;
-      await admin.from("gcc_kpis").upsert(
-        {
-          organization_id: organizationId,
-          kpi_key: kpi.key,
-          name: kpi.name,
-          value: kpi.value,
-          unit: kpi.unit,
-          change: kpi.change,
-          change_label: kpi.changeLabel,
-          target: kpi.target ?? null,
-          status: kpi.status ?? null,
-          enabled: true,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "organization_id,kpi_key" }
-      );
+      await upsertKpiComputedRow(organizationId, {
+        kpi_key: kpi.key,
+        name: kpi.name,
+        value: kpi.value,
+        unit: kpi.unit,
+        change: kpi.change,
+        change_label: kpi.changeLabel,
+        target: kpi.target ?? null,
+        status: kpi.status ?? null,
+        enabled: true,
+        updated_at: new Date().toISOString(),
+      });
       kpisUpdated++;
     }
 
-    const { count: versionCount } = await admin
-      .from("gcc_forecast_versions")
-      .select("*", { count: "exact", head: true })
-      .eq("organization_id", organizationId);
+    const versionCount = await countForecastVersions(organizationId);
 
-    await admin.from("gcc_forecast_versions").insert({
-      organization_id: organizationId,
-      version_num: (versionCount ?? 0) + 1,
+    await insertForecastVersionRow(organizationId, {
+      version_num: versionCount + 1,
       ending_cash: forecastedCash,
       minimum_cash: Math.min(...weeks.map((w) => w.endingBalance)),
       assumptions_snapshot: input,
     });
 
-    await admin
-      .from("gcc_organizations")
-      .update({ data_source: trends.length > 0 ? "imported" : "computed" })
-      .eq("id", organizationId);
+    await updateOrganizationDataSource(organizationId, trends.length > 0 ? "imported" : "computed");
 
     await completeJobRun(jobId, "success");
     return { success: true, forecastWeeks: weeks.length, kpisUpdated };

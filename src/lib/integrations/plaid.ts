@@ -1,7 +1,12 @@
 import { upsertConnection, getConnection } from "./store";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  deleteBankAccountsByOrganizationId,
+  updateFinancialSnapshotCash,
+  upsertBankAccounts,
+} from "@/lib/data/active-runtime-plane";
 import type { SyncResult } from "./types";
 import { isProduction } from "@/lib/config";
+import { isPersistentDataBackendAvailable } from "@/lib/data/data-plane";
 
 export function isPlaidConfigured(): boolean {
   return Boolean(
@@ -72,26 +77,15 @@ export async function syncPlaidBalances(organizationId: string): Promise<SyncRes
     };
   }
 
-  const admin = createAdminClient();
   const demoBalance = 487250;
   const accounts = [
     { plaid_account_id: "demo-checking", name: "Business Checking", mask: "4242", balance: 412800, institution: "First National Bank" },
     { plaid_account_id: "demo-savings", name: "Operating Reserve", mask: "8901", balance: 74450, institution: "First National Bank" },
   ];
 
-  if (admin) {
-    for (const acct of accounts) {
-      await admin.from("gcc_bank_accounts").upsert({
-        organization_id: organizationId,
-        ...acct,
-        last_sync: new Date().toISOString(),
-      }, { onConflict: "organization_id,plaid_account_id" });
-    }
-
-    await admin.from("gcc_financial_snapshots").update({
-      current_cash: demoBalance,
-      updated_at: new Date().toISOString(),
-    }).eq("organization_id", organizationId);
+  if (isPersistentDataBackendAvailable()) {
+    await upsertBankAccounts(organizationId, accounts);
+    await updateFinancialSnapshotCash(organizationId, demoBalance);
   }
 
   await upsertConnection({
@@ -111,9 +105,8 @@ export async function syncPlaidBalances(organizationId: string): Promise<SyncRes
 
 export async function disconnectPlaid(organizationId: string): Promise<boolean> {
   const { deleteConnection } = await import("./store");
-  const admin = createAdminClient();
-  if (admin) {
-    await admin.from("gcc_bank_accounts").delete().eq("organization_id", organizationId);
+  if (isPersistentDataBackendAvailable()) {
+    await deleteBankAccountsByOrganizationId(organizationId);
   }
   return deleteConnection(organizationId, "plaid");
 }

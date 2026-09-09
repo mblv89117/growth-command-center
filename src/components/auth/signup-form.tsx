@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Loader2, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { isEntraClientEnabled } from "@/lib/config";
 import { GccLogo } from "@/components/brand/gcc-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,32 @@ export function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState<SignupPhase>("form");
   const [pendingEmail, setPendingEmail] = useState("");
+  const entraEnabled = isEntraClientEnabled();
+
+  if (entraEnabled) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Sign up with Microsoft</CardTitle>
+            <CardDescription>
+              GCC uses Microsoft Entra for account access. Self-service email/password signup is
+              disabled in this environment.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button className="w-full" asChild>
+              <Link href="/login">Continue to sign in</Link>
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Need a new organization workspace? Contact your GCC administrator or use an invite
+              link from your team.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const emailRedirectTo = () =>
     `${window.location.origin}/auth/callback?next=/onboarding`;

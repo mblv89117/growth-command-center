@@ -1,4 +1,8 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  fetchProvenanceForOrg as fetchProvenanceFromPlane,
+  upsertProvenanceRecord,
+} from "@/lib/data/active-runtime-plane";
+import { isPersistentDataBackendAvailable } from "@/lib/data/data-plane";
 import type { ProvenanceCategory, ProvenanceRecord } from "./types";
 
 export interface StoredProvenance extends ProvenanceRecord {
@@ -12,58 +16,19 @@ export interface StoredProvenance extends ProvenanceRecord {
 const memoryProvenance: StoredProvenance[] = [];
 
 export async function storeProvenance(record: StoredProvenance): Promise<void> {
-  const admin = createAdminClient();
-  if (admin) {
-    await admin.from("gcc_data_provenance").upsert(
-      {
-        organization_id: record.organizationId,
-        field_key: record.fieldKey,
-        value_numeric: typeof record.value === "number" ? record.value : null,
-        value_text: typeof record.value === "string" ? record.value : null,
-        source: record.source,
-        source_type: record.sourceType,
-        connector_id: record.connectorId,
-        file_name: record.fileName,
-        period_start: record.periodStart,
-        period_end: record.periodEnd,
-        category: record.category,
-        confidence: record.confidence,
-        synced_at: record.syncedAt,
-        uploaded_at: record.uploadedAt,
-      },
-      { onConflict: "organization_id,field_key,source" }
-    );
-  } else {
-    memoryProvenance.push(record);
+  if (isPersistentDataBackendAvailable()) {
+    await upsertProvenanceRecord(record);
+    return;
   }
+
+  memoryProvenance.push(record);
 }
 
 export async function getProvenanceForOrg(
   organizationId: string
 ): Promise<StoredProvenance[]> {
-  const admin = createAdminClient();
-  if (admin) {
-    const { data } = await admin
-      .from("gcc_data_provenance")
-      .select("*")
-      .eq("organization_id", organizationId);
-
-    return (data ?? []).map((row) => ({
-      organizationId: row.organization_id as string,
-      fieldKey: row.field_key as string,
-      value: (row.value_numeric ?? row.value_text) as number | string,
-      source: row.source as string,
-      sourceType: row.source_type as ProvenanceRecord["sourceType"],
-      connectorId: row.connector_id as string | undefined,
-      fileName: row.file_name as string | undefined,
-      periodStart: row.period_start as string | undefined,
-      periodEnd: row.period_end as string | undefined,
-      category: row.category as ProvenanceCategory,
-      confidence: row.confidence as ProvenanceRecord["confidence"],
-      syncedAt: row.synced_at as string | undefined,
-      uploadedAt: row.uploaded_at as string | undefined,
-    }));
-  }
+  const rows = await fetchProvenanceFromPlane(organizationId);
+  if (rows.length > 0) return rows;
 
   return memoryProvenance.filter((p) => p.organizationId === organizationId);
 }

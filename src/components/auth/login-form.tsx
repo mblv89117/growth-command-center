@@ -201,12 +201,18 @@ export function LoginForm() {
             </>
           )}
 
-          {authReady && (
+          {authReady && !entraEnabled && (
             <p className="text-center text-sm text-muted-foreground">
               No account?{" "}
               <Link href="/signup" className="font-medium text-primary hover:underline">
                 Create one
               </Link>
+            </p>
+          )}
+          {authReady && entraEnabled && (
+            <p className="text-center text-sm text-muted-foreground">
+              New to GCC? Use Continue with Microsoft — account creation is managed through your
+              organization&apos;s Microsoft sign-in. Contact your admin if you need access.
             </p>
           )}
         </CardContent>

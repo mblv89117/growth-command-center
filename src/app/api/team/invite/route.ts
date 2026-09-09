@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       organizationId: body.organizationId,
       email: body.email,
       role: body.role,
+      invitedBy: access.userId,
     });
     if (!result.ok) {
       return NextResponse.json(
@@ -43,9 +44,13 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       preview: false,
-      message: `Invitation sent to ${body.email}.`,
+      message: result.inviteLink
+        ? `Invitation created for ${body.email}. Share the invite link with your teammate.`
+        : `Invitation sent to ${body.email}.`,
       email: body.email,
       role: body.role,
+      inviteLink: result.inviteLink,
+      mode: result.mode,
     });
   } catch (error) {
     if (error instanceof ValidationError) {

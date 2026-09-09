@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { isStripeConfigured } from "@/lib/stripe/config";
 import { getAppUrl } from "@/lib/config";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchOrganizationBillingFields } from "@/lib/data/active-runtime-plane";
+import { isPersistentDataBackendAvailable } from "@/lib/data/data-plane";
 import { requireAuth, authErrorResponse } from "@/lib/auth/api";
 
 export async function POST() {
@@ -12,15 +13,11 @@ export async function POST() {
     }
 
     const auth = await requireAuth();
-    const admin = createAdminClient();
-    if (!admin) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+    if (!isPersistentDataBackendAvailable()) {
+      return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+    }
 
-    const { data: org } = await admin
-      .from("gcc_organizations")
-      .select("stripe_customer_id")
-      .eq("id", auth.organizationId)
-      .maybeSingle();
-
+    const org = await fetchOrganizationBillingFields(auth.organizationId);
     if (!org?.stripe_customer_id) {
       return NextResponse.json({ error: "No active subscription" }, { status: 400 });
     }
