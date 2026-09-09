@@ -48,7 +48,7 @@ This is **not** a bad PostgreSQL 16 choice, a bad `Standard_B1ms` SKU, a bad `20
 - eastus preflight fail-closed: `REGION_POSTGRES_PROVISIONING_RESTRICTED`
 - `az deployment group validate` = Succeeded
 - `az deployment group what-if` = Create `azpg3uejm`, database `gcc`, `require_secure_transport`, `AllowAzureServices`; no error
-- Do **not** claim provision PASS until live `az postgres flexible-server show -g rg-gcc-prod -n azpg3uejm` is Ready
+- Live `az postgres flexible-server show -g rg-gcc-prod -n azpg3uejm` = **Ready** (Owner Gate C run `34389534837`). Full cutover evidence: `docs/evidence/azure-postgres-db-cutover-20260909.md`.
 
 ## ROLLBACK
 

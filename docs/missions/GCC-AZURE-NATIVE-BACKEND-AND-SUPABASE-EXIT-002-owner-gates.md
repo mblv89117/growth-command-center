@@ -1,22 +1,18 @@
 # Owner gates — exact actions
 
-## Gate 1 — Azure PostgreSQL admin password
+## Gate 1 — Azure PostgreSQL — COMPLETE (2026-09-09)
 
-1. GitHub → `mblv89117/growth-command-center` → Settings → Secrets and variables → Actions  
-2. New repository secret  
-3. Name: `AZURE_POSTGRES_ADMIN_PASSWORD`  
-4. Value: generate a 32+ character password (do **not** paste into chat)  
-5. Actions → **Azure PostgreSQL Stage 3 Provision** → Run workflow → confirmation `PROVISION` (Flexible Server region is **eastus2** via Bicep default; do not force eastus — this subscription returns `supportedServerVersions=[]` there).  
-6. From the job summary, create secret `AZURE_DATABASE_URL` =  
-   `postgresql://gccadmin@<FQDN>:5432/gcc?sslmode=require`  
-   (password URL-encoded; never commit)  
-7. Run `npm run db:migrate-to-azure-pg` (or Stage 3 Migrate workflow when available)
+Owner Gate C provision succeeded (run `34389534837`). Server `azpg3uejm` is Ready in eastus2. GitHub secret `AZURE_DATABASE_URL` is stored. Do **not** reset `gccadmin` or `AZURE_POSTGRES_ADMIN_PASSWORD`.
 
-## Gate 2 — Entra External ID
+Evidence: `docs/evidence/azure-postgres-db-cutover-20260909.md`
+
+## Gate 2 — Entra External ID — OPEN (current Owner action)
 
 Follow **`docs/entra-external-id-setup.md`** click-by-click (Customer/External ID tenant — not workforce).
 
-Required GitHub secrets:
+No CIAM tenant exists yet. ARM tenant list shows only workforce `High Value Capital Group`.
+
+Required GitHub secrets (values only in GitHub UI; names only in chat):
 
 - `ENTRA_EXTERNAL_TENANT_ID`
 - `ENTRA_EXTERNAL_CLIENT_ID`
@@ -26,22 +22,22 @@ Required GitHub secrets:
 
 Optional: `ENTRA_EXTERNAL_AUTHORITY` = `https://<tenant-id>.ciamlogin.com/<tenant-id>`
 
-## Gate 3 — Data migration
+After secrets exist, reply with the **names** of secrets created (never values). Cursor then runs Entra UAT.
 
-1. Ensure source DB URL available to Actions (existing Supabase DB secret)  
-2. Run migrate: `npm run db:migrate-to-azure-pg` (or CI job) with source + `AZURE_DATABASE_URL`  
-3. Verify row counts / FK / financial precision  
-4. Export identity map: `npm run export:identity-map`  
-5. Invite/activate users via Entra (no password hash migration)
+## Gate 3 — Data migration — COMPLETE (2026-09-09)
 
-## Gate 4 — Cutover (only after Azure-native UAT PASS)
+Schema, RLS, production copy, reconcile, and missing-row delta are done. Overlapping row counts match. Azure PG UAT PASS. Identity-map export + Entra user activation wait for Gate 2.
 
-1. Set Container App / GitHub secrets:  
-   - `AUTH_PROVIDER=entra`  
-   - `NEXT_PUBLIC_AUTH_PROVIDER=entra`  
-2. Deploy image (workflow_dispatch, **redeploy_infra=false**)  
-3. Smoke: login, tenant isolation, QuickBooks URLs, billing, AI  
-4. Freeze Supabase app writes; keep project for rollback window  
-5. After stability: revoke Supabase keys; retire Vercel production linkage
+## Gate 4 — Auth cutover (only after Entra UAT PASS)
+
+1. Set Container App / GitHub secrets:
+   - `AUTH_PROVIDER=entra`
+   - `NEXT_PUBLIC_AUTH_PROVIDER=entra`
+2. Deploy image (workflow_dispatch, **redeploy_infra=false**)
+3. Smoke: login, tenant isolation, QuickBooks URLs, billing, AI
+4. Keep Supabase Auth for rollback; application DB writes already use Azure
+5. After stability: revoke Supabase keys; retire leftover Vercel linkage
+
+Do **not** perform Gate 4 in this step.
 
 `ENTRA_OWNER_GATE = EXACT_AND_ACTIONABLE`

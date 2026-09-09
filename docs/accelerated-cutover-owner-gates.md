@@ -7,115 +7,30 @@ Agent cannot read/write GitHub Actions secret **values** (API 403). Presence is 
 
 ---
 
-## Current certification status (2026-09-02, run `33605754558`)
+## Current certification status (2026-09-09)
 
 | Gate | Status |
 |------|--------|
-| Required Supabase secrets present | **PASS** (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ACCESS_TOKEN`) |
-| `SUPABASE_DB_PASSWORD` / `SUPABASE_DATABASE_URL` | ABSENT (OK — Management API path used) |
-| `SUPABASE_KEY_COMPATIBILITY` (legacy anon/service_role) | **PASS** |
-| `RLS_MIGRATION_APPLIED` | **PASS** |
-| Anonymous tenant / server table access | **DENIED** |
-| Cross-tenant leakage | **0** |
-| Azure Container App | **LIVE_GCC** `azapprngzn` (not helloworld) |
-| Environment | `azcaerngzn` |
-| Revision | `azapprngzn--0000013` ready; `azapprngzn--0000015` created |
-| Default FQDN health | **PASS** — https://azapprngzn.nicecoast-be020962.eastus.azurecontainerapps.io/api/health |
-| Pre-cutover UAT | **PASS** (`GCC_COMMERCIAL_GOLIVE_CERTIFICATION = PASS`) |
-| Host-header domain smoke | **DEFERRED** until custom domains bound |
-| Vercel rollback | **AVAILABLE** (DNS still on Vercel) |
+| Azure Container App | **LIVE_GCC** `azapprngzn` revision `azapprngzn--0000031` |
+| Custom domains | PASS — do not reopen DNS |
+| Live health | `https://app.growthcommandcenter.com/api/health` → `azure-postgres` |
+| Azure PostgreSQL | **PASS** `azpg3uejm` Ready eastus2 PG16 |
+| Azure PG UAT | **PASS** |
+| AUTH_PROVIDER | supabase (not entra) |
+| Entra External ID | **OPEN** — Owner gates A–E |
+| MICROSOFT_NATIVE_COMPLETE | NO |
+
+DNS Stage 2b is already live. Do not re-cut DNS.
 
 ---
 
-## Owner action NOW — Stage 2b DNS
+## Stage 3 — Supabase exit
 
-Do **not** invent DNS values. Run the binder workflow, then apply only printed records.
+### 3a. Azure PostgreSQL — COMPLETE (2026-09-09)
 
-### 1) Run binder
+Server `azpg3uejm` Ready in eastus2. Live health `backend=azure-postgres`. Do not reset admin password. Evidence: `docs/evidence/azure-postgres-db-cutover-20260909.md`.
 
-1. Open: https://github.com/mblv89117/growth-command-center/actions/workflows/azure-bind-custom-domains.yml
-2. **Run workflow** → branch `main` (after merge) → Run
-3. Download artifact `gcc-azure-dns-records` or copy from job summary
-
-### 2) Add GoDaddy records (exact values from Azure output)
-
-```
-HOST = asuid
-TYPE = TXT
-VALUE = <CUSTOM_DOMAIN_VERIFICATION_ID from workflow>
-TTL = 600
-PURPOSE = Azure domain verification (apex)
-
-HOST = asuid.www
-TYPE = TXT
-VALUE = <same verification id>
-TTL = 600
-PURPOSE = Azure domain verification (www)
-
-HOST = asuid.app
-TYPE = TXT
-VALUE = <same verification id>
-TTL = 600
-PURPOSE = Azure domain verification (app)
-
-HOST = @
-TYPE = A
-VALUE = <ENVIRONMENT_STATIC_IP from workflow>
-TTL = 600
-PURPOSE = Apex → Azure Container Apps
-
-HOST = www
-TYPE = CNAME
-VALUE = azapprngzn.nicecoast-be020962.eastus.azurecontainerapps.io
-TTL = 600
-PURPOSE = www → Azure default FQDN
-
-HOST = app
-TYPE = CNAME
-VALUE = azapprngzn.nicecoast-be020962.eastus.azurecontainerapps.io
-TTL = 600
-PURPOSE = app → Azure default FQDN
-```
-
-### 3) Records to remove/replace at cutover (current Vercel)
-
-```
-HOST = @
-TYPE = A
-VALUE = 216.150.1.1
-PURPOSE = REPLACE — Vercel apex
-
-HOST = www
-TYPE = CNAME
-VALUE = growthcommandcenter.com
-PURPOSE = REPLACE — currently aliases apex/Vercel
-
-HOST = app
-TYPE = CNAME
-VALUE = c180f1d2697e4ac8.vercel-dns-017.com
-PURPOSE = REPLACE — Vercel app hostname
-```
-
-### Cutover order
-
-1. Create TXT `asuid*` first; wait for Azure hostname = Succeeded/Provisioned
-2. Switch A/CNAME traffic
-3. Re-run Host-header smoke against `https://app.growthcommandcenter.com`
-4. Keep Vercel project live until Azure production is stable
-
----
-
-## Stage 3 — Supabase exit (after DNS)
-
-### 3a. Azure PostgreSQL
-
-1. https://github.com/mblv89117/growth-command-center/settings/secrets/actions → **New repository secret**
-2. Name: `AZURE_POSTGRES_ADMIN_PASSWORD`
-3. Value: 32+ char password (do not paste in chat)
-4. Run workflow **Azure PostgreSQL Stage 3 Provision** with confirm=`PROVISION`
-5. Add `AZURE_DATABASE_URL` from printed FQDN (GitHub UI only)
-
-### 3b. Entra External ID
+### 3b. Entra External ID — current Owner gate
 
 Follow click-by-click: `docs/entra-external-id-setup.md`
 
@@ -125,6 +40,7 @@ Secrets to create (values only in GitHub UI):
 - `ENTRA_EXTERNAL_CLIENT_ID`
 - `ENTRA_EXTERNAL_CLIENT_SECRET`
 - `ENTRA_EXTERNAL_REDIRECT_URI` = `https://app.growthcommandcenter.com/auth/callback`
+- `SESSION_SECRET` (32+ chars)
 
 ### 3c. Identity migration
 
@@ -136,6 +52,7 @@ Secrets to create (values only in GitHub UI):
 ## Do not
 
 - Paste secret values in chat or commits
-- Cut DNS before Azure hostname bindings are Provisioned
-- Decommission Supabase or Vercel until Azure-native UAT PASS
-- Switch to Supabase `sb_publishable` / `sb_secret` keys during this cutover
+- Re-cut DNS
+- Set `AUTH_PROVIDER=entra` before Entra UAT PASS
+- Decommission Supabase until Entra UAT PASS
+- Reset `gccadmin`

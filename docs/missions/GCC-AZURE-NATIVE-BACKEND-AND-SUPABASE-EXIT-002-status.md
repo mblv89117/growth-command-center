@@ -1,42 +1,41 @@
 # GCC-AZURE-NATIVE-BACKEND-AND-SUPABASE-EXIT-002 — Status
 
-## Baseline (protected)
+Updated: 2026-09-09 after Azure PostgreSQL production data-plane cutover.
+
+## Baseline (live)
 
 | Field | Value |
 |-------|-------|
-| Canonical main SHA | `ada7af6` (#115) — this progress branch rebased atop #114/#115 |
-| Production health | `https://app.growthcommandcenter.com/api/health` → HTTP 200 |
+| Production health | `https://app.growthcommandcenter.com/api/health` → `{"status":"ok","backend":"azure-postgres","recentJobFailures":0}` |
 | Custom domains / TLS | PASS — **do not reopen DNS** |
-| Auth runtime (prod today) | Supabase Auth |
-| DB runtime (prod today) | Supabase Postgres via `@supabase/*` |
-| Vercel | Obsolete for production SoT; treat PR status as **non-blocking** (see `docs/microsoft-native-cutover-checklist.md`) |
+| Auth runtime (prod today) | Supabase Auth (`AUTH_PROVIDER` unset / supabase) |
+| DB runtime (prod today) | Azure PostgreSQL `azpg3uejm` / database `gcc` |
+| Live revision | `azapprngzn--0000031` / `gcc-web:454ebdb5` |
+| Vercel | Obsolete for production SoT; treat PR status as **non-blocking** |
+| MICROSOFT_NATIVE_COMPLETE | NO |
 
-`AZURE_HOSTING_BASELINE_CAPTURED = PASS`
+`AZURE_HOSTING_BASELINE_CAPTURED = PASS`  
+`AZURE_POSTGRES_PRODUCTION_DATA_PLANE = PASS`
 
-## What this branch delivers (code-complete, cutover gated)
+## Completed
 
-1. **Domain-binding deployment regression protection** — `azure-production.yml` skips Bicep by default (`redeploy_infra=false`); image-only updates preserve custom domains.
-2. **Azure PostgreSQL Stage 3** — Flexible Server in **eastus2** (eastus is subscription-restricted; run `34386312875` failed with empty Version `[]`). Bicep `postgresLocation` default eastus2. Owner secret `AZURE_POSTGRES_ADMIN_PASSWORD` already present.
-3. **Entra External ID scaffold** — OIDC PKCE login/logout/callback, sealed `gcc_entra_session` cookie, identity link table, dual-mode middleware/login (`AUTH_PROVIDER` / `NEXT_PUBLIC_AUTH_PROVIDER`).
-4. **Azure PG pool** — `src/lib/db/pool.ts` prefers `AZURE_DATABASE_URL` over `DATABASE_URL`.
-5. **Migration tooling** — `scripts/migrate-supabase-to-azure-pg.mjs`, `scripts/export-identity-map-for-entra.mjs`.
-6. **Owner-gate docs** — `docs/entra-external-id-setup.md` + `docs/microsoft-native-cutover-checklist.md`.
-7. **Atlas Waves 1–3** — ClientCode fail-closed map + Hub HMAC ingest (**no** `x-atlas-module-key` secret header).
-8. **Evidence tests** — `npm run test:microsoft-native` (tenant isolation + azure/entra selection without crash).
+1. Domain-binding deployment regression protection (`redeploy_infra=false`).
+2. Azure PostgreSQL Stage 3 in **eastus2** after eastus restriction (failed run `34386312875`, success `34389534837`).
+3. Schema + RLS + production data copy + missing-row delta + reconcile.
+4. Azure PG UAT PASS; microsoft-native suite 31/31 including SUPABASE_DISABLED simulation.
+5. Entra External ID **code** scaffold — off until `AUTH_PROVIDER=entra`.
 
 ## Hard blockers (owner actions)
 
-Production cutover **cannot** complete in this agent session without:
-
-1. ~~`AZURE_POSTGRES_ADMIN_PASSWORD`~~ **COMPLETE** (run 34386312875 passed the password gate). Re-run Stage 3 after the eastus2 fix — do not change the password.
-2. After FQDN exists: set `AZURE_DATABASE_URL` and migrate (`npm run db:migrate-to-azure-pg` or Stage 3 Migrate workflow once present).
-3. Entra External ID tenant + app registration secrets (see `docs/entra-external-id-setup.md`) — Gate D, after Azure PG UAT.
-4. UAT PASS, then set `AUTH_PROVIDER=entra` and `NEXT_PUBLIC_AUTH_PROVIDER=entra`.
-5. Keep Supabase as rollback-only until traffic is none. Do not delete it at cutover.
+1. ~~Azure PostgreSQL provision + `AZURE_DATABASE_URL` + migrate + DB UAT~~ **COMPLETE**.
+2. **Entra External ID tenant + app registration secrets** — `docs/entra-external-id-setup.md` (current gate).
+3. Entra UAT PASS, **then** set `AUTH_PROVIDER=entra` and `NEXT_PUBLIC_AUTH_PROVIDER=entra`.
+4. Keep Supabase as auth rollback until traffic is none. Do not delete it.
 
 ## Safety
 
-- `AUTH_PROVIDER` remains **supabase** until explicit owner cutover.
+- `AUTH_PROVIDER` remains **supabase** until explicit owner auth cutover.
 - Supabase secrets retained for rollback.
-- Vercel not decommissioned.
+- Do not reset `gccadmin`.
 - No plaintext password migration.
+- `PLAINTEXT_PASSWORDS_HANDLED = 0`
