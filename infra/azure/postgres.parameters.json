@@ -4,6 +4,15 @@
   "parameters": {
     "location": {
       "value": "eastus"
+    },
+    "postgresLocation": {
+      "value": "eastus2"
+    },
+    "postgresVersion": {
+      "value": "16"
+    },
+    "postgresSkuName": {
+      "value": "Standard_B1ms"
     }
   }
 }

@@ -6,10 +6,11 @@
 2. New repository secret  
 3. Name: `AZURE_POSTGRES_ADMIN_PASSWORD`  
 4. Value: generate a 32+ character password (do **not** paste into chat)  
-5. Actions → **Azure PostgreSQL Stage 3 Provision** → Run workflow → type `PROVISION`  
+5. Actions → **Azure PostgreSQL Stage 3 Provision** → Run workflow → confirmation `PROVISION` (Flexible Server region is **eastus2** via Bicep default; do not force eastus — this subscription returns `supportedServerVersions=[]` there).  
 6. From the job summary, create secret `AZURE_DATABASE_URL` =  
    `postgresql://gccadmin@<FQDN>:5432/gcc?sslmode=require`  
-   (password URL-encoded; never commit)
+   (password URL-encoded; never commit)  
+7. Run `npm run db:migrate-to-azure-pg` (or Stage 3 Migrate workflow when available)
 
 ## Gate 2 — Entra External ID
 
