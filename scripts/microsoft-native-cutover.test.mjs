@@ -23,8 +23,13 @@ import {
 } from "../src/lib/auth/session-gate.ts";
 import {
   assertOrganizationIdMatch,
+  DASHBOARD_AGGREGATE_TABLES,
+  fetchDashboardAggregatesByOrganizationId,
+  fetchTenantAggregatesByOrganizationId,
+  filterRowsByOrganizationId,
   isAzureDataPlaneActive,
   resolveDataBackend,
+  TENANT_EXTENDED_AGGREGATE_TABLES,
 } from "../src/lib/data/data-plane.ts";
 import { __resetPgPoolForTests, getDatabaseUrl } from "../src/lib/db/pool.ts";
 import {
@@ -145,6 +150,52 @@ test("data-plane fail-closes on organization id mismatch", () => {
   assert.equal(assertOrganizationIdMatch("org-a", "org-b"), false);
   assert.equal(assertOrganizationIdMatch("org-a", null), false);
   assert.equal(assertOrganizationIdMatch("", "org-a"), false);
+});
+
+test("data-plane filterRowsByOrganizationId drops cross-tenant rows", () => {
+  const rows = [
+    { organization_id: "org-a", value: 1 },
+    { organization_id: "org-b", value: 2 },
+    { organization_id: "org-a", value: 3 },
+  ];
+  const scoped = filterRowsByOrganizationId("org-a", rows);
+  assert.equal(scoped.length, 2);
+  assert.deepEqual(
+    scoped.map((r) => r.value),
+    [1, 3]
+  );
+  assert.deepEqual(filterRowsByOrganizationId("", rows), []);
+  assert.deepEqual(filterRowsByOrganizationId("org-a", []), []);
+});
+
+test("dashboard/tenant aggregate fetchers stay inactive without Azure URL", async () => {
+  await withEnv(
+    {
+      AZURE_DATABASE_URL: undefined,
+      DATABASE_URL: undefined,
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon",
+    },
+    async () => {
+      __resetPgPoolForTests();
+      assert.equal(isAzureDataPlaneActive(), false);
+      assert.equal(await fetchDashboardAggregatesByOrganizationId("org-a"), null);
+      assert.equal(await fetchTenantAggregatesByOrganizationId("org-a"), null);
+    }
+  );
+});
+
+test("dashboard/tenant aggregate table coverage lists primary modules", () => {
+  assert.deepEqual(DASHBOARD_AGGREGATE_TABLES, [
+    "gcc_financial_snapshots",
+    "gcc_monthly_trends",
+    "gcc_budget_vs_actual",
+    "gcc_kpis",
+    "gcc_alerts",
+  ]);
+  assert.ok(TENANT_EXTENDED_AGGREGATE_TABLES.includes("gcc_cash_forecast_weeks"));
+  assert.ok(TENANT_EXTENDED_AGGREGATE_TABLES.includes("gcc_transactions"));
+  assert.equal(TENANT_EXTENDED_AGGREGATE_TABLES.length, 12);
 });
 
 test("entra session gate does not require Supabase URL", () => {

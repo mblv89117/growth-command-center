@@ -2,6 +2,10 @@ import { getTenantData } from "@/lib/mock-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/config";
+import {
+  fetchDashboardAggregatesByOrganizationId,
+  isAzureDataPlaneActive,
+} from "@/lib/data/data-plane";
 import { computeDashboardDeltas, computeWorkingCapital, type DashboardDeltas } from "@/lib/financial/deltas";
 import type {
   Alert,
@@ -59,6 +63,90 @@ function mapFinancialSnapshot(row: Record<string, unknown>): FinancialSnapshot {
   };
 }
 
+function mapRowsToDashboardData(
+  organizationId: string,
+  orgDataSource: string | null | undefined,
+  snapshot: Record<string, unknown>,
+  trendsRows: Record<string, unknown>[],
+  budgetRows: Record<string, unknown>[],
+  kpiRows: Record<string, unknown>[],
+  alertRows: Record<string, unknown>[]
+): DashboardData {
+  const monthlyTrends = trendsRows.map((r) => ({
+    month: String(r.month),
+    revenue: Number(r.revenue),
+    expenses: Number(r.expenses),
+    profit: Number(r.profit),
+    cash: Number(r.cash),
+  }));
+  const financialSnapshot = mapFinancialSnapshot(snapshot);
+
+  return {
+    financialSnapshot,
+    monthlyTrends,
+    budgetVsActual: budgetRows.map((r) => ({
+      category: String(r.category),
+      budget: Number(r.budget),
+      actual: Number(r.actual),
+      variance: Number(r.variance),
+      variancePercent: Number(r.variance_percent),
+    })),
+    kpis: kpiRows.map((r) => ({
+      id: String(r.kpi_key),
+      name: String(r.name),
+      value: Number(r.value),
+      unit: r.unit as KPI["unit"],
+      change: Number(r.change),
+      changeLabel: (r.change_label as string | null) ?? "",
+      target: r.target != null ? Number(r.target) : undefined,
+      status: (r.status as KPI["status"]) ?? undefined,
+      plan: (r.plan as string | null) ?? undefined,
+      updatedAt: (r.updated_at as string | null) ?? undefined,
+      manualOverride: (r.manual_override as boolean | null) ?? undefined,
+    })),
+    alerts: alertRows.map((r) => ({
+      id: String(r.alert_key),
+      title: String(r.title),
+      description: String(r.description),
+      severity: r.severity as AlertSeverity,
+      recommendedAction: String(r.recommended_action),
+      affectedMetric: String(r.affected_metric),
+      dueDate: (r.due_date as string | null) ?? undefined,
+      riskWindow: (r.risk_window as string | null) ?? undefined,
+      owner: String(r.owner),
+      isRead: Boolean(r.is_read),
+      createdAt: String(r.created_at),
+    })),
+    source: "supabase" as const,
+    dataProvenance: resolveDataProvenance(organizationId, orgDataSource ?? undefined),
+    deltas: computeDashboardDeltas(financialSnapshot, monthlyTrends),
+    workingCapital: computeWorkingCapital(financialSnapshot),
+    forecastVariancePercent:
+      financialSnapshot.currentCash > 0
+        ? Math.round(
+            ((financialSnapshot.forecastedCash - financialSnapshot.currentCash) /
+              financialSnapshot.currentCash) *
+              1000
+          ) / 10
+        : 0,
+  };
+}
+
+async function fetchFromAzure(organizationId: string): Promise<DashboardData | null> {
+  const bundle = await fetchDashboardAggregatesByOrganizationId(organizationId);
+  if (!bundle?.financialSnapshot) return null;
+
+  return mapRowsToDashboardData(
+    organizationId,
+    bundle.organizationDataSource,
+    bundle.financialSnapshot,
+    bundle.monthlyTrends,
+    bundle.budgetVsActual,
+    bundle.kpis,
+    bundle.alerts
+  );
+}
+
 async function fetchFromSupabase(
   organizationId: string,
   useAdmin: boolean
@@ -77,97 +165,28 @@ async function fetchFromSupabase(
 
   if (snapshotRes.error || !snapshotRes.data) return null;
 
-  const monthlyTrends = (trendsRes.data ?? []).map((r) => ({
-    month: r.month,
-    revenue: Number(r.revenue),
-    expenses: Number(r.expenses),
-    profit: Number(r.profit),
-    cash: Number(r.cash),
-  }));
-  const financialSnapshot = mapFinancialSnapshot(snapshotRes.data);
-
-  return {
-    financialSnapshot,
-    monthlyTrends,
-    budgetVsActual: (budgetRes.data ?? []).map((r) => ({
-      category: r.category,
-      budget: Number(r.budget),
-      actual: Number(r.actual),
-      variance: Number(r.variance),
-      variancePercent: Number(r.variance_percent),
-    })),
-    kpis: (kpisRes.data ?? []).map((r) => ({
-      id: r.kpi_key,
-      name: r.name,
-      value: Number(r.value),
-      unit: r.unit as KPI["unit"],
-      change: Number(r.change),
-      changeLabel: r.change_label ?? "",
-      target: r.target != null ? Number(r.target) : undefined,
-      status: (r.status as KPI["status"]) ?? undefined,
-      plan: r.plan ?? undefined,
-      updatedAt: r.updated_at ?? undefined,
-      manualOverride: r.manual_override ?? undefined,
-    })),
-    alerts: (alertsRes.data ?? []).map((r) => ({
-      id: r.alert_key,
-      title: r.title,
-      description: r.description,
-      severity: r.severity as AlertSeverity,
-      recommendedAction: r.recommended_action,
-      affectedMetric: r.affected_metric,
-      dueDate: r.due_date ?? undefined,
-      riskWindow: r.risk_window ?? undefined,
-      owner: r.owner,
-      isRead: r.is_read,
-      createdAt: r.created_at,
-    })),
-    source: "supabase" as const,
-    dataProvenance: resolveDataProvenance(organizationId, orgRes.data?.data_source as string | undefined),
-    deltas: computeDashboardDeltas(financialSnapshot, monthlyTrends),
-    workingCapital: computeWorkingCapital(financialSnapshot),
-    forecastVariancePercent:
-      financialSnapshot.currentCash > 0
-        ? Math.round(
-            ((financialSnapshot.forecastedCash - financialSnapshot.currentCash) /
-              financialSnapshot.currentCash) *
-              1000
-          ) / 10
-        : 0,
-  };
+  return mapRowsToDashboardData(
+    organizationId,
+    orgRes.data?.data_source as string | undefined,
+    snapshotRes.data as Record<string, unknown>,
+    (trendsRes.data ?? []) as Record<string, unknown>[],
+    (budgetRes.data ?? []) as Record<string, unknown>[],
+    (kpisRes.data ?? []) as Record<string, unknown>[],
+    (alertsRes.data ?? []) as Record<string, unknown>[]
+  );
 }
 
 export async function getDashboardData(organizationId: string): Promise<DashboardData> {
-  if (!isSupabaseConfigured()) {
-    const mock = getTenantData(organizationId);
-    const deltas = computeDashboardDeltas(mock.financialSnapshot, mock.monthlyTrends);
-    return {
-      financialSnapshot: mock.financialSnapshot,
-      monthlyTrends: mock.monthlyTrends,
-      budgetVsActual: mock.budgetVsActual,
-      kpis: mock.kpis,
-      alerts: mock.alerts,
-      source: "mock",
-      dataProvenance: "mock",
-      deltas,
-      workingCapital: computeWorkingCapital(mock.financialSnapshot),
-      forecastVariancePercent:
-        mock.financialSnapshot.currentCash > 0
-          ? Math.round(
-              ((mock.financialSnapshot.forecastedCash - mock.financialSnapshot.currentCash) /
-                mock.financialSnapshot.currentCash) *
-                1000
-            ) / 10
-          : 0,
-    };
+  if (isAzureDataPlaneActive()) {
+    const azure = await fetchFromAzure(organizationId);
+    if (azure) return azure;
+  } else if (isSupabaseConfigured()) {
+    const userScoped = await fetchFromSupabase(organizationId, false);
+    if (userScoped) return userScoped;
+
+    const adminScoped = await fetchFromSupabase(organizationId, true);
+    if (adminScoped) return adminScoped;
   }
-
-  // Try user-scoped client first (authenticated), then admin (demo/server)
-  const userScoped = await fetchFromSupabase(organizationId, false);
-  if (userScoped) return userScoped;
-
-  const adminScoped = await fetchFromSupabase(organizationId, true);
-  if (adminScoped) return adminScoped;
 
   const mock = getTenantData(organizationId);
   const deltas = computeDashboardDeltas(mock.financialSnapshot, mock.monthlyTrends);
