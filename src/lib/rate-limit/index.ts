@@ -1,5 +1,7 @@
 import { RateLimitError } from "@/lib/api/errors";
+import { isAzureDataPlaneActive } from "@/lib/data/data-plane";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { azurePgRateLimitStore } from "./azure-pg-store";
 import { memoryRateLimitStore } from "./memory-store";
 import { supabaseRateLimitStore } from "./supabase-store";
 import type { RateLimitOptions, RateLimitResult, RateLimitStore } from "./types";
@@ -16,6 +18,7 @@ function buildRateLimitKey(route: string, userId: string): string {
 }
 
 function getDefaultStore(): RateLimitStore {
+  if (isAzureDataPlaneActive()) return azurePgRateLimitStore;
   return createAdminClient() ? supabaseRateLimitStore : memoryRateLimitStore;
 }
 

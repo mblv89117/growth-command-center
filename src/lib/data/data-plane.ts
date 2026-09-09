@@ -138,6 +138,383 @@ export async function updateOrganizationById(
   return { ok: true };
 }
 
+/** True when Azure PG or Supabase admin can persist data. */
+export function isPersistentDataBackendAvailable(): boolean {
+  return isAzureDataPlaneActive() || Boolean(createAdminClient());
+}
+
+// --- KPI dual-mode ---
+
+export async function fetchKpiRowByKey(
+  organizationId: string,
+  kpiKey: string
+): Promise<Record<string, unknown> | null> {
+  if (!organizationId?.trim() || !kpiKey?.trim()) return null;
+
+  if (isAzureDataPlaneActive()) {
+    const result = await pgQuery<Record<string, unknown>>(
+      "SELECT * FROM gcc_kpis WHERE organization_id = $1 AND kpi_key = $2 LIMIT 1",
+      [organizationId, kpiKey]
+    );
+    return tenantScopedRow(organizationId, result.rows[0]);
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data, error } = await admin
+    .from("gcc_kpis")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("kpi_key", kpiKey)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  if (
+    !assertOrganizationIdMatch(
+      organizationId,
+      (data as Record<string, unknown>).organization_id
+    )
+  ) {
+    return null;
+  }
+  return data as Record<string, unknown>;
+}
+
+export async function updateKpiRowByKey(
+  organizationId: string,
+  kpiKey: string,
+  rowPatch: Record<string, unknown>
+): Promise<Record<string, unknown> | null> {
+  if (!organizationId?.trim() || !kpiKey?.trim()) return null;
+
+  if (isAzureDataPlaneActive()) {
+    const keys = Object.keys(rowPatch);
+    if (keys.length === 0) return fetchKpiRowByKey(organizationId, kpiKey);
+
+    const setClauses = keys.map((key, index) => `${key} = $${index + 3}`);
+    const values = keys.map((key) => rowPatch[key]);
+
+    const result = await pgQuery<Record<string, unknown>>(
+      `UPDATE gcc_kpis SET ${setClauses.join(", ")} WHERE organization_id = $1 AND kpi_key = $2 RETURNING *`,
+      [organizationId, kpiKey, ...values]
+    );
+    return tenantScopedRow(organizationId, result.rows[0]);
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data, error } = await admin
+    .from("gcc_kpis")
+    .update(rowPatch)
+    .eq("organization_id", organizationId)
+    .eq("kpi_key", kpiKey)
+    .select("*")
+    .single();
+
+  if (error || !data) return null;
+  if (
+    !assertOrganizationIdMatch(
+      organizationId,
+      (data as Record<string, unknown>).organization_id
+    )
+  ) {
+    return null;
+  }
+  return data as Record<string, unknown>;
+}
+
+export async function upsertKpiRow(
+  organizationId: string,
+  row: Record<string, unknown>
+): Promise<void> {
+  if (!organizationId?.trim()) return;
+
+  if (isAzureDataPlaneActive()) {
+    await pgQuery(
+      `INSERT INTO gcc_kpis (organization_id, kpi_key, name, value, unit, change, target, status, manual_override, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (organization_id, kpi_key) DO UPDATE SET
+         name = EXCLUDED.name,
+         value = EXCLUDED.value,
+         unit = EXCLUDED.unit,
+         change = EXCLUDED.change,
+         target = EXCLUDED.target,
+         status = EXCLUDED.status,
+         manual_override = EXCLUDED.manual_override,
+         updated_at = EXCLUDED.updated_at`,
+      [
+        organizationId,
+        row.kpi_key,
+        row.name,
+        row.value,
+        row.unit,
+        row.change,
+        row.target,
+        row.status,
+        row.manual_override,
+        row.updated_at,
+      ]
+    );
+    return;
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return;
+
+  await admin.from("gcc_kpis").upsert(row, { onConflict: "organization_id,kpi_key" });
+}
+
+export async function fetchKpiKeysWithTargets(
+  organizationId: string,
+  kpiKeys: readonly string[]
+): Promise<string[]> {
+  if (!organizationId?.trim() || kpiKeys.length === 0) return [];
+
+  if (isAzureDataPlaneActive()) {
+    const placeholders = kpiKeys.map((_, index) => `$${index + 2}`).join(", ");
+    const result = await pgQuery<{ kpi_key: string; target: unknown; organization_id: string }>(
+      `SELECT kpi_key, target, organization_id FROM gcc_kpis
+       WHERE organization_id = $1 AND kpi_key IN (${placeholders})`,
+      [organizationId, ...kpiKeys]
+    );
+    return filterRowsByOrganizationId(organizationId, result.rows)
+      .filter((row) => row.target != null)
+      .map((row) => row.kpi_key as string);
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return [];
+
+  const { data } = await admin
+    .from("gcc_kpis")
+    .select("kpi_key, target, organization_id")
+    .eq("organization_id", organizationId)
+    .in("kpi_key", [...kpiKeys]);
+
+  return filterRowsByOrganizationId(organizationId, (data ?? []) as Record<string, unknown>[])
+    .filter((row) => row.target != null)
+    .map((row) => row.kpi_key as string);
+}
+
+// --- Onboarding dual-mode ---
+
+export async function fetchOnboardingMessagesByOrganizationId(
+  organizationId: string
+): Promise<Record<string, unknown>[]> {
+  if (!organizationId?.trim()) return [];
+
+  if (isAzureDataPlaneActive()) {
+    const result = await pgQuery<Record<string, unknown>>(
+      `SELECT id, role, content, created_at, organization_id FROM gcc_onboarding_messages
+       WHERE organization_id = $1 ORDER BY created_at ASC`,
+      [organizationId]
+    );
+    return filterRowsByOrganizationId(organizationId, result.rows);
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return [];
+
+  const { data } = await admin
+    .from("gcc_onboarding_messages")
+    .select("id, role, content, created_at, organization_id")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: true });
+
+  return filterRowsByOrganizationId(organizationId, (data ?? []) as Record<string, unknown>[]);
+}
+
+export async function insertOnboardingMessage(
+  organizationId: string,
+  role: string,
+  content: string
+): Promise<Record<string, unknown> | null> {
+  if (!organizationId?.trim()) return null;
+
+  if (isAzureDataPlaneActive()) {
+    const result = await pgQuery<Record<string, unknown>>(
+      `INSERT INTO gcc_onboarding_messages (organization_id, role, content)
+       VALUES ($1, $2, $3)
+       RETURNING id, role, content, created_at, organization_id`,
+      [organizationId, role, content]
+    );
+    return tenantScopedRow(organizationId, result.rows[0]);
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data, error } = await admin
+    .from("gcc_onboarding_messages")
+    .insert({ organization_id: organizationId, role, content })
+    .select("id, role, content, created_at, organization_id")
+    .single();
+
+  if (error || !data) return null;
+  if (
+    !assertOrganizationIdMatch(
+      organizationId,
+      (data as Record<string, unknown>).organization_id
+    )
+  ) {
+    return null;
+  }
+  return data as Record<string, unknown>;
+}
+
+// --- Integration connections dual-mode ---
+
+export async function fetchIntegrationConnection(
+  organizationId: string,
+  provider: string
+): Promise<Record<string, unknown> | null> {
+  if (!organizationId?.trim() || !provider?.trim()) return null;
+
+  if (isAzureDataPlaneActive()) {
+    const result = await pgQuery<Record<string, unknown>>(
+      `SELECT * FROM gcc_integration_connections
+       WHERE organization_id = $1 AND provider = $2 LIMIT 1`,
+      [organizationId, provider]
+    );
+    return tenantScopedRow(organizationId, result.rows[0]);
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data } = await admin
+    .from("gcc_integration_connections")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("provider", provider)
+    .maybeSingle();
+
+  if (!data) return null;
+  if (
+    !assertOrganizationIdMatch(
+      organizationId,
+      (data as Record<string, unknown>).organization_id
+    )
+  ) {
+    return null;
+  }
+  return data as Record<string, unknown>;
+}
+
+export async function fetchIntegrationConnectionsByOrganizationId(
+  organizationId: string
+): Promise<Record<string, unknown>[]> {
+  if (!organizationId?.trim()) return [];
+
+  if (isAzureDataPlaneActive()) {
+    const result = await pgQuery<Record<string, unknown>>(
+      "SELECT * FROM gcc_integration_connections WHERE organization_id = $1",
+      [organizationId]
+    );
+    return filterRowsByOrganizationId(organizationId, result.rows);
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return [];
+
+  const { data } = await admin
+    .from("gcc_integration_connections")
+    .select("*")
+    .eq("organization_id", organizationId);
+
+  return filterRowsByOrganizationId(organizationId, (data ?? []) as Record<string, unknown>[]);
+}
+
+export async function upsertIntegrationConnectionRow(
+  row: Record<string, unknown>
+): Promise<Record<string, unknown> | null> {
+  const organizationId = row.organization_id as string | undefined;
+  if (!organizationId?.trim()) return null;
+
+  if (isAzureDataPlaneActive()) {
+    const result = await pgQuery<Record<string, unknown>>(
+      `INSERT INTO gcc_integration_connections (
+         organization_id, provider, status, access_token, refresh_token, realm_id,
+         connected_at, last_sync, error_message, metadata
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (organization_id, provider) DO UPDATE SET
+         status = EXCLUDED.status,
+         access_token = EXCLUDED.access_token,
+         refresh_token = EXCLUDED.refresh_token,
+         realm_id = EXCLUDED.realm_id,
+         connected_at = EXCLUDED.connected_at,
+         last_sync = EXCLUDED.last_sync,
+         error_message = EXCLUDED.error_message,
+         metadata = EXCLUDED.metadata
+       RETURNING *`,
+      [
+        organizationId,
+        row.provider,
+        row.status,
+        row.access_token ?? null,
+        row.refresh_token ?? null,
+        row.realm_id ?? null,
+        row.connected_at ?? null,
+        row.last_sync ?? null,
+        row.error_message ?? null,
+        JSON.stringify(row.metadata ?? {}),
+      ]
+    );
+    return tenantScopedRow(organizationId, result.rows[0]);
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data, error } = await admin
+    .from("gcc_integration_connections")
+    .upsert(row, { onConflict: "organization_id,provider" })
+    .select("*")
+    .single();
+
+  if (error || !data) return null;
+  if (
+    !assertOrganizationIdMatch(
+      organizationId,
+      (data as Record<string, unknown>).organization_id
+    )
+  ) {
+    return null;
+  }
+  return data as Record<string, unknown>;
+}
+
+export async function deleteIntegrationConnection(
+  organizationId: string,
+  provider: string
+): Promise<boolean> {
+  if (!organizationId?.trim() || !provider?.trim()) return false;
+
+  if (isAzureDataPlaneActive()) {
+    const result = await pgQuery<{ organization_id: string }>(
+      `DELETE FROM gcc_integration_connections
+       WHERE organization_id = $1 AND provider = $2
+       RETURNING organization_id`,
+      [organizationId, provider]
+    );
+    const deleted = result.rows[0];
+    return Boolean(deleted && assertOrganizationIdMatch(organizationId, deleted.organization_id));
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return false;
+
+  const { error } = await admin
+    .from("gcc_integration_connections")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("provider", provider);
+
+  return !error;
+}
+
 /** Tables read for dashboard primary aggregates (Azure PG dual-mode). */
 export const DASHBOARD_AGGREGATE_TABLES = [
   "gcc_financial_snapshots",

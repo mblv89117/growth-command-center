@@ -1,4 +1,13 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  fetchKpiKeysWithTargets,
+  fetchOnboardingMessagesByOrganizationId,
+  fetchOrganizationRowById,
+  insertOnboardingMessage,
+  isPersistentDataBackendAvailable,
+  updateOrganizationById,
+  upsertIntegrationConnectionRow,
+  upsertKpiRow,
+} from "@/lib/data/data-plane";
 import type { IntegrationProvider } from "@/lib/integrations/types";
 import { progressForStep } from "./progress";
 import type {
@@ -67,20 +76,14 @@ function mapOrgRow(row: Record<string, unknown>): OnboardingProfile {
 }
 
 export async function getOnboardingState(organizationId: string): Promise<OnboardingState> {
-  const admin = createAdminClient();
-
-  if (admin) {
-    const [{ data: org }, { data: messages }] = await Promise.all([
-      admin.from("gcc_organizations").select("*").eq("id", organizationId).maybeSingle(),
-      admin
-        .from("gcc_onboarding_messages")
-        .select("id, role, content, created_at")
-        .eq("organization_id", organizationId)
-        .order("created_at", { ascending: true }),
+  if (isPersistentDataBackendAvailable()) {
+    const [org, messageRows] = await Promise.all([
+      fetchOrganizationRowById(organizationId),
+      fetchOnboardingMessagesByOrganizationId(organizationId),
     ]);
 
     const profile = org ? mapOrgRow(org) : defaultProfile(organizationId);
-    const mappedMessages: OnboardingMessage[] = (messages ?? []).map((row) => ({
+    const mappedMessages: OnboardingMessage[] = messageRows.map((row) => ({
       id: row.id as string,
       role: row.role as OnboardingMessage["role"],
       content: row.content as string,
@@ -109,7 +112,6 @@ export async function appendOnboardingMessage(
   role: OnboardingMessage["role"],
   content: string
 ): Promise<OnboardingMessage> {
-  const admin = createAdminClient();
   const message: OnboardingMessage = {
     id: crypto.randomUUID(),
     role,
@@ -117,23 +119,14 @@ export async function appendOnboardingMessage(
     createdAt: new Date().toISOString(),
   };
 
-  if (admin) {
-    const { data, error } = await admin
-      .from("gcc_onboarding_messages")
-      .insert({
-        organization_id: organizationId,
-        role,
-        content,
-      })
-      .select("id, role, content, created_at")
-      .single();
-
-    if (!error && data) {
+  if (isPersistentDataBackendAvailable()) {
+    const row = await insertOnboardingMessage(organizationId, role, content);
+    if (row) {
       return {
-        id: data.id as string,
-        role: data.role as OnboardingMessage["role"],
-        content: data.content as string,
-        createdAt: data.created_at as string,
+        id: row.id as string,
+        role: row.role as OnboardingMessage["role"],
+        content: row.content as string,
+        createdAt: row.created_at as string,
       };
     }
   }
@@ -148,9 +141,8 @@ async function updateOrganization(
   organizationId: string,
   patch: Record<string, unknown>
 ): Promise<void> {
-  const admin = createAdminClient();
-  if (admin) {
-    await admin.from("gcc_organizations").update(patch).eq("id", organizationId);
+  if (isPersistentDataBackendAvailable()) {
+    await updateOrganizationById(organizationId, patch);
     return;
   }
 
@@ -188,20 +180,11 @@ function missingRequirements(profile: OnboardingProfile, kpiTargets: string[]): 
 }
 
 async function getConfiguredKpiKeys(organizationId: string): Promise<string[]> {
-  const admin = createAdminClient();
-  if (!admin) {
-    return [...(memoryKpiTargets.get(organizationId) ?? new Set<string>())];
+  if (isPersistentDataBackendAvailable()) {
+    return fetchKpiKeysWithTargets(organizationId, REQUIRED_KPI_KEYS);
   }
 
-  const { data } = await admin
-    .from("gcc_kpis")
-    .select("kpi_key, target")
-    .eq("organization_id", organizationId)
-    .in("kpi_key", [...REQUIRED_KPI_KEYS]);
-
-  return (data ?? [])
-    .filter((row) => row.target != null)
-    .map((row) => row.kpi_key as string);
+  return [...(memoryKpiTargets.get(organizationId) ?? new Set<string>())];
 }
 
 export async function executeOnboardingTool(
@@ -326,24 +309,20 @@ async function setMetricTarget(
   }
 
   const definition = KPI_DEFINITIONS[metricKey as keyof typeof KPI_DEFINITIONS];
-  const admin = createAdminClient();
 
-  if (admin) {
-    await admin.from("gcc_kpis").upsert(
-      {
-        organization_id: organizationId,
-        kpi_key: metricKey,
-        name: definition.name,
-        value: 0,
-        unit: definition.unit,
-        change: 0,
-        target: targetValue,
-        status: "green",
-        manual_override: true,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "organization_id,kpi_key" }
-    );
+  if (isPersistentDataBackendAvailable()) {
+    await upsertKpiRow(organizationId, {
+      organization_id: organizationId,
+      kpi_key: metricKey,
+      name: definition.name,
+      value: 0,
+      unit: definition.unit,
+      change: 0,
+      target: targetValue,
+      status: "green",
+      manual_override: true,
+      updated_at: new Date().toISOString(),
+    });
   } else {
     const targets = memoryKpiTargets.get(organizationId) ?? new Set<string>();
     targets.add(metricKey);
@@ -377,21 +356,17 @@ async function connectIntegrationIntent(
     return { success: false, message: "category and softwareName are required." };
   }
 
-  const admin = createAdminClient();
-  if (admin) {
-    await admin.from("gcc_integration_connections").upsert(
-      {
-        organization_id: organizationId,
-        provider,
-        status: "pending",
-        metadata: {
-          onboarding_intent: true,
-          category,
-          software_name: softwareName,
-        },
+  if (isPersistentDataBackendAvailable()) {
+    await upsertIntegrationConnectionRow({
+      organization_id: organizationId,
+      provider,
+      status: "pending",
+      metadata: {
+        onboarding_intent: true,
+        category,
+        software_name: softwareName,
       },
-      { onConflict: "organization_id,provider" }
-    );
+    });
   }
 
   return {
