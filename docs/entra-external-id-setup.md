@@ -4,8 +4,12 @@
 **Goal:** Replace Supabase Auth for customer login with **Microsoft Entra External ID (CIAM)**.  
 Do **not** use workforce Entra ID as a substitute unless architecture explicitly requires it.
 
+**Prerequisite (PASS 2026-09-09):** Azure PostgreSQL is the live production database (`azpg3uejm` / `gcc`). Live health `backend=azure-postgres`. Azure PG UAT PASS. See `docs/evidence/azure-postgres-db-cutover-20260909.md`.
+
+**This gate is now the blocker.** ARM tenant list shows only workforce tenant `High Value Capital Group` (`3df46563-86f3-4414-87fd-84ba967741ef`). No Customer / External ID tenant exists yet.
+
 Code scaffold: `src/lib/auth/entra/config.ts`  
-Keep `AUTH_PROVIDER=supabase` until Entra UAT passes.
+Keep `AUTH_PROVIDER=supabase` until Entra UAT passes. **Do not** set `AUTH_PROVIDER=entra` or `NEXT_PUBLIC_AUTH_PROVIDER=entra` in this portal step.
 
 ---
 

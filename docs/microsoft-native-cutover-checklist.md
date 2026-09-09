@@ -1,8 +1,9 @@
 # Microsoft-native DB/Auth cutover checklist (runbook)
 
-**Status:** Progress / scaffolding — **cutover is NOT complete**.  
+**Status:** Azure PostgreSQL is the **live production database**. Auth cutover is **not** complete.  
 **Production hosting SoT:** Azure Container Apps (not Vercel).  
-**Current runtime:** Still Supabase DB + Auth until owner gates below pass.
+**Current runtime:** Azure PG data plane + Supabase Auth. `AUTH_PROVIDER` remains supabase.  
+**MICROSOFT_NATIVE_COMPLETE = NO** until Entra External ID is live.
 
 Related:
 - `docs/microsoft-native-migration-plan.md`
@@ -42,15 +43,15 @@ Recommended branch protection: require Azure workflow + `npm run test:microsoft-
 
 ---
 
-## GCC_OWNER_GATE_READY criteria (not met until owner checks all)
+## GCC_OWNER_GATE_READY criteria
 
-1. Azure PostgreSQL provisioned; `AZURE_DATABASE_URL` set on Container App
-2. Entra External ID app + secrets configured (`docs/entra-external-id-setup.md`)
-3. `npm run db:migrate-to-azure-pg` completed with row-count verification
-4. `npm run azure:validate-migration-structure` PASS
-5. `npm run export:identity-map` + Entra user activation
-6. Azure-native UAT PASS (login, tenant isolation, billing, imports, AI advisor)
-7. **Only then:** set `AUTH_PROVIDER=entra` + `NEXT_PUBLIC_AUTH_PROVIDER=entra` on Container App
+1. [x] Azure PostgreSQL provisioned; `AZURE_DATABASE_URL` set on Container App (`azpg3uejm`, live `/api/health` = `azure-postgres`)
+2. [ ] Entra External ID app + secrets configured (`docs/entra-external-id-setup.md`) — **current Owner gate**
+3. [x] Production data copied + reconciled (overlapping row counts match; final delta inserted 0)
+4. [x] `npm run azure:validate-migration-structure` PASS
+5. [ ] `npm run export:identity-map` + Entra user activation (after CIAM tenant exists)
+6. [x] Azure PG UAT PASS (RLS, same-tenant / cross-tenant isolation). Entra login UAT still open.
+7. **Only after Entra UAT PASS:** set `AUTH_PROVIDER=entra` + `NEXT_PUBLIC_AUTH_PROVIDER=entra` on Container App
 
 ---
 
@@ -68,14 +69,14 @@ This is a **simulation** — not proof of live cutover. Live Supabase remains ro
 
 ## Owner gates that still block live cutover
 
-### 1) Azure Postgres provision
+### 1) Azure Postgres provision — COMPLETE (2026-09-09)
 
-- [ ] Create/confirm Azure Database for PostgreSQL Flexible Server
-- [ ] Set GitHub secret `AZURE_POSTGRES_ADMIN_PASSWORD`
-- [ ] Run Stage 3 provision workflow (or equivalent) and capture FQDN
-- [ ] Set GitHub / Container App secret `AZURE_DATABASE_URL`
+- [x] Flexible Server `azpg3uejm` Ready in eastus2 (PG 16 / Standard_B1ms)
+- [x] GitHub secret `AZURE_POSTGRES_ADMIN_PASSWORD` (Owner-stored; do not reset)
+- [x] Stage 3 run `34389534837`
+- [x] GitHub + Container App secret `AZURE_DATABASE_URL`
 
-### 2) Entra External ID (portal)
+### 2) Entra External ID (portal) — OPEN (blocks auth cutover)
 
 Follow `docs/entra-external-id-setup.md`:
 
@@ -85,17 +86,17 @@ Follow `docs/entra-external-id-setup.md`:
 
 ### 3) Data migration + identity map
 
-- [ ] `npm run db:migrate-to-azure-pg`
-- [ ] `npm run azure:validate-migration-structure`
-- [ ] Row-count / FK / financial precision verification
-- [ ] `npm run export:identity-map` and Entra user activation
+- [x] Schema + data copy + missing-row delta (`scripts/azure/stage3-*.mjs`)
+- [x] `npm run azure:validate-migration-structure`
+- [x] Row-count / PK / FK / index / sequence / org / ClientCode reconcile
+- [ ] `npm run export:identity-map` and Entra user activation (after Gate 2)
 
-### 4) Flip cutover flags (only after Azure-native UAT PASS)
+### 4) Flip auth flags (only after Entra UAT PASS — not after DB UAT alone)
 
 - [ ] Set `AUTH_PROVIDER=entra` and `NEXT_PUBLIC_AUTH_PROVIDER=entra` on Container App
 - [ ] Deploy with **redeploy_infra=false** (protect custom domains)
 - [ ] Smoke: login, tenant isolation, QuickBooks, billing, AI
-- [ ] Freeze Supabase app writes; keep rollback window
+- [ ] Keep Supabase Auth rollback; DB writes already on Azure
 - [ ] Later: revoke Supabase keys
 
 ---
@@ -111,9 +112,9 @@ Follow `docs/entra-external-id-setup.md`:
 ## Do not claim
 
 - Live auth is Entra
-- Live DB is Azure Postgres
+- Microsoft-native cutover is finished
 - Supabase exit is finished
 
-Claim only scaffolding + tests + owner-gate clarity until the boxes above are checked.
+Live DB **is** Azure Postgres (verified 2026-09-09). Auth is still Supabase.
 
-**Cutover remains Owner-gated:** do not set `AUTH_PROVIDER=entra` in production or claim live Azure DB/auth until owner gates in this document pass UAT.
+**Auth cutover remains Owner-gated:** do not set `AUTH_PROVIDER=entra` until Entra External ID UAT PASS.
