@@ -10,6 +10,8 @@
     "smoke:auth": "node scripts/smoke-auth.mjs",
     "test": "node --import tsx --test scripts/commercial-readiness.test.mjs",
     "test:commercial": "node --import tsx --test scripts/commercial-readiness.test.mjs",
+    "test:microsoft-native": "node --import tsx --test scripts/microsoft-native-cutover.test.mjs",
+    "test:atlas": "node --import tsx --test scripts/microsoft-native-cutover.test.mjs",
     "test:rls": "node scripts/rls-security.test.mjs",
     "db:rls": "node scripts/run-supabase-sql.mjs rls",
     "db:rls:apply-api": "node scripts/apply-supabase-rls-via-api.mjs",

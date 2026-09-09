@@ -86,11 +86,34 @@ export function isPublicApiRoute(pathname: string): boolean {
 
 export function validateProductionEnv(): string[] {
   const missing: string[] = [];
-  if (!isProduction) return missing;
+  // Read NODE_ENV at call time so dual-mode checks work in tests and boot hooks.
+  if (process.env.NODE_ENV !== "production") return missing;
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) missing.push("NEXT_PUBLIC_SUPABASE_URL");
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  const authProvider = (process.env.AUTH_PROVIDER ?? "supabase").toLowerCase();
+  const usingEntra = authProvider === "entra";
+
+  // Dual-mode: Supabase remains required until AUTH_PROVIDER=entra cutover.
+  if (!usingEntra) {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) missing.push("NEXT_PUBLIC_SUPABASE_URL");
+    if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  } else {
+    if (!process.env.ENTRA_EXTERNAL_TENANT_ID && !process.env.ENTRA_EXTERNAL_ID_TENANT_ID) {
+      missing.push("ENTRA_EXTERNAL_TENANT_ID");
+    }
+    if (!process.env.ENTRA_EXTERNAL_CLIENT_ID && !process.env.ENTRA_EXTERNAL_ID_CLIENT_ID) {
+      missing.push("ENTRA_EXTERNAL_CLIENT_ID");
+    }
+    if (!process.env.ENTRA_EXTERNAL_CLIENT_SECRET && !process.env.ENTRA_EXTERNAL_ID_CLIENT_SECRET) {
+      missing.push("ENTRA_EXTERNAL_CLIENT_SECRET");
+    }
+    const session = process.env.SESSION_SECRET ?? process.env.ENTRA_SESSION_SECRET;
+    if (!session || session.length < 32) missing.push("SESSION_SECRET");
+    if (!process.env.AZURE_DATABASE_URL && !process.env.DATABASE_URL) {
+      missing.push("AZURE_DATABASE_URL");
+    }
+  }
+
   if (!process.env.NEXT_PUBLIC_APP_URL) missing.push("NEXT_PUBLIC_APP_URL");
   if (!process.env.NEXT_PUBLIC_MARKETING_URL) missing.push("NEXT_PUBLIC_MARKETING_URL");
 

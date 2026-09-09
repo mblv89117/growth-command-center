@@ -1,13 +1,20 @@
 /**
  * PostgreSQL connection pool for Azure Database for PostgreSQL Flexible Server.
- * Active when DATABASE_URL (or AZURE_DATABASE_URL) is set.
+ * Prefer AZURE_DATABASE_URL (cutover SoT); fall back to DATABASE_URL.
  */
 import pg from "pg";
 
 let pool: pg.Pool | null = null;
 
+/**
+ * Prefer the Azure Flexible Server URL so dual-env containers can keep a
+ * legacy DATABASE_URL without accidentally routing traffic to Supabase PG.
+ */
 export function getDatabaseUrl(): string | undefined {
-  return process.env.DATABASE_URL ?? process.env.AZURE_DATABASE_URL;
+  const azure = process.env.AZURE_DATABASE_URL?.trim();
+  if (azure) return azure;
+  const generic = process.env.DATABASE_URL?.trim();
+  return generic || undefined;
 }
 
 export function getPgPool(): pg.Pool | null {
@@ -30,10 +37,15 @@ export async function pgQuery<T extends pg.QueryResultRow = pg.QueryResultRow>(
   params?: unknown[]
 ): Promise<pg.QueryResult<T>> {
   const p = getPgPool();
-  if (!p) throw new Error("DATABASE_URL / AZURE_DATABASE_URL is not configured");
+  if (!p) throw new Error("AZURE_DATABASE_URL / DATABASE_URL is not configured");
   return p.query<T>(text, params);
 }
 
 export function isAzurePostgresConfigured(): boolean {
   return Boolean(getDatabaseUrl());
+}
+
+/** Reset singleton — test helper only. */
+export function __resetPgPoolForTests(): void {
+  pool = null;
 }
