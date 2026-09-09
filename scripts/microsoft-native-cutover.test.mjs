@@ -17,6 +17,15 @@ import {
   postGccEnvelopeToHub,
 } from "../src/lib/atlas/hubIngest.ts";
 import { getAuthProvider } from "../src/lib/auth/entra/config.ts";
+import {
+  isEntraSessionGateSatisfied,
+  shouldUseSupabaseSessionGate,
+} from "../src/lib/auth/session-gate.ts";
+import {
+  assertOrganizationIdMatch,
+  isAzureDataPlaneActive,
+  resolveDataBackend,
+} from "../src/lib/data/data-plane.ts";
 import { __resetPgPoolForTests, getDatabaseUrl } from "../src/lib/db/pool.ts";
 import {
   selectProductionAuthAndDb,
@@ -109,6 +118,66 @@ test("pool prefers AZURE_DATABASE_URL over DATABASE_URL", () => {
       const snap = snapshotMicrosoftNativeRuntime();
       assert.equal(snap.databaseUrlSource, "AZURE_DATABASE_URL");
       assert.equal(snap.dataPlane, "azure-postgres");
+      assert.equal(resolveDataBackend(), "azure-postgres");
+      assert.equal(isAzureDataPlaneActive(), true);
+    }
+  );
+});
+
+test("data-plane defaults to supabase when Azure URL unset", () => {
+  withEnv(
+    {
+      AZURE_DATABASE_URL: undefined,
+      DATABASE_URL: undefined,
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon",
+    },
+    () => {
+      __resetPgPoolForTests();
+      assert.equal(isAzureDataPlaneActive(), false);
+      assert.equal(resolveDataBackend(), "supabase");
+    }
+  );
+});
+
+test("data-plane fail-closes on organization id mismatch", () => {
+  assert.equal(assertOrganizationIdMatch("org-a", "org-a"), true);
+  assert.equal(assertOrganizationIdMatch("org-a", "org-b"), false);
+  assert.equal(assertOrganizationIdMatch("org-a", null), false);
+  assert.equal(assertOrganizationIdMatch("", "org-a"), false);
+});
+
+test("entra session gate does not require Supabase URL", () => {
+  assert.equal(shouldUseSupabaseSessionGate("entra"), false);
+  assert.equal(shouldUseSupabaseSessionGate("supabase"), true);
+
+  withEnv(
+    {
+      AUTH_PROVIDER: "entra",
+      NEXT_PUBLIC_SUPABASE_URL: undefined,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined,
+    },
+    () => {
+      assert.equal(getAuthProvider(), "entra");
+      assert.equal(
+        isEntraSessionGateSatisfied(
+          [{ name: "gcc_entra_session", value: "sealed-token" }],
+          {
+            entraSessionCookieName: "gcc_entra_session",
+            demoModeAllowed: false,
+            demoModeCookieName: "gcc_demo_mode",
+          }
+        ),
+        true
+      );
+      assert.equal(
+        isEntraSessionGateSatisfied([], {
+          entraSessionCookieName: "gcc_entra_session",
+          demoModeAllowed: false,
+          demoModeCookieName: "gcc_demo_mode",
+        }),
+        false
+      );
     }
   );
 });

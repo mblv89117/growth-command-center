@@ -1,32 +1,22 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  fetchOrganizationSettingsById,
+  updateOrganizationById,
+} from "@/lib/data/data-plane";
 
 export async function persistOrganizationSettings(
   organizationId: string,
   section: string,
   settings: Record<string, unknown>
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const admin = createAdminClient();
-  if (!admin) {
+  const org = await fetchOrganizationSettingsById(organizationId);
+  if (!org) {
     return {
       ok: false,
-      message: "Database admin client is not configured.",
+      message: "Organization not found.",
     };
   }
 
-  const { data: org, error: fetchError } = await admin
-    .from("gcc_organizations")
-    .select("settings")
-    .eq("id", organizationId)
-    .single();
-
-  if (fetchError || !org) {
-    return {
-      ok: false,
-      message: fetchError?.message ?? "Organization not found.",
-    };
-  }
-
-  const current = (org.settings as Record<string, unknown>) ?? {};
+  const current = org.settings ?? {};
   const merged = { ...current, ...settings };
 
   const rowUpdate: Record<string, unknown> = { settings: merged };
@@ -37,14 +27,5 @@ export async function persistOrganizationSettings(
     if (typeof settings.slug === "string") rowUpdate.slug = settings.slug;
   }
 
-  const { error: updateError } = await admin
-    .from("gcc_organizations")
-    .update(rowUpdate)
-    .eq("id", organizationId);
-
-  if (updateError) {
-    return { ok: false, message: updateError.message };
-  }
-
-  return { ok: true };
+  return updateOrganizationById(organizationId, rowUpdate);
 }
