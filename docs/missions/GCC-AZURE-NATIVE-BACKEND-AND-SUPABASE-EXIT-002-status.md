@@ -16,7 +16,7 @@
 ## What this branch delivers (code-complete, cutover gated)
 
 1. **Domain-binding deployment regression protection** — `azure-production.yml` skips Bicep by default (`redeploy_infra=false`); image-only updates preserve custom domains.
-2. **Azure PostgreSQL Stage 3** — `infra/azure/postgres.bicep` + `azure-postgres-stage3.yml` (owner secret `AZURE_POSTGRES_ADMIN_PASSWORD`).
+2. **Azure PostgreSQL Stage 3** — Flexible Server in **eastus2** (eastus is subscription-restricted; run `34386312875` failed with empty Version `[]`). Bicep `postgresLocation` default eastus2. Owner secret `AZURE_POSTGRES_ADMIN_PASSWORD` already present.
 3. **Entra External ID scaffold** — OIDC PKCE login/logout/callback, sealed `gcc_entra_session` cookie, identity link table, dual-mode middleware/login (`AUTH_PROVIDER` / `NEXT_PUBLIC_AUTH_PROVIDER`).
 4. **Azure PG pool** — `src/lib/db/pool.ts` prefers `AZURE_DATABASE_URL` over `DATABASE_URL`.
 5. **Migration tooling** — `scripts/migrate-supabase-to-azure-pg.mjs`, `scripts/export-identity-map-for-entra.mjs`.
@@ -28,11 +28,11 @@
 
 Production cutover **cannot** complete in this agent session without:
 
-1. GitHub secret `AZURE_POSTGRES_ADMIN_PASSWORD` + run **Azure PostgreSQL Stage 3 Provision** with `PROVISION`.
-2. Entra External ID tenant + app registration secrets (see `docs/entra-external-id-setup.md`).
-3. `AZURE_DATABASE_URL` + one-time migrate from Supabase.
+1. ~~`AZURE_POSTGRES_ADMIN_PASSWORD`~~ **COMPLETE** (run 34386312875 passed the password gate). Re-run Stage 3 after the eastus2 fix — do not change the password.
+2. After FQDN exists: set `AZURE_DATABASE_URL` and migrate (`npm run db:migrate-to-azure-pg` or Stage 3 Migrate workflow once present).
+3. Entra External ID tenant + app registration secrets (see `docs/entra-external-id-setup.md`) — Gate D, after Azure PG UAT.
 4. UAT PASS, then set `AUTH_PROVIDER=entra` and `NEXT_PUBLIC_AUTH_PROVIDER=entra`.
-5. Agent Azure CLI / MCP subscription access (currently unavailable — `az login` not present; Azure MCP timed out).
+5. Keep Supabase as rollback-only until traffic is none. Do not delete it at cutover.
 
 ## Safety
 
