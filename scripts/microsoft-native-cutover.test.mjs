@@ -441,9 +441,103 @@ test("active-runtime-plane exports connector and job helpers", async () => {
     "insertJobRun",
     "updateJobRun",
     "selectImportCommitBackend",
+    "selectPdfImportBackend",
+    "insertPdfImportJob",
+    "updatePdfImportJob",
+    "fetchPdfImportJob",
+    "upsertFinancialSnapshotPatch",
   ]) {
     assert.equal(typeof plane[fn], "function", `${fn} should be exported`);
   }
+});
+
+test("PDF import path selects azure backend when URL set", async () => {
+  const { selectPdfImportBackend } = await import("../src/lib/data/active-runtime-plane.ts");
+  withEnv(
+    {
+      AZURE_DATABASE_URL: "postgresql://azure.example/gcc?sslmode=require",
+      NEXT_PUBLIC_SUPABASE_URL: undefined,
+      SUPABASE_SERVICE_ROLE_KEY: undefined,
+    },
+    () => {
+      __resetPgPoolForTests();
+      assert.equal(selectPdfImportBackend(), "azure-postgres");
+    }
+  );
+});
+
+test("buildPdfSnapshotPatch maps confirmed fields and skips ignored", async () => {
+  const { buildPdfSnapshotPatch } = await import("../src/lib/imports/pdf-snapshot.ts");
+  const patch = buildPdfSnapshotPatch({
+    confirmedFields: {
+      revenue: 100_000,
+      grossProfit: 40_000,
+      currentCash: null,
+      netIncome: 12_000,
+    },
+    ignoredFields: ["netIncome"],
+  });
+  assert.deepEqual(patch, {
+    revenue_mtd: 100_000,
+    gross_profit: 40_000,
+  });
+});
+
+test("evaluateAdminRouteAccess fail-closes non-platform_admin on admin routes", async () => {
+  const { evaluateAdminRouteAccess, isPlatformAdminRole } = await import(
+    "../src/lib/auth/admin-gate.ts"
+  );
+
+  assert.equal(isPlatformAdminRole("platform_admin"), true);
+  assert.equal(isPlatformAdminRole("founder"), false);
+
+  assert.deepEqual(
+    evaluateAdminRouteAccess({
+      isAdminRoute: false,
+      demoMode: false,
+      role: "founder",
+    }),
+    { allowed: true }
+  );
+
+  assert.deepEqual(
+    evaluateAdminRouteAccess({
+      isAdminRoute: true,
+      demoMode: true,
+      role: "platform_admin",
+    }),
+    { allowed: false, redirectPath: "/dashboard" }
+  );
+
+  assert.deepEqual(
+    evaluateAdminRouteAccess({
+      isAdminRoute: true,
+      demoMode: false,
+      role: "founder",
+    }),
+    { allowed: false, redirectPath: "/dashboard" }
+  );
+
+  assert.deepEqual(
+    evaluateAdminRouteAccess({
+      isAdminRoute: true,
+      demoMode: false,
+      role: "platform_admin",
+    }),
+    { allowed: true }
+  );
+});
+
+test("Supabase Bearer auth blocked when AUTH_PROVIDER=entra", async () => {
+  const { isSupabaseBearerAuthAllowed } = await import("../src/lib/auth/bearer-policy.ts");
+
+  withEnv({ AUTH_PROVIDER: "entra" }, () => {
+    assert.equal(isSupabaseBearerAuthAllowed(), false);
+  });
+
+  withEnv({ AUTH_PROVIDER: "supabase" }, () => {
+    assert.equal(isSupabaseBearerAuthAllowed(), true);
+  });
 });
 
 test("production validateProductionEnv allows azure/entra selection without throw", () => {

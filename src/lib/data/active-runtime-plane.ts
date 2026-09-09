@@ -25,6 +25,185 @@ export function selectImportCommitBackend(): DataBackend {
   return resolveDataBackend();
 }
 
+export function selectPdfImportBackend(): DataBackend {
+  return resolveDataBackend();
+}
+
+// --- PDF import jobs ---
+
+export interface PdfImportJobInsert {
+  organizationId: string;
+  fileName: string;
+  documentType: string;
+  periodStart?: string;
+  periodEnd?: string;
+  extractedFields: Record<string, unknown>;
+  status: string;
+  provenanceCategory: string;
+  createdBy: string;
+}
+
+export interface PdfImportJobRow {
+  id: string;
+  organization_id: string;
+  file_name: string;
+  document_type: string | null;
+  status: string;
+  confirmed_fields: Record<string, unknown> | null;
+}
+
+export async function insertPdfImportJob(job: PdfImportJobInsert): Promise<string | null> {
+  if (isAzureDataPlaneActive()) {
+    const result = await pgQuery<{ id: string; organization_id: string }>(
+      `INSERT INTO gcc_pdf_import_jobs (
+         organization_id, file_name, document_type, period_start, period_end,
+         extracted_fields, status, provenance_category, created_by
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING id, organization_id`,
+      [
+        job.organizationId,
+        job.fileName,
+        job.documentType,
+        job.periodStart ?? null,
+        job.periodEnd ?? null,
+        JSON.stringify(job.extractedFields),
+        job.status,
+        job.provenanceCategory,
+        job.createdBy,
+      ]
+    );
+    const row = result.rows[0];
+    if (!row || !assertOrganizationIdMatch(job.organizationId, row.organization_id)) return null;
+    return row.id;
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data, error } = await admin
+    .from("gcc_pdf_import_jobs")
+    .insert({
+      organization_id: job.organizationId,
+      file_name: job.fileName,
+      document_type: job.documentType,
+      period_start: job.periodStart,
+      period_end: job.periodEnd,
+      extracted_fields: job.extractedFields,
+      status: job.status,
+      provenance_category: job.provenanceCategory,
+      created_by: job.createdBy,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data?.id) return null;
+  return data.id as string;
+}
+
+export async function fetchPdfImportJob(
+  jobId: string,
+  organizationId: string
+): Promise<PdfImportJobRow | null> {
+  if (isAzureDataPlaneActive()) {
+    const result = await pgQuery<PdfImportJobRow>(
+      `SELECT id, organization_id, file_name, document_type, status, confirmed_fields
+       FROM gcc_pdf_import_jobs
+       WHERE id = $1 AND organization_id = $2
+       LIMIT 1`,
+      [jobId, organizationId]
+    );
+    return tenantScopedRow(organizationId, result.rows[0]) as PdfImportJobRow | null;
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data } = await admin
+    .from("gcc_pdf_import_jobs")
+    .select("id, organization_id, file_name, document_type, status, confirmed_fields")
+    .eq("id", jobId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (!data) return null;
+  return tenantScopedRow(organizationId, data as Record<string, unknown>) as PdfImportJobRow;
+}
+
+export async function updatePdfImportJob(
+  jobId: string,
+  organizationId: string,
+  patch: {
+    confirmedFields?: Record<string, number | null>;
+    status: string;
+    provenanceCategory?: string;
+    confirmedAt?: string;
+  }
+): Promise<void> {
+  if (isAzureDataPlaneActive()) {
+    await pgQuery(
+      `UPDATE gcc_pdf_import_jobs SET
+         confirmed_fields = COALESCE($3, confirmed_fields),
+         status = $4,
+         provenance_category = COALESCE($5, provenance_category),
+         confirmed_at = COALESCE($6, confirmed_at)
+       WHERE id = $1 AND organization_id = $2`,
+      [
+        jobId,
+        organizationId,
+        patch.confirmedFields ? JSON.stringify(patch.confirmedFields) : null,
+        patch.status,
+        patch.provenanceCategory ?? null,
+        patch.confirmedAt ?? null,
+      ]
+    );
+    return;
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return;
+
+  await admin
+    .from("gcc_pdf_import_jobs")
+    .update({
+      confirmed_fields: patch.confirmedFields,
+      status: patch.status,
+      provenance_category: patch.provenanceCategory,
+      confirmed_at: patch.confirmedAt,
+    })
+    .eq("id", jobId)
+    .eq("organization_id", organizationId);
+}
+
+export async function upsertFinancialSnapshotPatch(
+  organizationId: string,
+  patch: Record<string, number>
+): Promise<void> {
+  if (Object.keys(patch).length === 0) return;
+
+  if (isAzureDataPlaneActive()) {
+    const keys = Object.keys(patch);
+    const columns = ["organization_id", ...keys];
+    const placeholders = columns.map((_, index) => `$${index + 1}`);
+    const values = [organizationId, ...keys.map((key) => patch[key])];
+    const updateClauses = keys.map((key) => `${key} = EXCLUDED.${key}`);
+
+    await pgQuery(
+      `INSERT INTO gcc_financial_snapshots (${columns.join(", ")})
+       VALUES (${placeholders.join(", ")})
+       ON CONFLICT (organization_id) DO UPDATE SET ${updateClauses.join(", ")}`,
+      values
+    );
+    return;
+  }
+
+  const admin = createAdminClient();
+  if (admin) {
+    await admin
+      .from("gcc_financial_snapshots")
+      .upsert({ organization_id: organizationId, ...patch }, { onConflict: "organization_id" });
+  }
+}
+
 // --- Connector audit ---
 
 export async function insertConnectorAuditEvent(

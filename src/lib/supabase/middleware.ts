@@ -9,8 +9,11 @@ import {
   isSupabaseConfigured,
 } from "@/lib/config";
 import { getSupabaseUrl } from "@/lib/supabase/url";
+import { evaluateAdminRouteAccess } from "@/lib/auth/admin-gate";
 import { getAuthProvider, isEntraAuthEnabled } from "@/lib/auth/entra/config";
-import { ENTRA_SESSION_COOKIE } from "@/lib/auth/entra/oidc";
+import { resolveProfileForEntra } from "@/lib/auth/entra/identity";
+import { ENTRA_SESSION_COOKIE, unsealSession } from "@/lib/auth/entra/oidc";
+import { fetchProfileByEmail } from "@/lib/data/active-runtime-plane";
 import {
   isEntraSessionGateSatisfied,
   isLikelyAuthSessionCookieName,
@@ -55,6 +58,20 @@ function withAttributionCookie(
 
 function hasLikelyAuthSession(request: NextRequest): boolean {
   return request.cookies.getAll().some((cookie) => isLikelyAuthSessionCookieName(cookie.name));
+}
+
+async function resolveEntraAdminRole(request: NextRequest): Promise<string | null> {
+  const token = request.cookies.get(ENTRA_SESSION_COOKIE)?.value;
+  if (!token) return null;
+
+  const session = await unsealSession(token);
+  if (!session) return null;
+
+  const linked = await resolveProfileForEntra(session);
+  if (linked?.role) return linked.role;
+
+  const profile = await fetchProfileByEmail(session.email);
+  return profile?.role ?? null;
 }
 
 async function getAuthenticatedUser(request: NextRequest): Promise<boolean> {
@@ -170,7 +187,7 @@ export async function updateSession(request: NextRequest) {
 
   const demoMode = isDemoModeAllowed() && request.cookies.get(DEMO_MODE_COOKIE)?.value === "1";
 
-  // Entra External ID dual-mode: sealed cookie gate only — no Supabase SSR client.
+  // Entra External ID: sealed cookie gate only — no Supabase SSR client.
   if (isEntraAuthEnabled()) {
     if (
       isEntraSessionGateSatisfied(request.cookies.getAll(), {
@@ -179,6 +196,19 @@ export async function updateSession(request: NextRequest) {
         demoModeCookieName: DEMO_MODE_COOKIE,
       })
     ) {
+      if (isAdminRoute(pathname)) {
+        const role = await resolveEntraAdminRole(request);
+        const adminAccess = evaluateAdminRouteAccess({
+          isAdminRoute: true,
+          demoMode,
+          role,
+        });
+        if (!adminAccess.allowed) {
+          const url = request.nextUrl.clone();
+          url.pathname = adminAccess.redirectPath ?? "/dashboard";
+          return NextResponse.redirect(url);
+        }
+      }
       return supabaseResponse;
     }
     const url = request.nextUrl.clone();

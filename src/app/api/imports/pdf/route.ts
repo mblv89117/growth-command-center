@@ -4,7 +4,14 @@ import { requireSecureTenantRequest } from "@/lib/api/secure-access";
 import { apiErrorResponse } from "@/lib/api/errors";
 import { organizationIdSchema } from "@/lib/validation/schemas";
 import { extractFromPdfBuffer, type PdfConfirmationPayload } from "@/lib/imports/pdf-extract";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { buildPdfSnapshotPatch } from "@/lib/imports/pdf-snapshot";
+import {
+  insertPdfImportJob,
+  isPersistentDataBackendAvailable,
+  updateOrganizationDataSource,
+  updatePdfImportJob,
+  upsertFinancialSnapshotPatch,
+} from "@/lib/data/active-runtime-plane";
 import { storeProvenance } from "@/lib/connectors/provenance";
 import { recordConnectorAudit } from "@/lib/connectors/audit";
 import { recomputeTenantFinancials } from "@/lib/pipeline/recompute";
@@ -39,25 +46,20 @@ export async function POST(request: Request) {
       const buffer = Buffer.from(body.fileBase64, "base64");
       const extraction = await extractFromPdfBuffer(buffer, body.fileName);
 
-      const admin = createAdminClient();
       let jobId: string | undefined;
-      if (admin) {
-        const { data } = await admin
-          .from("gcc_pdf_import_jobs")
-          .insert({
-            organization_id: body.organizationId,
-            file_name: body.fileName,
-            document_type: extraction.documentType,
-            period_start: extraction.periodStart,
-            period_end: extraction.periodEnd,
-            extracted_fields: extraction.fields,
-            status: "pending_confirmation",
-            provenance_category: extraction.provenanceCategory,
-            created_by: access.userId,
-          })
-          .select("id")
-          .single();
-        jobId = data?.id as string | undefined;
+      if (isPersistentDataBackendAvailable()) {
+        const id = await insertPdfImportJob({
+          organizationId: body.organizationId,
+          fileName: body.fileName,
+          documentType: extraction.documentType,
+          periodStart: extraction.periodStart,
+          periodEnd: extraction.periodEnd,
+          extractedFields: extraction.fields,
+          status: "pending_confirmation",
+          provenanceCategory: extraction.provenanceCategory,
+          createdBy: access.userId,
+        });
+        jobId = id ?? undefined;
       }
 
       await recordConnectorAudit({
@@ -76,44 +78,20 @@ export async function POST(request: Request) {
         schema: confirmSchema,
       });
 
-      const admin = createAdminClient();
-      if (!admin) {
+      if (!isPersistentDataBackendAvailable()) {
         return NextResponse.json({ error: "Database not configured" }, { status: 503 });
       }
 
       const confirmation = body.confirmation as PdfConfirmationPayload;
       const fields = confirmation.confirmedFields;
-
-      const snapshotPatch: Record<string, number> = {};
-      const fieldMap: Record<string, string> = {
-        revenue: "revenue_mtd",
-        grossProfit: "gross_profit",
-        netIncome: "net_profit",
-        operatingExpenses: "operating_expenses",
-        currentCash: "current_cash",
-        accountsReceivable: "accounts_receivable",
-        accountsPayable: "accounts_payable",
-        payroll: "payroll_obligations",
-      };
-
-      for (const [key, value] of Object.entries(fields)) {
-        if (value === null || confirmation.ignoredFields.includes(key)) continue;
-        const dbKey = fieldMap[key];
-        if (dbKey) snapshotPatch[dbKey] = value;
-      }
+      const snapshotPatch = buildPdfSnapshotPatch({
+        confirmedFields: fields,
+        ignoredFields: confirmation.ignoredFields,
+      });
 
       if (Object.keys(snapshotPatch).length > 0) {
-        await admin
-          .from("gcc_financial_snapshots")
-          .upsert(
-            { organization_id: body.organizationId, ...snapshotPatch },
-            { onConflict: "organization_id" }
-          );
-
-        await admin
-          .from("gcc_organizations")
-          .update({ data_source: "imported" })
-          .eq("id", body.organizationId);
+        await upsertFinancialSnapshotPatch(body.organizationId, snapshotPatch);
+        await updateOrganizationDataSource(body.organizationId, "imported");
 
         for (const [key, value] of Object.entries(fields)) {
           if (value === null || confirmation.ignoredFields.includes(key)) continue;
@@ -135,16 +113,12 @@ export async function POST(request: Request) {
         await recomputeTenantFinancials(body.organizationId);
       }
 
-      await admin
-        .from("gcc_pdf_import_jobs")
-        .update({
-          confirmed_fields: fields,
-          status: "confirmed",
-          confirmed_at: new Date().toISOString(),
-          provenance_category: "USER_CONFIRMED",
-        })
-        .eq("id", body.jobId)
-        .eq("organization_id", body.organizationId);
+      await updatePdfImportJob(body.jobId, body.organizationId, {
+        confirmedFields: fields,
+        status: "confirmed",
+        provenanceCategory: "USER_CONFIRMED",
+        confirmedAt: new Date().toISOString(),
+      });
 
       await recordConnectorAudit({
         organizationId: body.organizationId,

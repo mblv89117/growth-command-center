@@ -2,6 +2,7 @@ import { headers, cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserRole } from "@/lib/types";
+import { isSupabaseBearerAuthAllowed } from "@/lib/auth/bearer-policy";
 import { isEntraAuthEnabled } from "@/lib/auth/entra/config";
 import { ENTRA_SESSION_COOKIE, unsealSession } from "@/lib/auth/entra/oidc";
 import { resolveProfileForEntra } from "@/lib/auth/entra/identity";
@@ -62,22 +63,19 @@ async function getEntraAuthContext(): Promise<AuthContext | null> {
 
 /**
  * Resolve the caller from:
- * 1) Entra session cookie when AUTH_PROVIDER=entra
- * 2) Authorization: Bearer <access_token> (API / UAT clients) via Supabase JWT (legacy)
+ * 1) Entra session cookie when AUTH_PROVIDER=entra (fail closed — no Supabase Bearer fallback)
+ * 2) Authorization: Bearer <access_token> (API / UAT clients) via Supabase JWT when supabase mode
  * 3) Supabase SSR cookie session (browser)
  */
 export async function getAuthContext(): Promise<AuthContext | null> {
   if (isEntraAuthEnabled()) {
-    const entra = await getEntraAuthContext();
-    if (entra) return entra;
-    // Fail closed for browser sessions when Entra is the provider.
-    // Bearer tokens still allowed during dual-run cutover below.
+    return getEntraAuthContext();
   }
 
   const headerStore = await headers();
   const authHeader = headerStore.get("authorization");
 
-  if (authHeader?.toLowerCase().startsWith("bearer ")) {
+  if (isSupabaseBearerAuthAllowed() && authHeader?.toLowerCase().startsWith("bearer ")) {
     const token = authHeader.slice(7).trim();
     if (token) {
       const admin = createAdminClient();
@@ -100,10 +98,6 @@ export async function getAuthContext(): Promise<AuthContext | null> {
         }
       }
     }
-  }
-
-  if (isEntraAuthEnabled()) {
-    return null;
   }
 
   const supabase = await createClient();
