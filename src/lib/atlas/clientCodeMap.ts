@@ -1,8 +1,8 @@
 /**
- * Atlas ClientCode \u2194 GCC organization mapping.
+ * Atlas ClientCode ↔ GCC organization mapping.
  * Fail-closed: unknown ClientCode never routes to a tenant.
  * Production mappings load from Azure PostgreSQL (gcc_atlas_client_code_map).
- * SYN01 is a test fixture only \u2014 never a production entitlement.
+ * SYN01 is a test fixture only — never a production entitlement.
  */
 
 import { pgQuery, isAzurePostgresConfigured } from '@/lib/db/pool';
@@ -28,7 +28,7 @@ const SYN01_FIXTURE: GccClientCodeMapping = {
   organizationId: 'org-syn01',
   status: 'INFERRED',
   confidence: 'INFERRED',
-  notes: 'Contract/test fixture only \u2014 not a production entitlement.',
+  notes: 'Contract/test fixture only — not a production entitlement.',
 };
 
 const CLIENT_CODE_RE = /^[A-Z][A-Z0-9]{2,15}$/;
@@ -55,6 +55,7 @@ function buildCache(rows: GccClientCodeMapping[]): Cache {
   const byOrg = new Map<string, GccClientCodeMapping>();
   for (const row of [...fixtureMappings(), ...rows]) {
     if (byCode.has(row.clientCode) || byOrg.has(row.organizationId)) {
+      // Duplicate ClientCode or organization mapping → fail closed (omit both).
       byCode.delete(row.clientCode);
       byOrg.delete(row.organizationId);
       continue;
@@ -69,6 +70,11 @@ export function isCanonicalClientCode(raw: string | null | undefined): boolean {
   return typeof raw === 'string' && CLIENT_CODE_RE.test(raw);
 }
 
+/**
+ * Test/helper: replace in-memory cache (does not touch DB).
+ * Does NOT merge SYN01 fixture — tests pass explicit rows to avoid
+ * duplicate fail-closed wiping when the fixture flag is also enabled.
+ */
 export function __setClientCodeMapForTests(rows: readonly GccClientCodeMapping[]): void {
   const byCode = new Map<string, GccClientCodeMapping>();
   const byOrg = new Map<string, GccClientCodeMapping>();
@@ -104,15 +110,18 @@ export async function refreshClientCodeMapFromDb(): Promise<void> {
       WHERE status = 'VERIFIED'`,
   );
 
+  // Detect duplicate organizations or codes at query layer via unique constraints;
+  // still fail closed if two VERIFIED rows somehow collide in memory.
   const seenCodes = new Set<string>();
   const seenOrgs = new Set<string>();
   const rows: GccClientCodeMapping[] = [];
   for (const r of result.rows) {
     if (!isCanonicalClientCode(r.client_code)) continue;
-    if (r.client_code === 'SYN01') continue;
+    if (r.client_code === 'SYN01') continue; // never treat SYN01 as production
     if (seenCodes.has(r.client_code) || seenOrgs.has(r.organization_id)) {
       seenCodes.add(r.client_code);
       seenOrgs.add(r.organization_id);
+      // Drop colliding mappings entirely.
       const idx = rows.findIndex(
         (x) => x.clientCode === r.client_code || x.organizationId === r.organization_id,
       );
@@ -142,6 +151,7 @@ function syncCacheOrEmpty(): Cache {
   return cache ?? buildCache([]);
 }
 
+/** Sync resolve for callers that already refreshed cache / tests. */
 export function organizationIdForClientCode(clientCode: string): string | null {
   if (!isCanonicalClientCode(clientCode)) return null;
   if (clientCode === 'SYN01' && !syn01Allowed()) return null;
@@ -184,7 +194,7 @@ export function dualResolveGccIdentity(input: {
     if (mappedOrg !== org || mappedCode !== code) {
       return { ok: false, reason: 'AMBIGUOUS_CROSS_TENANT' };
     }
-    return { ok: true; clientCode: code, organizationId: org };
+    return { ok: true, clientCode: code, organizationId: org };
   }
   if (code) {
     const organizationId = organizationIdForClientCode(code);
