@@ -2,7 +2,9 @@
 
 FAILED_RUN = 34386312875  
 WORKFLOW = Azure PostgreSQL Stage 3 Provision  
-CONSTITUTION = HVCG-CONSTITUTION-2026-09-04-v1.0
+CONSTITUTION = HVCG-CONSTITUTION-2026-09-04-v1.0  
+FIX_PR = https://github.com/mblv89117/growth-command-center/pull/122  
+MERGED = yes (`43d7dee` on `main`)
 
 ## ROOT_CAUSE
 
@@ -35,16 +37,18 @@ This is **not** a bad PostgreSQL 16 choice, a bad `Standard_B1ms` SKU, a bad `20
 
 - Keep PostgreSQL **16** and **Standard_B1ms / Burstable**.
 - Deploy Flexible Server to **eastus2** (`postgresLocation`), not the RG location.
-- Stable server name `azpg` + `uniqueString(resourceGroup().id, 'gcc-postgres')` so location fallback does not rename.
+- Stable server name `azpg` + `uniqueString(resourceGroup().id, 'gcc-postgres')` → `azpg3uejm`.
 - Existing Stage 3 workflow does not pass `postgresLocation`; Bicep default `eastus2` is enough for a clean retry.
-- Preflight script fails closed when `supportedServerVersions` is empty.
+- Preflight script is on `main` and fails closed when `supportedServerVersions` is empty. Workflow YAML preflight step could not be committed (`workflow` scope denied).
 
 ## VALIDATION
 
-- `az bicep build` on `postgres.bicep`
-- Preflight against live eastus2 capabilities (PASS) and eastus (fail-closed)
-- `az deployment group validate` with dummy password (not stored)
-- Do **not** claim provision PASS from compile alone — live `az postgres flexible-server show` after workflow
+- `az bicep build` = PASS
+- eastus2 capabilities: versions 11–18, Standard_B1ms present
+- eastus preflight fail-closed: `REGION_POSTGRES_PROVISIONING_RESTRICTED`
+- `az deployment group validate` = Succeeded
+- `az deployment group what-if` = Create `azpg3uejm`, database `gcc`, `require_secure_transport`, `AllowAzureServices`; no error
+- Do **not** claim provision PASS until live `az postgres flexible-server show -g rg-gcc-prod -n azpg3uejm` is Ready
 
 ## ROLLBACK
 
