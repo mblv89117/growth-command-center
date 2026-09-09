@@ -9,8 +9,13 @@ import {
   isSupabaseConfigured,
 } from "@/lib/config";
 import { getSupabaseUrl } from "@/lib/supabase/url";
-import { isEntraAuthEnabled } from "@/lib/auth/entra/config";
+import { getAuthProvider, isEntraAuthEnabled } from "@/lib/auth/entra/config";
 import { ENTRA_SESSION_COOKIE } from "@/lib/auth/entra/oidc";
+import {
+  isEntraSessionGateSatisfied,
+  isLikelyAuthSessionCookieName,
+  shouldUseSupabaseSessionGate,
+} from "@/lib/auth/session-gate";
 import {
   captureAttributionFromRequest,
   attributionCookieOptions,
@@ -49,18 +54,21 @@ function withAttributionCookie(
 }
 
 function hasLikelyAuthSession(request: NextRequest): boolean {
-  return request.cookies.getAll().some((cookie) => {
-    const name = cookie.name.toLowerCase();
-    return (
-      name.includes("auth-token") ||
-      name.includes("access-token") ||
-      name === "gcc_entra_session"
-    );
-  });
+  return request.cookies.getAll().some((cookie) => isLikelyAuthSessionCookieName(cookie.name));
 }
 
 async function getAuthenticatedUser(request: NextRequest): Promise<boolean> {
+  const cookies = request.cookies.getAll();
+
   if (hasLikelyAuthSession(request)) return true;
+
+  if (!shouldUseSupabaseSessionGate(getAuthProvider())) {
+    return isEntraSessionGateSatisfied(cookies, {
+      entraSessionCookieName: ENTRA_SESSION_COOKIE,
+      demoModeAllowed: isDemoModeAllowed(),
+      demoModeCookieName: DEMO_MODE_COOKIE,
+    });
+  }
 
   if (!isSupabaseConfigured()) {
     return isDemoModeAllowed() && request.cookies.get(DEMO_MODE_COOKIE)?.value === "1";
@@ -162,10 +170,15 @@ export async function updateSession(request: NextRequest) {
 
   const demoMode = isDemoModeAllowed() && request.cookies.get(DEMO_MODE_COOKIE)?.value === "1";
 
-  // Entra External ID dual-mode: accept sealed session cookie when AUTH_PROVIDER=entra.
+  // Entra External ID dual-mode: sealed cookie gate only — no Supabase SSR client.
   if (isEntraAuthEnabled()) {
-    const entraSession = request.cookies.get(ENTRA_SESSION_COOKIE)?.value;
-    if (entraSession || demoMode) {
+    if (
+      isEntraSessionGateSatisfied(request.cookies.getAll(), {
+        entraSessionCookieName: ENTRA_SESSION_COOKIE,
+        demoModeAllowed: isDemoModeAllowed(),
+        demoModeCookieName: DEMO_MODE_COOKIE,
+      })
+    ) {
       return supabaseResponse;
     }
     const url = request.nextUrl.clone();
@@ -173,7 +186,6 @@ export async function updateSession(request: NextRequest) {
     url.searchParams.set("redirect", pathname);
     return NextResponse.redirect(url);
   }
-
 
   if (!isSupabaseConfigured()) {
     if (!demoMode) {

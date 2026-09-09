@@ -15,6 +15,8 @@ Related:
 
 Azure Container Apps + GitHub Actions (`azure-production.yml`) are the **source of truth** for production deploys.
 
+Root `vercel.json` has been **archived** to `archive/vercel/vercel.json` (see `archive/vercel/README.md`). Azure health ping (`.github/workflows/azure-health-ping.yml`) replaces the former Vercel cron.
+
 Vercel preview/status checks on PRs are **legacy / non-blocking** for merge decisions once Azure build + UAT are green. Do not invest in fixing Vercel as a future platform. If a PR fails Vercel but Azure Docker/`npm run build` succeeds, treat Vercel as obsolete noise and document that in the PR.
 
 Recommended branch protection: require Azure workflow / unit tests; do **not** require the Vercel status check.
@@ -26,6 +28,10 @@ Recommended branch protection: require Azure workflow / unit tests; do **not** r
 - [x] Entra External ID OIDC scaffold (`src/lib/auth/entra/*`) — off until `AUTH_PROVIDER=entra`
 - [x] Dual-mode auth default = `supabase`
 - [x] Azure PG pool prefers `AZURE_DATABASE_URL` (`src/lib/db/pool.ts`)
+- [x] **Data-plane dual-read (IMPLEMENTED_IN_BRANCH):** `src/lib/data/data-plane.ts` routes via Azure PG when `AZURE_DATABASE_URL` / `DATABASE_URL` is set; Supabase path unchanged when unset.
+  - **Dual-mode modules (read path):** `organizations`, `settings`, **`dashboard`** (financial snapshot, trends, budget, KPIs, alerts), **`tenant`** (dashboard aggregates + forecast/scenarios/pipeline/AR-AP tables).
+  - **Still Supabase-only (incomplete):** connectors, onboarding, KPI store writes, imports/pipeline recompute, billing, auth profiles, admin APIs.
+- [x] Entra middleware session gate uses sealed cookie path only (`src/lib/auth/session-gate.ts`) — no Supabase SSR when `AUTH_PROVIDER=entra`
 - [x] Deploy workflow can inject Azure PG + Entra secrets without flipping provider
 - [x] Atlas ClientCode fail-closed dual-resolve + Hub HMAC ingest (secret **not** sent as `x-atlas-module-key`)
 - [x] Unit tests: `npm run test:microsoft-native`
@@ -76,3 +82,5 @@ Follow `docs/entra-external-id-setup.md`:
 - Supabase exit is finished
 
 Claim only scaffolding + tests + owner-gate clarity until the boxes above are checked.
+
+**Cutover remains Owner-gated:** do not set `AUTH_PROVIDER=entra` or claim live Azure DB/auth until owner gates in this document pass UAT.

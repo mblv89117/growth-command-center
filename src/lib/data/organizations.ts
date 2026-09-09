@@ -1,5 +1,5 @@
 import { ORGANIZATIONS } from "@/lib/mock-data";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchOrganizationRowById } from "@/lib/data/data-plane";
 import type { Organization, OrganizationSettings } from "@/lib/types";
 
 const DEFAULT_SETTINGS: OrganizationSettings = {
@@ -40,15 +40,7 @@ export async function getOrganizationById(organizationId: string): Promise<Organ
       slug: organizationId,
     };
 
-  const admin = createAdminClient();
-  if (!admin) return fallback;
-
-  const { data, error } = await admin
-    .from("gcc_organizations")
-    .select("*")
-    .eq("id", organizationId)
-    .maybeSingle();
-
-  if (error || !data) return fallback;
-  return mapOrganizationRow(data as Record<string, unknown>);
+  const row = await fetchOrganizationRowById(organizationId);
+  if (!row) return fallback;
+  return mapOrganizationRow(row);
 }
