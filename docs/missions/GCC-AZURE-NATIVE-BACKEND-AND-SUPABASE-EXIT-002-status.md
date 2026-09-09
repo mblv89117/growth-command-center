@@ -18,9 +18,11 @@
 1. **Domain-binding deployment regression protection** — `azure-production.yml` skips Bicep by default (`redeploy_infra=false`); image-only updates preserve custom domains.
 2. **Azure PostgreSQL Stage 3** — `infra/azure/postgres.bicep` + `azure-postgres-stage3.yml` (owner secret `AZURE_POSTGRES_ADMIN_PASSWORD`).
 3. **Entra External ID scaffold** — OIDC PKCE login/logout/callback, sealed `gcc_entra_session` cookie, identity link table, dual-mode middleware/login (`AUTH_PROVIDER` / `NEXT_PUBLIC_AUTH_PROVIDER`).
-4. **Azure PG pool** — `src/lib/db/pool.ts` when `AZURE_DATABASE_URL` / `DATABASE_URL` set.
+4. **Azure PG pool** — `src/lib/db/pool.ts` prefers `AZURE_DATABASE_URL` over `DATABASE_URL`.
 5. **Migration tooling** — `scripts/migrate-supabase-to-azure-pg.mjs`, `scripts/export-identity-map-for-entra.mjs`.
-6. **Owner-gate docs** — `docs/entra-external-id-setup.md` (click-by-click).
+6. **Owner-gate docs** — `docs/entra-external-id-setup.md` + `docs/microsoft-native-cutover-checklist.md`.
+7. **Atlas Waves 1–3** — ClientCode fail-closed map + Hub HMAC ingest (**no** `x-atlas-module-key` secret header).
+8. **Evidence tests** — `npm run test:microsoft-native` (tenant isolation + azure/entra selection without crash).
 
 ## Hard blockers (owner actions)
 
