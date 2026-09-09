@@ -1,1 +1,1 @@
-{{file:/tmp/exact_test.mjs}}
+PLACEHOLDER_REPLACE_WITH_EXACT
