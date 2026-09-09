@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { verifySupabaseConnection } from "@/lib/data/dashboard";
 import { isProduction, validateProductionEnv } from "@/lib/config";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { countRecentFailedJobRuns } from "@/lib/data/active-runtime-plane";
+import { isPersistentDataBackendAvailable } from "@/lib/data/data-plane";
 
 export async function GET() {
   const status = await verifySupabaseConnection();
@@ -9,15 +10,9 @@ export async function GET() {
   const productionReady = status.ok && missingEnv.length === 0;
 
   let recentJobFailures = 0;
-  const admin = createAdminClient();
-  if (admin) {
+  if (isPersistentDataBackendAvailable()) {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count } = await admin
-      .from("gcc_job_runs")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "failed")
-      .gte("started_at", since);
-    recentJobFailures = count ?? 0;
+    recentJobFailures = await countRecentFailedJobRuns(since);
   }
 
   if (isProduction) {

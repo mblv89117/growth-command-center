@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { isStripeConfigured } from "@/lib/stripe/config";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  fetchSubscriptionByStripeCustomer,
+  updateOrganizationBilling,
+  updateSubscriptionStatus,
+  upsertSubscriptionRow,
+} from "@/lib/data/active-runtime-plane";
+import { isPersistentDataBackendAvailable } from "@/lib/data/data-plane";
 
 export async function POST(request: Request) {
   if (!isStripeConfigured()) {
@@ -25,36 +31,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const admin = createAdminClient();
-  if (!admin) return NextResponse.json({ received: true });
+  if (!isPersistentDataBackendAvailable()) {
+    return NextResponse.json({ received: true });
+  }
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
     const orgId = session.metadata?.organizationId;
     const plan = session.metadata?.plan ?? "growth";
     if (orgId) {
-      await admin.from("gcc_organizations").update({ plan }).eq("id", orgId);
-      await admin.from("gcc_subscriptions").upsert({
+      await updateOrganizationBilling(orgId, { plan });
+      await upsertSubscriptionRow({
         organization_id: orgId,
         stripe_customer_id: session.customer as string,
         stripe_subscription_id: session.subscription as string,
         plan,
         status: "active",
-      }, { onConflict: "organization_id" });
+      });
     }
   }
 
   if (event.type === "customer.subscription.deleted") {
     const sub = event.data.object;
     const customerId = sub.customer as string;
-    const { data: subRow } = await admin
-      .from("gcc_subscriptions")
-      .select("organization_id")
-      .eq("stripe_customer_id", customerId)
-      .maybeSingle();
+    const subRow = await fetchSubscriptionByStripeCustomer(customerId);
     if (subRow) {
-      await admin.from("gcc_subscriptions").update({ status: "cancelled" }).eq("organization_id", subRow.organization_id);
-      await admin.from("gcc_organizations").update({ plan: "starter" }).eq("id", subRow.organization_id);
+      await updateSubscriptionStatus(subRow.organization_id, "cancelled");
+      await updateOrganizationBilling(subRow.organization_id, { plan: "starter" });
     }
   }
 

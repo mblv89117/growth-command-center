@@ -5,6 +5,8 @@ import type { UserRole } from "@/lib/types";
 import { isEntraAuthEnabled } from "@/lib/auth/entra/config";
 import { ENTRA_SESSION_COOKIE, unsealSession } from "@/lib/auth/entra/oidc";
 import { resolveProfileForEntra } from "@/lib/auth/entra/identity";
+import { fetchProfileByUserId } from "@/lib/data/active-runtime-plane";
+import { isAzureDataPlaneActive } from "@/lib/data/data-plane";
 
 export interface AuthContext {
   userId: string;
@@ -19,6 +21,13 @@ async function resolveProfile(
 ): Promise<{ organizationId: string; role: UserRole }> {
   let organizationId = (metadata.organization_id as string) ?? "org-apex";
   let role = (metadata.role as UserRole) ?? "founder";
+
+  if (isAzureDataPlaneActive()) {
+    const profile = await fetchProfileByUserId(userId);
+    if (profile?.organization_id) organizationId = profile.organization_id;
+    if (profile?.role) role = profile.role as UserRole;
+    return { organizationId, role };
+  }
 
   const admin = createAdminClient();
   if (admin) {

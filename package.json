@@ -17,6 +17,7 @@
     "db:rls:apply-api": "node scripts/apply-supabase-rls-via-api.mjs",
     "db:security-review": "node scripts/security-incident-review.mjs",
     "db:migrate-to-azure-pg": "node scripts/migrate-supabase-to-azure-pg.mjs",
+    "azure:validate-migration-structure": "node scripts/azure/validate-migration-structure.mjs",
     "secrets:sync-github": "node scripts/sync-production-secrets.mjs",
     "uat:golive": "node --import tsx scripts/production-golive-uat.mjs",
     "pilot:hvcg": "node scripts/hvcg-real-user-pilot.mjs",
