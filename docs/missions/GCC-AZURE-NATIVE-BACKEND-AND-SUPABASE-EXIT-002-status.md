@@ -4,12 +4,12 @@
 
 | Field | Value |
 |-------|-------|
-| Canonical main SHA | `ea48777` (#112) |
+| Canonical main SHA | `ada7af6` (#115) — this progress branch rebased atop #114/#115 |
 | Production health | `https://app.growthcommandcenter.com/api/health` → HTTP 200 |
 | Custom domains / TLS | PASS — **do not reopen DNS** |
 | Auth runtime (prod today) | Supabase Auth |
 | DB runtime (prod today) | Supabase Postgres via `@supabase/*` |
-| Vercel | Rollback only until Azure-native backend UAT PASS |
+| Vercel | Obsolete for production SoT; treat PR status as **non-blocking** (see `docs/microsoft-native-cutover-checklist.md`) |
 
 `AZURE_HOSTING_BASELINE_CAPTURED = PASS`
 
