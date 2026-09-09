@@ -77,8 +77,7 @@ export async function postGccEnvelopeToHub(
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-atlas-module-key': cfg.moduleIngestKey,
-      'x-atlas-module-key-id': cfg.moduleIngestKeyId || 'module',
+      'x-atlas-module-key-id': cfg.moduleIngestKeyId || 'gcc',
       'x-atlas-module-timestamp': timestamp,
       'x-atlas-module-signature': signature,
     },
