@@ -1,66 +1,49 @@
 # HVCG / GCC current program state
 
-Updated: 2026-09-09 after Azure PostgreSQL production data-plane cutover + UAT PASS.
+Updated: 2026-09-09 after Entra live cutover PASS + GCC\u2192Atlas E2E probes.
 
 CONSTITUTION_VERSION = HVCG-CONSTITUTION-2026-09-04-v1.0
 
 | Field | Value |
 |-------|--------|
 | HVCG_DEFAULT_BRANCH | `production/atlas-core` |
-| STALE_DEFAULT_BRANCH_P0 | CLOSED |
 | LIVE_HUB_SHA | `f6db86587b237bcf2c61e01919016763f8bc9c51` |
-| HUB_DEPLOY_P0 | CLOSED |
-| HUB_UNDEPLOYED_P0 | CLOSED |
-| PR214 | MERGED (evidence only; `cfd817fc`) |
-| HMAC_LIVE | ENDPOINT_LIVE_FAIL_CLOSED (not LIVE_MODULE_TRAFFIC_ENABLED; key ring unconfigured) |
+| HMAC_LIVE | ENDPOINT_LIVE_FAIL_CLOSED (key ring unconfigured; not LIVE_MODULE_TRAFFIC_ENABLED) |
 | CLIENTCODE_ISOLATION | LIVE_VERIFIED |
 | GLOBAL_AUTO_RESPOND | false |
-| Elite | `b504e12245e57b016e2bab934ebb44e55747a7e8` (independent; do not redeploy to match Hub) |
-| GCC_PR122 | MERGED (`43d7dee`) |
-| STAGE3_SUCCESS_RUN | `34389534837` |
-| FAILED_STAGE3_RUN | `34386312875` |
-| AZURE_POSTGRES_PROVISION | PASS |
-| SERVER_NAME | `azpg3uejm` |
-| FQDN | `azpg3uejm.postgres.database.azure.com` |
-| DATABASE | `gcc` |
-| POSTGRES_VERSION | 16 |
-| SKU | Standard_B1ms / Burstable |
-| LOCATION | eastus2 |
-| TLS / BACKUP | PASS / 14d |
-| DATA_MIGRATION | PASS (overlapping counts match; final delta inserted 0) |
-| RLS / ISOLATION / AZURE_PG_UAT | PASS |
-| MS_NATIVE_SUITE | 31/31 PASS (includes SUPABASE_DISABLED simulation) |
-| LIVE_APP_DATA_PLANE | `azure-postgres` (`/api/health`) |
-| LIVE_REVISION | `azapprngzn--0000031` / image `gcc-web:454ebdb5` |
-| AUTH_PROVIDER | supabase (unchanged; flags unset on Container App) |
-| SUPABASE_DB | rollback-only after production DB cutover |
-| SUPABASE_AUTH | still source of truth |
-| MICROSOFT_NATIVE_COMPLETE | NO |
-| NEXT_OWNER_ACTION | Entra External ID portal gates A–E (`docs/entra-external-id-setup.md`) |
+| Elite | `b504e12245e57b016e2bab934ebb44e55747a7e8` (do not redeploy to match Hub) |
+| GCC_PR123 | OPEN \u2014 Azure PG + Entra live evidence |
+| AZURE_POSTGRES | PASS (`azpg3uejm` / `gcc` / eastus2 / PG16) |
+| LIVE_APP_DATA_PLANE | `azure-postgres` |
+| ENTRA_UAT | PASS (24/24; `PLAINTEXT_PASSWORDS_HANDLED=0`) |
+| ENTRA_LIVE_VERIFY | PASS (8/8; session on `/dashboard`) |
+| AUTH_PROVIDER | entra |
+| NEXT_PUBLIC_AUTH_PROVIDER | entra |
+| LIVE_REVISION | `azapprngzn--0000033` / `gcc-web:entra-20260909b` |
+| SUPABASE_DB | rollback-only |
+| SUPABASE_AUTH | rollback-only (do not delete) |
+| MICROSOFT_NATIVE_COMPLETE | YES |
+| WAVE_10 | isolation fabric 3/3 PASS; real-client signed ingest blocked on HMAC key ring |
+| SUPERVISOR_V4 | not started \u2014 no mission artifact in these repos |
 
-## Closed P0s (do not relist as open)
+## Closed this run
 
-- HVCG default-branch migration
-- Atlas Hub undeployed / SHA lag
-- Azure PostgreSQL Stage 3 provision (eastus restriction; fixed eastus2)
-- Azure PostgreSQL schema / RLS / data copy / reconcile / UAT
+- Azure PostgreSQL is the live production database
+- Entra External ID Owner gates A\u2013D
+- Entra UAT + live AUTH_PROVIDER cutover
+- Callback public-origin fix (ACA `HOSTNAME=0.0.0.0`)
+- Supabase Auth moved to rollback-only (not deleted)
 
-## Active critical path
+## Remaining (not blockers for Microsoft-native complete)
 
-1. **Owner — Entra External ID (CIAM) portal gates A–E** — Customer tenant does not exist yet (only workforce `High Value Capital Group` is visible). Click-by-click: `docs/entra-external-id-setup.md`. Secrets names only in chat.
-2. Cursor: Entra UAT (login/logout/session, role parity, isolation). **Do not** set `AUTH_PROVIDER=entra` until that UAT PASS.
-3. After Entra UAT PASS: set `AUTH_PROVIDER=entra` + `NEXT_PUBLIC_AUTH_PROVIDER=entra` on Container App (`redeploy_infra=false`).
-4. Keep Supabase Auth for rollback until auth cutover is stable; DB writes stay on Azure.
-5. GCC live Atlas E2E
-6. Wave 10
-7. Supervisor V4
+1. Owner: configure Hub module HMAC key ring if GCC\u2192Atlas **signed** ingest should leave fail-closed.
+2. Wave 10 real-client certification after key ring exists (no synthetic real-client mutation until then).
+3. Governance repo `hvcg-platform-governance` still 404 from this agent.
+4. Supervisor V4 \u2014 define mission before execution.
 
 ## Safety
 
-- Do not reset `gccadmin` (Owner GitHub `AZURE_DATABASE_URL`).
+- Do not reset `gccadmin`.
 - Do not delete Supabase.
-- Do not claim Microsoft-native cutover complete until Entra is the live auth provider **and** Azure PG remains the live database.
-- Firewall must stay `AllowAzureServices` only (no standing `0.0.0.0/0`).
-- `GLOBAL_AUTO_RESPOND` stays false. HMAC ingest stays ENDPOINT_LIVE_FAIL_CLOSED.
-
-`mblv89117/hvcg-platform-governance` was not readable from this agent (404). This file is the writable program-state record.
+- Firewall: `AllowAzureServices` only.
+- `GLOBAL_AUTO_RESPOND` stays false.

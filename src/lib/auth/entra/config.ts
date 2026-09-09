@@ -57,3 +57,27 @@ export function getEntraConfig(): EntraConfig | null {
 export function isEntraConfigured(): boolean {
   return getEntraConfig() !== null;
 }
+
+/**
+ * Public browser origin for Entra redirects.
+ * Azure Container Apps sets HOSTNAME=0.0.0.0 for listen bind; never use
+ * request.url origin (it becomes https://0.0.0.0:3000).
+ */
+export function entraPublicOrigin(): string {
+  const configured = (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.growthcommandcenter.com").trim();
+  try {
+    const url = new URL(configured);
+    if (url.hostname === "0.0.0.0" || url.hostname === "127.0.0.1") {
+      return "https://app.growthcommandcenter.com";
+    }
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return "https://app.growthcommandcenter.com";
+  }
+}
+
+/** Absolute app URL for Entra login/callback redirects. */
+export function entraAbsolutePath(pathAndQuery: string): string {
+  const raw = pathAndQuery.startsWith("/") ? pathAndQuery : `/${pathAndQuery}`;
+  return new URL(raw, `${entraPublicOrigin()}/`).toString();
+}

@@ -6,39 +6,41 @@ import {
   sealSession,
   verifyIdToken,
 } from "@/lib/auth/entra/oidc";
-import { isEntraAuthEnabled } from "@/lib/auth/entra/config";
+import { entraAbsolutePath, isEntraAuthEnabled } from "@/lib/auth/entra/config";
 import { linkEntraIdentity } from "@/lib/auth/entra/identity";
+
+function redirectPublic(pathAndQuery: string): NextResponse {
+  return NextResponse.redirect(entraAbsolutePath(pathAndQuery));
+}
 
 export async function handleEntraCallback(request: NextRequest): Promise<NextResponse> {
   if (!isEntraAuthEnabled()) {
-    return NextResponse.redirect(new URL("/login?error=auth_provider", request.url));
+    return redirectPublic("/login?error=auth_provider");
   }
 
   const code = request.nextUrl.searchParams.get("code");
   const state = request.nextUrl.searchParams.get("state");
   const oauthError = request.nextUrl.searchParams.get("error");
   if (oauthError) {
-    return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(oauthError)}`, request.url)
-    );
+    return redirectPublic(`/login?error=${encodeURIComponent(oauthError)}`);
   }
   if (!code || !state) {
-    return NextResponse.redirect(new URL("/login?error=missing_code", request.url));
+    return redirectPublic("/login?error=missing_code");
   }
 
   const raw = request.cookies.get(ENTRA_STATE_COOKIE)?.value;
   if (!raw) {
-    return NextResponse.redirect(new URL("/login?error=missing_state", request.url));
+    return redirectPublic("/login?error=missing_state");
   }
 
   let parsed: { state: string; verifier: string; next?: string };
   try {
     parsed = JSON.parse(raw) as { state: string; verifier: string; next?: string };
   } catch {
-    return NextResponse.redirect(new URL("/login?error=bad_state", request.url));
+    return redirectPublic("/login?error=bad_state");
   }
   if (parsed.state !== state) {
-    return NextResponse.redirect(new URL("/login?error=state_mismatch", request.url));
+    return redirectPublic("/login?error=state_mismatch");
   }
 
   try {
@@ -50,7 +52,7 @@ export async function handleEntraCallback(request: NextRequest): Promise<NextRes
     await linkEntraIdentity(session);
     const sealed = await sealSession(session);
     const nextPath = parsed.next?.startsWith("/") ? parsed.next : "/dashboard";
-    const res = NextResponse.redirect(new URL(nextPath, request.url));
+    const res = redirectPublic(nextPath);
     res.cookies.set(ENTRA_SESSION_COOKIE, sealed, {
       httpOnly: true,
       secure: true,
@@ -61,6 +63,6 @@ export async function handleEntraCallback(request: NextRequest): Promise<NextRes
     res.cookies.set(ENTRA_STATE_COOKIE, "", { path: "/", maxAge: 0 });
     return res;
   } catch {
-    return NextResponse.redirect(new URL("/login?error=entra_exchange", request.url));
+    return redirectPublic("/login?error=entra_exchange");
   }
 }
