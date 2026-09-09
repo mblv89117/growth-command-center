@@ -45,3 +45,20 @@ GCC accepts structured value-creation signals when provided:
 - Atlas schema changes
 - Atlas CRM duplication
 - Live provisioning without owner approval
+
+## ClientCode mapping (Wave 2)
+
+- Canonical key: Atlas `ClientCode`
+- Lookup: `src/lib/atlas/clientCodeMap.ts`
+- Unknown ClientCode: **FAIL CLOSED** (no default tenant)
+- Dual-resolve required when both `clientCode` and `organizationId` are present
+- Auto-provision remains `false`
+- Additive mapping rows only — local `gcc_organizations.id` values are retained
+
+## Hub ingest (Wave 3)
+
+- Endpoint: `POST {hub}/api/modules/ingest`
+- Auth: module HMAC (`x-atlas-module-*`)
+- Envelope builder: `src/lib/atlas/hubIngest.ts`
+- Maturity target: `OBSERVATION_LIVE` (SYN01 / value signals)
+- `autoProvision` remains **false**

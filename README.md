@@ -349,3 +349,7 @@ npm run smoke:auth
 ## License
 
 Private — Growth Command Center SaaS
+
+## Atlas platform inheritance
+
+This repository is an Atlas module under \`ONE_PLATFORM_MULTI_REPO\`. See [ATLAS.md](./ATLAS.md) and canonical governance \`mblv89117/hvcg-platform-governance\`.

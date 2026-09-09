@@ -10,6 +10,11 @@ on:
         required: false
         type: boolean
         default: false
+      provision_note:
+        description: "Optional note for operators"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   id-token: write
@@ -185,12 +190,11 @@ jobs:
           echo "app_name=${APP_NAME}" >> "$GITHUB_OUTPUT"
           echo "fqdn=${FQDN}" >> "$GITHUB_OUTPUT"
           echo "azure_url=${AZURE_URL}" >> "$GITHUB_OUTPUT"
-
+          echo "DOMAIN_BINDING_DEPLOYMENT_REGRESSION=REDEPLOY_INFRA_PATH"
           echo "Infrastructure deployed:"
           echo "  ACR: ${ACR_NAME}"
           echo "  Container App: ${APP_NAME}"
           echo "  FQDN: ${FQDN}"
-
 
       - name: Resolve existing Container App (skip Bicep)
         id: resolve
@@ -308,6 +312,16 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          AZURE_DATABASE_URL: ${{ secrets.AZURE_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.AZURE_DATABASE_URL }}
+          ENTRA_EXTERNAL_TENANT_ID: ${{ secrets.ENTRA_EXTERNAL_TENANT_ID }}
+          ENTRA_EXTERNAL_CLIENT_ID: ${{ secrets.ENTRA_EXTERNAL_CLIENT_ID }}
+          ENTRA_EXTERNAL_CLIENT_SECRET: ${{ secrets.ENTRA_EXTERNAL_CLIENT_SECRET }}
+          ENTRA_EXTERNAL_AUTHORITY: ${{ secrets.ENTRA_EXTERNAL_AUTHORITY }}
+          ENTRA_EXTERNAL_REDIRECT_URI: ${{ secrets.ENTRA_EXTERNAL_REDIRECT_URI }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          AUTH_PROVIDER: ${{ secrets.AUTH_PROVIDER }}
+          NEXT_PUBLIC_AUTH_PROVIDER: ${{ secrets.NEXT_PUBLIC_AUTH_PROVIDER }}
         run: |
           set -euo pipefail
           APP="${{ steps.target.outputs.app_name }}"
@@ -383,6 +397,20 @@ jobs:
           add_secret GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
           add_secret GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
           add_secret GOOGLE_REDIRECT_URI "$GOOGLE_REDIRECT_URI"
+
+          # Azure PostgreSQL + Entra External ID (optional until cutover).
+          # Do NOT set AUTH_PROVIDER=entra / NEXT_PUBLIC_AUTH_PROVIDER=entra until UAT PASS.
+          add_secret AZURE_DATABASE_URL "${AZURE_DATABASE_URL:-}"
+          add_secret DATABASE_URL "${DATABASE_URL:-${AZURE_DATABASE_URL:-}}"
+          add_secret ENTRA_EXTERNAL_TENANT_ID "${ENTRA_EXTERNAL_TENANT_ID:-}"
+          add_secret ENTRA_EXTERNAL_CLIENT_ID "${ENTRA_EXTERNAL_CLIENT_ID:-}"
+          add_secret ENTRA_EXTERNAL_CLIENT_SECRET "${ENTRA_EXTERNAL_CLIENT_SECRET:-}"
+          add_secret ENTRA_EXTERNAL_AUTHORITY "${ENTRA_EXTERNAL_AUTHORITY:-}"
+          add_secret ENTRA_EXTERNAL_REDIRECT_URI "${ENTRA_EXTERNAL_REDIRECT_URI:-}"
+          add_secret SESSION_SECRET "${SESSION_SECRET:-}"
+          # Plain env (not secretref) for non-sensitive provider switch — only if explicitly set.
+          if [ -n "${AUTH_PROVIDER:-}" ]; then env_args+=("AUTH_PROVIDER=${AUTH_PROVIDER}"); fi
+          if [ -n "${NEXT_PUBLIC_AUTH_PROVIDER:-}" ]; then env_args+=("NEXT_PUBLIC_AUTH_PROVIDER=${NEXT_PUBLIC_AUTH_PROVIDER}"); fi
 
           if [ "${#secret_args[@]}" -gt 0 ]; then
             az containerapp secret set \

@@ -10,6 +10,8 @@
     "smoke:auth": "node scripts/smoke-auth.mjs",
     "test": "node --import tsx --test scripts/commercial-readiness.test.mjs",
     "test:commercial": "node --import tsx --test scripts/commercial-readiness.test.mjs",
+    "test:microsoft-native": "node --import tsx --test scripts/microsoft-native-cutover.test.mjs",
+    "test:atlas": "node --import tsx --test scripts/microsoft-native-cutover.test.mjs",
     "test:rls": "node scripts/rls-security.test.mjs",
     "db:rls": "node scripts/run-supabase-sql.mjs rls",
     "db:rls:apply-api": "node scripts/apply-supabase-rls-via-api.mjs",
@@ -56,6 +58,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "exceljs": "^4.4.0",
+    "jose": "^6.2.10",
     "lucide-react": "^0.475.0",
     "next": "^15.2.0",
     "next-themes": "^0.4.4",
@@ -67,7 +70,8 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "ws": "^8.21.3",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -79,7 +83,6 @@
     "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "^15.2.0",
-    "pg": "^8.16.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.23.12",

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import { isSupabaseConfigured } from "@/lib/config";
+import { isEntraClientEnabled, isSupabaseConfigured } from "@/lib/config";
 
 interface AuthContextValue {
   session: Session | null;
@@ -50,6 +50,11 @@ export function AuthProvider({
       await fetch("/api/auth/demo", { method: "DELETE" });
       setIsDemoMode(false);
       window.location.href = "/login";
+      return;
+    }
+
+    if (isEntraClientEnabled()) {
+      window.location.href = "/api/auth/entra/logout";
       return;
     }
 
