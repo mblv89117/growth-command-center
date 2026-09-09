@@ -29,10 +29,12 @@ Recommended branch protection: require Azure workflow + `npm run test:microsoft-
 - [x] Dual-mode auth default = `supabase`
 - [x] Azure PG pool prefers `AZURE_DATABASE_URL` (`src/lib/db/pool.ts`)
 - [x] **Data-plane dual-mode:** `src/lib/data/data-plane.ts` + `src/lib/data/active-runtime-plane.ts` route via Azure PG when URL set; Supabase path when unset.
-  - **Dual-mode (this branch):** organizations, settings, dashboard, tenant aggregates, KPI/onboarding/integration stores, rate-limit, **connectors audit/provenance**, **Plaid bank accounts**, **imports commit**, **PDF import preview/confirm** (`/api/imports/pdf`), **pipeline recompute**, **job runs**, **tenant provision**, **billing webhook/checkout/portal**, **AI advisor persistence**, **team invites (Entra token path)**, **auth profiles via Azure PG when active**, **Entra admin route gate** (Azure PG profile/identity link, no Supabase SSR), **Entra-only API auth** (no Supabase Bearer fallback when `AUTH_PROVIDER=entra`).
-  - **Still ACTIVE_RUNTIME / incomplete:** QuickBooks OAuth token refresh edge paths, live Plaid production sync.
+  - **Dual-mode (this branch):** organizations, settings, dashboard, tenant aggregates, KPI/onboarding/integration stores, rate-limit, **connectors audit/provenance**, **Plaid bank accounts**, **imports commit**, **PDF import preview/confirm** (`/api/imports/pdf`), **pipeline recompute**, **job runs**, **tenant provision**, **billing webhook/checkout/portal**, **AI advisor persistence**, **team invites (Entra token path)**, **auth profiles via Azure PG when active**, **Entra admin route gate** (Azure PG profile/identity link, no Supabase SSR), **Entra-only API auth** (no Supabase Bearer fallback when `AUTH_PROVIDER=entra`), **dashboard/app-host shell via `getAuthContext` (no Supabase session when Entra)**, **`/api/health` Azure PG probe** when data plane active, **Docker/CI dual-mode** (Supabase keys not required when `AUTH_PROVIDER=entra`).
+  - **Still incomplete (product, not Supabase Auth/DB blockers):** QuickBooks OAuth token refresh edge paths, live Plaid production sync (explicitly disabled).
 - [x] Entra middleware session gate uses sealed cookie path only — no Supabase SSR when `AUTH_PROVIDER=entra`
 - [x] Entra login/logout/callback routes + client auth context skip Supabase listener when `NEXT_PUBLIC_AUTH_PROVIDER=entra`
+- [x] Dashboard layout + app-host `/` resolve Entra sessions without Supabase `getSession`/`getUser`
+- [x] TenantProvider uses provider-neutral `AuthUserIdentity` (not `@supabase/supabase-js` User)
 - [x] `validateProductionEnv`: Entra mode does not require Supabase keys; requires Entra + `SESSION_SECRET` + `AZURE_DATABASE_URL`
 - [x] Migration tooling: `npm run db:migrate-to-azure-pg`, `npm run azure:validate-migration-structure` (no passwords)
 - [x] Key Vault stub: `src/lib/secrets/azure-keyvault.ts` (env-first; ACA reference pattern documented)

@@ -575,7 +575,7 @@ export function filterRowsByOrganizationId<T extends Record<string, unknown>>(
   return rows.filter((row) => assertOrganizationIdMatch(requestedOrganizationId, row[column]));
 }
 
-function tenantScopedRow(
+export function tenantScopedRow(
   requestedOrganizationId: string,
   row: Record<string, unknown> | undefined
 ): Record<string, unknown> | null {

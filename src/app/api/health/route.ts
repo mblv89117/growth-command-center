@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { verifySupabaseConnection } from "@/lib/data/dashboard";
+import { verifyPersistentDataConnection } from "@/lib/data/dashboard";
 import { isProduction, validateProductionEnv } from "@/lib/config";
 import { countRecentFailedJobRuns } from "@/lib/data/active-runtime-plane";
 import { isPersistentDataBackendAvailable } from "@/lib/data/data-plane";
 
 export async function GET() {
-  const status = await verifySupabaseConnection();
+  const status = await verifyPersistentDataConnection();
   const missingEnv = isProduction ? validateProductionEnv() : [];
   const productionReady = status.ok && missingEnv.length === 0;
 
@@ -19,6 +19,7 @@ export async function GET() {
     return NextResponse.json(
       {
         status: productionReady && recentJobFailures < 10 ? "ok" : "degraded",
+        backend: status.backend,
         recentJobFailures,
       },
       { status: productionReady ? 200 : 503 }

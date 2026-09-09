@@ -563,6 +563,55 @@ test("production validateProductionEnv allows azure/entra selection without thro
   );
 });
 
+test("health probe selects azure-postgres when AZURE_DATABASE_URL set (no Supabase)", async () => {
+  const { verifyPersistentDataConnection } = await import("../src/lib/data/dashboard.ts");
+
+  const prev = {
+    AZURE_DATABASE_URL: process.env.AZURE_DATABASE_URL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    AUTH_PROVIDER: process.env.AUTH_PROVIDER,
+  };
+  try {
+    process.env.AZURE_DATABASE_URL = "postgresql://azure.example/gcc?sslmode=require";
+    delete process.env.DATABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.AUTH_PROVIDER = "entra";
+    __resetPgPoolForTests();
+    assert.equal(isAzureDataPlaneActive(), true);
+    const status = await verifyPersistentDataConnection();
+    assert.equal(status.backend, "azure-postgres");
+    assert.equal(status.configured, true);
+    // Connection to fixture host will fail; must not fall through to Supabase.
+    assert.equal(status.ok, false);
+    assert.match(status.message, /connect|ECONNREFUSED|getaddrinfo|timeout|ENOTFOUND|failed|error/i);
+  } finally {
+    for (const [k, v] of Object.entries(prev)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    __resetPgPoolForTests();
+  }
+});
+
+test("Entra auth enabled without Supabase is true when AUTH_PROVIDER=entra", async () => {
+  const { isEntraAuthEnabled } = await import("../src/lib/auth/entra/config.ts");
+  withEnv(
+    {
+      AUTH_PROVIDER: "entra",
+      NEXT_PUBLIC_SUPABASE_URL: undefined,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined,
+    },
+    () => {
+      assert.equal(isEntraAuthEnabled(), true);
+    }
+  );
+});
+
 test("hub ingest does not send module key secret as a header", async () => {
   const secret = "test-module-ingest-secret";
   /** @type {import('node:http').IncomingMessage['headers'] | null} */

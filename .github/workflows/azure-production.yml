@@ -256,31 +256,42 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_AUTH_PROVIDER: ${{ secrets.NEXT_PUBLIC_AUTH_PROVIDER }}
+          AUTH_PROVIDER: ${{ secrets.AUTH_PROVIDER }}
         run: |
           set -euo pipefail
           TAG="${{ github.sha }}"
           IMAGE="${{ steps.target.outputs.acr_name }}.azurecr.io/${{ env.IMAGE_NAME }}:${TAG}"
+          AUTH_MODE="${AUTH_PROVIDER:-${NEXT_PUBLIC_AUTH_PROVIDER:-supabase}}"
 
-          if [ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" ] || [ -z "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
-            echo "Missing required GitHub secret for Docker build: NEXT_PUBLIC_SUPABASE_URL and/or NEXT_PUBLIC_SUPABASE_ANON_KEY" >&2
-            exit 1
+          if [ "$AUTH_MODE" != "entra" ]; then
+            if [ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" ] || [ -z "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
+              echo "Missing required GitHub secret for Docker build: NEXT_PUBLIC_SUPABASE_URL and/or NEXT_PUBLIC_SUPABASE_ANON_KEY" >&2
+              exit 1
+            fi
+          else
+            echo "Docker build mode: Microsoft-native (entra) — Supabase public keys optional"
+            NEXT_PUBLIC_AUTH_PROVIDER="${NEXT_PUBLIC_AUTH_PROVIDER:-entra}"
           fi
 
-          # Normalize Project URL for build-time inlining (never echo secret values).
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%"${NEXT_PUBLIC_SUPABASE_URL##*[![:space:]]}"}"
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL#"${NEXT_PUBLIC_SUPABASE_URL%%[![:space:]]*}"}"
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/rest/v1}"
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/auth/v1}"
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
-          host="$(echo "$NEXT_PUBLIC_SUPABASE_URL" | sed -E 's|https?://([^/]+).*|\1|')"
-          echo "Docker build-arg Supabase host: $host"
+          # Normalize Project URL for build-time inlining when present (never echo secret values).
+          if [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}" ]; then
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%"${NEXT_PUBLIC_SUPABASE_URL##*[![:space:]]}"}"
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL#"${NEXT_PUBLIC_SUPABASE_URL%%[![:space:]]*}"}"
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/rest/v1}"
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/auth/v1}"
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
+            host="$(echo "$NEXT_PUBLIC_SUPABASE_URL" | sed -E 's|https?://([^/]+).*|\1|')"
+            echo "Docker build-arg Supabase host: $host"
+          fi
 
           # NEXT_PUBLIC_* must be build-args so Next.js inlines them into the browser bundle.
           # SUPABASE_SERVICE_ROLE_KEY must NEVER be passed as a build-arg.
           docker build \
-            --build-arg "NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}" \
-            --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}" \
+            --build-arg "NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-}" \
+            --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" \
+            --build-arg "NEXT_PUBLIC_AUTH_PROVIDER=${NEXT_PUBLIC_AUTH_PROVIDER:-supabase}" \
             --build-arg "NEXT_PUBLIC_APP_URL=https://app.growthcommandcenter.com" \
             --build-arg "NEXT_PUBLIC_MARKETING_URL=https://growthcommandcenter.com" \
             -t "$IMAGE" \
@@ -327,36 +338,53 @@ jobs:
           APP="${{ steps.target.outputs.app_name }}"
           RG="$AZURE_RESOURCE_GROUP"
 
-          required=(NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY)
-          for key in "${required[@]}"; do
-            if [ -z "${!key:-}" ]; then
-              echo "Missing required GitHub secret: $key" >&2
+          # Dual-mode secrets: Supabase required unless AUTH_PROVIDER=entra (Microsoft-native).
+          AUTH_MODE="${AUTH_PROVIDER:-supabase}"
+          if [ "$AUTH_MODE" = "entra" ]; then
+            required=(AZURE_DATABASE_URL ENTRA_EXTERNAL_TENANT_ID ENTRA_EXTERNAL_CLIENT_ID ENTRA_EXTERNAL_CLIENT_SECRET SESSION_SECRET)
+            for key in "${required[@]}"; do
+              if [ -z "${!key:-}" ]; then
+                echo "Missing required GitHub secret for Entra cutover: $key" >&2
+                exit 1
+              fi
+            done
+            echo "Deploy mode: Microsoft-native (AUTH_PROVIDER=entra) — Supabase secrets optional rollback"
+          else
+            required=(NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY)
+            for key in "${required[@]}"; do
+              if [ -z "${!key:-}" ]; then
+                echo "Missing required GitHub secret: $key" >&2
+                exit 1
+              fi
+            done
+          fi
+
+          # Normalize Project URL when present (strip /rest/v1|/auth/v1|trailing slash). Never echo secret values.
+          if [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}" ]; then
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%"${NEXT_PUBLIC_SUPABASE_URL##*[![:space:]]}"}"
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL#"${NEXT_PUBLIC_SUPABASE_URL%%[![:space:]]*}"}"
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/rest/v1}"
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/auth/v1}"
+            NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
+            host="$(echo "$NEXT_PUBLIC_SUPABASE_URL" | sed -E 's|https?://([^/]+).*|\1|')"
+            echo "Supabase URL host: $host"
+            if [[ ! "$host" =~ \.supabase\.(co|in)$ ]] && [[ "$host" != "localhost" ]] && [[ "$host" != "127.0.0.1" ]]; then
+              echo "BLOCKER: NEXT_PUBLIC_SUPABASE_URL must be https://<ref>.supabase.co (got host=$host)" >&2
               exit 1
             fi
-          done
-
-          # Normalize Project URL (strip /rest/v1|/auth/v1|trailing slash). Never echo secret values.
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%"${NEXT_PUBLIC_SUPABASE_URL##*[![:space:]]}"}"
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL#"${NEXT_PUBLIC_SUPABASE_URL%%[![:space:]]*}"}"
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/rest/v1}"
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/auth/v1}"
-          NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
-          host="$(echo "$NEXT_PUBLIC_SUPABASE_URL" | sed -E 's|https?://([^/]+).*|\1|')"
-          echo "Supabase URL host: $host"
-          if [[ ! "$host" =~ \.supabase\.(co|in)$ ]] && [[ "$host" != "localhost" ]] && [[ "$host" != "127.0.0.1" ]]; then
-            echo "BLOCKER: NEXT_PUBLIC_SUPABASE_URL must be https://<ref>.supabase.co (got host=$host)" >&2
-            exit 1
-          fi
-          if [[ "$NEXT_PUBLIC_SUPABASE_URL" =~ /rest/v1|/auth/v1 ]]; then
-            echo "BLOCKER: NEXT_PUBLIC_SUPABASE_URL still contains API path after normalize" >&2
-            exit 1
+            if [[ "$NEXT_PUBLIC_SUPABASE_URL" =~ /rest/v1|/auth/v1 ]]; then
+              echo "BLOCKER: NEXT_PUBLIC_SUPABASE_URL still contains API path after normalize" >&2
+              exit 1
+            fi
           fi
 
-          # Trim accidental whitespace / Bearer prefix on service role (never print value)
-          SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY#"${SUPABASE_SERVICE_ROLE_KEY%%[![:space:]]*}"}"
-          SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY%"${SUPABASE_SERVICE_ROLE_KEY##*[![:space:]]}"}"
-          SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY#Bearer }"
+          # Trim accidental whitespace / Bearer prefix on service role when present (never print value)
+          if [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY#"${SUPABASE_SERVICE_ROLE_KEY%%[![:space:]]*}"}"
+            SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY%"${SUPABASE_SERVICE_ROLE_KEY##*[![:space:]]}"}"
+            SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY#Bearer }"
+          fi
 
           secret_args=()
           env_args=(
@@ -365,9 +393,13 @@ jobs:
             "HOSTNAME=0.0.0.0"
             "NEXT_PUBLIC_APP_URL=https://app.growthcommandcenter.com"
             "NEXT_PUBLIC_MARKETING_URL=https://growthcommandcenter.com"
-            "NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}"
-            "NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}"
           )
+          if [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}" ]; then
+            env_args+=("NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}")
+          fi
+          if [ -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
+            env_args+=("NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}")
+          fi
 
           add_secret() {
             local env_name="$1"

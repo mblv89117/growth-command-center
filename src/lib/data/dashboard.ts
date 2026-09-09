@@ -6,6 +6,7 @@ import {
   fetchDashboardAggregatesByOrganizationId,
   isAzureDataPlaneActive,
 } from "@/lib/data/data-plane";
+import { pgQuery } from "@/lib/db/pool";
 import { computeDashboardDeltas, computeWorkingCapital, type DashboardDeltas } from "@/lib/financial/deltas";
 import type {
   Alert,
@@ -236,6 +237,7 @@ export async function verifySupabaseConnection(): Promise<{
   adminReady: boolean;
   organizations?: number;
   message: string;
+  backend?: "supabase" | "azure-postgres";
 }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, configured: false, adminReady: false, message: "Supabase env vars not set" };
@@ -267,6 +269,71 @@ export async function verifySupabaseConnection(): Promise<{
     configured: true,
     adminReady: true,
     organizations: count ?? 0,
+    backend: "supabase",
     message: count ? "Supabase connected and seeded" : "Connected but no data — run: npm run db:setup",
   };
+}
+
+/** Production health probe for Microsoft-native mode (Azure PG). Does not require Supabase. */
+export async function verifyAzurePostgresConnection(): Promise<{
+  ok: boolean;
+  configured: boolean;
+  adminReady: boolean;
+  organizations?: number;
+  message: string;
+  backend: "azure-postgres";
+}> {
+  if (!isAzureDataPlaneActive()) {
+    return {
+      ok: false,
+      configured: false,
+      adminReady: false,
+      backend: "azure-postgres",
+      message: "AZURE_DATABASE_URL / DATABASE_URL not set",
+    };
+  }
+
+  try {
+    const result = await pgQuery<{ count: string }>(
+      "SELECT COUNT(*)::text AS count FROM gcc_organizations"
+    );
+    const organizations = Number(result.rows[0]?.count ?? 0);
+    return {
+      ok: true,
+      configured: true,
+      adminReady: true,
+      organizations,
+      backend: "azure-postgres",
+      message: organizations
+        ? "Azure PostgreSQL connected and seeded"
+        : "Azure PostgreSQL connected but no organizations yet",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      configured: true,
+      adminReady: false,
+      backend: "azure-postgres",
+      message: error instanceof Error ? error.message : "Azure PostgreSQL probe failed",
+    };
+  }
+}
+
+/**
+ * Prefer Azure PG when the Microsoft-native data plane is active; otherwise Supabase.
+ * Enables AUTH_PROVIDER=entra + AZURE_DATABASE_URL cutover without Supabase health dependency.
+ */
+export async function verifyPersistentDataConnection(): Promise<{
+  ok: boolean;
+  configured: boolean;
+  adminReady: boolean;
+  organizations?: number;
+  message: string;
+  backend: "azure-postgres" | "supabase" | "none";
+}> {
+  if (isAzureDataPlaneActive()) {
+    return verifyAzurePostgresConnection();
+  }
+  const supabase = await verifySupabaseConnection();
+  return { ...supabase, backend: supabase.ok || supabase.configured ? "supabase" : "none" };
 }
