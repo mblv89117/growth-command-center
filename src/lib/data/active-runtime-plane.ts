@@ -37,7 +37,7 @@ export interface PdfImportJobInsert {
   documentType: string;
   periodStart?: string;
   periodEnd?: string;
-  extractedFields: Record<string, unknown>;
+  extractedFields: unknown;
   status: string;
   provenanceCategory: string;
   createdBy: string;
@@ -112,7 +112,10 @@ export async function fetchPdfImportJob(
        LIMIT 1`,
       [jobId, organizationId]
     );
-    return tenantScopedRow(organizationId, result.rows[0]) as PdfImportJobRow | null;
+    return tenantScopedRow(
+      organizationId,
+      result.rows[0] as unknown as Record<string, unknown>
+    ) as unknown as PdfImportJobRow | null;
   }
 
   const admin = createAdminClient();
@@ -126,7 +129,7 @@ export async function fetchPdfImportJob(
     .maybeSingle();
 
   if (!data) return null;
-  return tenantScopedRow(organizationId, data as Record<string, unknown>) as PdfImportJobRow;
+  return tenantScopedRow(organizationId, data as Record<string, unknown>) as unknown as PdfImportJobRow;
 }
 
 export async function updatePdfImportJob(

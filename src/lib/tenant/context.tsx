@@ -1,9 +1,15 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { ORGANIZATIONS, CURRENT_USER } from "@/lib/mock-data";
 import type { Organization, User, UserRole } from "@/lib/types";
+
+/** Provider-neutral identity for TenantProvider (Entra or Supabase). */
+export interface AuthUserIdentity {
+  id: string;
+  email: string;
+  name?: string | null;
+}
 
 interface TenantContextValue {
   organization: Organization;
@@ -15,17 +21,16 @@ interface TenantContextValue {
 const TenantContext = createContext<TenantContextValue | null>(null);
 
 function mapAuthUser(
-  authUser: SupabaseUser,
+  authUser: AuthUserIdentity,
   serverRole?: UserRole,
   serverOrganizationId?: string
 ): User {
-  const metadata = authUser.user_metadata ?? {};
   return {
     id: authUser.id,
     email: authUser.email ?? "",
-    name: (metadata.full_name as string) ?? authUser.email?.split("@")[0] ?? "User",
-    role: serverRole ?? ((metadata.role as UserRole) ?? "founder"),
-    organizationId: serverOrganizationId ?? ((metadata.organization_id as string) ?? ORGANIZATIONS[0].id),
+    name: authUser.name?.trim() || authUser.email?.split("@")[0] || "User",
+    role: serverRole ?? "founder",
+    organizationId: serverOrganizationId ?? ORGANIZATIONS[0].id,
     lastActiveAt: new Date().toISOString(),
   };
 }
@@ -39,7 +44,7 @@ export function TenantProvider({
   demoMode = false,
 }: {
   children: ReactNode;
-  authUser?: SupabaseUser | null;
+  authUser?: AuthUserIdentity | null;
   serverRole?: UserRole;
   serverOrganizationId?: string;
   serverOrganization?: Organization;

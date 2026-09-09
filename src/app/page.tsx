@@ -2,6 +2,8 @@ import { GtmHomepage } from "@/components/marketing/gtm-homepage";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getAuthContext } from "@/lib/auth/api";
+import { isEntraAuthEnabled } from "@/lib/auth/entra/config";
 import { getPrimaryPublicUrl, isAppHost } from "@/lib/domains";
 import { attributionFromSearchParams } from "@/lib/gtm/attribution";
 import { createClient } from "@/lib/supabase/server";
@@ -32,6 +34,11 @@ export default async function Home({
   const host = (await headers()).get("host") ?? "";
 
   if (isAppHost(host)) {
+    if (isEntraAuthEnabled()) {
+      const auth = await getAuthContext();
+      redirect(auth ? "/dashboard" : "/login");
+    }
+
     const supabase = await createClient();
     const {
       data: { user },
