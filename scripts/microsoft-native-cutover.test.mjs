@@ -1,1 +1,1 @@
-FILE:///tmp/exact_test.mjs
+{{file:/tmp/exact_test.mjs}}
