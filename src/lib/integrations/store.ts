@@ -1,4 +1,10 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  deleteIntegrationConnection,
+  fetchIntegrationConnection,
+  fetchIntegrationConnectionsByOrganizationId,
+  isPersistentDataBackendAvailable,
+  upsertIntegrationConnectionRow,
+} from "@/lib/data/data-plane";
 import type { IntegrationConnection, IntegrationProvider, SyncResult } from "./types";
 
 const memoryStore = new Map<string, IntegrationConnection>();
@@ -41,15 +47,9 @@ export async function getConnection(
   organizationId: string,
   provider: IntegrationProvider
 ): Promise<IntegrationConnection | undefined> {
-  const admin = createAdminClient();
-  if (admin) {
-    const { data } = await admin
-      .from("gcc_integration_connections")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .eq("provider", provider)
-      .maybeSingle();
-    if (data) return mapRow(data);
+  if (isPersistentDataBackendAvailable()) {
+    const row = await fetchIntegrationConnection(organizationId, provider);
+    if (row) return mapRow(row);
   }
   return memoryStore.get(storeKey(organizationId, provider));
 }
@@ -57,13 +57,9 @@ export async function getConnection(
 export async function getOrganizationConnections(
   organizationId: string
 ): Promise<IntegrationConnection[]> {
-  const admin = createAdminClient();
-  if (admin) {
-    const { data } = await admin
-      .from("gcc_integration_connections")
-      .select("*")
-      .eq("organization_id", organizationId);
-    if (data?.length) return data.map(mapRow);
+  if (isPersistentDataBackendAvailable()) {
+    const rows = await fetchIntegrationConnectionsByOrganizationId(organizationId);
+    if (rows.length) return rows.map(mapRow);
   }
   return Array.from(memoryStore.values()).filter((c) => c.organizationId === organizationId);
 }
@@ -71,14 +67,9 @@ export async function getOrganizationConnections(
 export async function upsertConnection(
   connection: IntegrationConnection
 ): Promise<IntegrationConnection> {
-  const admin = createAdminClient();
-  if (admin) {
-    const { data, error } = await admin
-      .from("gcc_integration_connections")
-      .upsert(toRow(connection), { onConflict: "organization_id,provider" })
-      .select()
-      .single();
-    if (!error && data) return mapRow(data);
+  if (isPersistentDataBackendAvailable()) {
+    const row = await upsertIntegrationConnectionRow(toRow(connection));
+    if (row) return mapRow(row);
   }
   memoryStore.set(storeKey(connection.organizationId, connection.provider), connection);
   return connection;
@@ -88,14 +79,9 @@ export async function deleteConnection(
   organizationId: string,
   provider: IntegrationProvider
 ): Promise<boolean> {
-  const admin = createAdminClient();
-  if (admin) {
-    const { error } = await admin
-      .from("gcc_integration_connections")
-      .delete()
-      .eq("organization_id", organizationId)
-      .eq("provider", provider);
-    if (!error) return true;
+  if (isPersistentDataBackendAvailable()) {
+    const deleted = await deleteIntegrationConnection(organizationId, provider);
+    if (deleted) return true;
   }
   return memoryStore.delete(storeKey(organizationId, provider));
 }

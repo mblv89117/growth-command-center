@@ -28,9 +28,9 @@ Recommended branch protection: require Azure workflow / unit tests; do **not** r
 - [x] Entra External ID OIDC scaffold (`src/lib/auth/entra/*`) — off until `AUTH_PROVIDER=entra`
 - [x] Dual-mode auth default = `supabase`
 - [x] Azure PG pool prefers `AZURE_DATABASE_URL` (`src/lib/db/pool.ts`)
-- [x] **Data-plane dual-read (IMPLEMENTED_IN_BRANCH):** `src/lib/data/data-plane.ts` routes via Azure PG when `AZURE_DATABASE_URL` / `DATABASE_URL` is set; Supabase path unchanged when unset.
-  - **Dual-mode modules (read path):** `organizations`, `settings`, **`dashboard`** (financial snapshot, trends, budget, KPIs, alerts), **`tenant`** (dashboard aggregates + forecast/scenarios/pipeline/AR-AP tables).
-  - **Still Supabase-only (incomplete):** connectors, onboarding, KPI store writes, imports/pipeline recompute, billing, auth profiles, admin APIs.
+- [x] **Data-plane dual-mode (IMPLEMENTED_IN_BRANCH):** `src/lib/data/data-plane.ts` routes via Azure PG when `AZURE_DATABASE_URL` / `DATABASE_URL` is set; Supabase path unchanged when unset.
+  - **Dual-mode modules (read + write where simple):** `organizations`, `settings`, **`dashboard`** (financial snapshot, trends, budget, KPIs, alerts), **`tenant`** (dashboard aggregates + forecast/scenarios/pipeline/AR-AP tables), **`kpi/store`** (KPI fetch/update), **`onboarding/store`** (org profile, messages, KPI targets, integration intents), **`integrations/store`** (connection CRUD), **`rate-limit`** (prefers Azure PG `gcc_api_rate_limits` when URL set).
+  - **Still Supabase-only (incomplete):** connectors/plaid OAuth sync, imports/pipeline recompute, billing, auth profiles, **team invites** (`sendTeamInvite` — Supabase Auth admin API), admin APIs.
 - [x] Entra middleware session gate uses sealed cookie path only (`src/lib/auth/session-gate.ts`) — no Supabase SSR when `AUTH_PROVIDER=entra`
 - [x] Deploy workflow can inject Azure PG + Entra secrets without flipping provider
 - [x] Atlas ClientCode fail-closed dual-resolve + Hub HMAC ingest (secret **not** sent as `x-atlas-module-key`)

@@ -28,9 +28,13 @@ import {
   fetchTenantAggregatesByOrganizationId,
   filterRowsByOrganizationId,
   isAzureDataPlaneActive,
+  isPersistentDataBackendAvailable,
   resolveDataBackend,
   TENANT_EXTENDED_AGGREGATE_TABLES,
 } from "../src/lib/data/data-plane.ts";
+import { azurePgRateLimitStore } from "../src/lib/rate-limit/azure-pg-store.ts";
+import { memoryRateLimitStore } from "../src/lib/rate-limit/memory-store.ts";
+import { supabaseRateLimitStore } from "../src/lib/rate-limit/supabase-store.ts";
 import { __resetPgPoolForTests, getDatabaseUrl } from "../src/lib/db/pool.ts";
 import {
   selectProductionAuthAndDb,
@@ -183,6 +187,116 @@ test("dashboard/tenant aggregate fetchers stay inactive without Azure URL", asyn
       assert.equal(await fetchTenantAggregatesByOrganizationId("org-a"), null);
     }
   );
+});
+
+test("isPersistentDataBackendAvailable prefers Azure PG without Supabase keys", () => {
+  withEnv(
+    {
+      AZURE_DATABASE_URL: "postgresql://azure.example/gcc?sslmode=require",
+      NEXT_PUBLIC_SUPABASE_URL: undefined,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined,
+      SUPABASE_SERVICE_ROLE_KEY: undefined,
+    },
+    () => {
+      __resetPgPoolForTests();
+      assert.equal(isAzureDataPlaneActive(), true);
+      assert.equal(isPersistentDataBackendAvailable(), true);
+    }
+  );
+});
+
+test("isPersistentDataBackendAvailable falls back to Supabase admin when Azure unset", () => {
+  withEnv(
+    {
+      AZURE_DATABASE_URL: undefined,
+      DATABASE_URL: undefined,
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+    },
+    () => {
+      __resetPgPoolForTests();
+      assert.equal(isAzureDataPlaneActive(), false);
+      assert.equal(isPersistentDataBackendAvailable(), true);
+    }
+  );
+});
+
+test("rate-limit azure store fails closed without live DB; checkRateLimit falls back to memory", async () => {
+  const { checkRateLimit } = await import("../src/lib/rate-limit/index.ts");
+
+  await withEnv(
+    {
+      AZURE_DATABASE_URL: "postgresql://azure.example/gcc?sslmode=require",
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+    },
+    async () => {
+      __resetPgPoolForTests();
+      await assert.rejects(
+        () =>
+          azurePgRateLimitStore.consume("test:bucket", 5, 60_000),
+        /connect|ECONNREFUSED|getaddrinfo|timeout/i
+      );
+
+      const result = await checkRateLimit({
+        route: "test-route",
+        userId: "user-1",
+        limit: 5,
+        windowMs: 60_000,
+      });
+      assert.equal(result.allowed, true);
+    }
+  );
+});
+
+test("rate-limit store selection: azure before supabase before memory", () => {
+  withEnv(
+    {
+      AZURE_DATABASE_URL: "postgresql://azure.example/gcc?sslmode=require",
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+    },
+    () => {
+      __resetPgPoolForTests();
+      assert.equal(isAzureDataPlaneActive(), true);
+      assert.ok(azurePgRateLimitStore);
+      assert.notEqual(azurePgRateLimitStore, supabaseRateLimitStore);
+      assert.notEqual(azurePgRateLimitStore, memoryRateLimitStore);
+    }
+  );
+
+  withEnv(
+    {
+      AZURE_DATABASE_URL: undefined,
+      DATABASE_URL: undefined,
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+    },
+    () => {
+      __resetPgPoolForTests();
+      assert.equal(isAzureDataPlaneActive(), false);
+      assert.ok(supabaseRateLimitStore);
+    }
+  );
+});
+
+test("expanded data-plane modules export KPI and integration helpers", async () => {
+  const dataPlane = await import("../src/lib/data/data-plane.ts");
+  for (const fn of [
+    "fetchKpiRowByKey",
+    "updateKpiRowByKey",
+    "upsertKpiRow",
+    "fetchKpiKeysWithTargets",
+    "fetchOnboardingMessagesByOrganizationId",
+    "insertOnboardingMessage",
+    "fetchIntegrationConnection",
+    "fetchIntegrationConnectionsByOrganizationId",
+    "upsertIntegrationConnectionRow",
+    "deleteIntegrationConnection",
+  ]) {
+    assert.equal(typeof dataPlane[fn], "function", `${fn} should be exported`);
+  }
 });
 
 test("dashboard/tenant aggregate table coverage lists primary modules", () => {

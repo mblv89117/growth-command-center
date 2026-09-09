@@ -1,5 +1,9 @@
 import { NotFoundError, ValidationError } from "@/lib/api/errors";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  fetchKpiRowByKey,
+  isPersistentDataBackendAvailable,
+  updateKpiRowByKey,
+} from "@/lib/data/data-plane";
 import { validateKpiNumericValue } from "@/lib/kpi/limits";
 import type { KPI, KpiStatus } from "@/lib/types";
 
@@ -64,7 +68,6 @@ export async function updateKpi(
   options: { demoMode?: boolean } = {}
 ): Promise<KPI> {
   const key = memoryKey(organizationId, kpiKey);
-  const admin = createAdminClient();
 
   if (options.demoMode) {
     const existing =
@@ -89,18 +92,11 @@ export async function updateKpi(
     return updated;
   }
 
-  if (!admin) {
+  if (!isPersistentDataBackendAvailable()) {
     throw new Error("Database admin client is not configured.");
   }
 
-  const { data: existing, error: fetchError } = await admin
-    .from("gcc_kpis")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .eq("kpi_key", kpiKey)
-    .maybeSingle();
-
-  if (fetchError) throw new Error(fetchError.message);
+  const existing = await fetchKpiRowByKey(organizationId, kpiKey);
   if (!existing) throw new NotFoundError("KPI not found");
 
   validatePatchForUnit(mapRow(existing).unit, patch);
@@ -116,14 +112,7 @@ export async function updateKpi(
   if (patch.status !== undefined) rowPatch.status = patch.status;
   if (patch.plan !== undefined) rowPatch.plan = patch.plan;
 
-  const { data, error } = await admin
-    .from("gcc_kpis")
-    .update(rowPatch)
-    .eq("organization_id", organizationId)
-    .eq("kpi_key", kpiKey)
-    .select("*")
-    .single();
-
-  if (error) throw new Error(error.message);
-  return mapRow(data);
+  const updated = await updateKpiRowByKey(organizationId, kpiKey, rowPatch);
+  if (!updated) throw new NotFoundError("KPI not found");
+  return mapRow(updated);
 }
