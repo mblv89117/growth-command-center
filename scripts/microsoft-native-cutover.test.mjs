@@ -1,1 +1,1 @@
-@/tmp/CONTENT_FOR_MCP.mjs
+@/tmp/exact_test.mjs
