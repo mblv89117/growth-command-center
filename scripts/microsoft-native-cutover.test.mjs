@@ -11,6 +11,8 @@ import {
   clientCodeForOrganizationId,
   dualResolveGccIdentity,
   organizationIdForClientCode,
+  __resetClientCodeMapCache,
+  __setClientCodeMapForTests,
 } from "../src/lib/atlas/clientCodeMap.ts";
 import {
   buildGccValueSignalEnvelope,
@@ -42,7 +44,7 @@ import {
 } from "../src/lib/runtime/microsoft-native.ts";
 import { validateProductionEnv } from "../src/lib/config.ts";
 
-function withEnv(overrides, fn) {
+async function withEnv(overrides, fn) {
   const keys = Object.keys(overrides);
   const previous = {};
   for (const key of keys) {
@@ -52,7 +54,7 @@ function withEnv(overrides, fn) {
     else process.env[key] = value;
   }
   try {
-    return fn();
+    return await fn();
   } finally {
     for (const key of keys) {
       if (previous[key] === undefined) delete process.env[key];
@@ -66,23 +68,65 @@ test("tenant isolation: fail-closes unknown ClientCode", () => {
   assert.equal(organizationIdForClientCode("bad"), null);
 });
 
-test("tenant isolation: dual-resolves SYN01 fixture", () => {
-  const r = dualResolveGccIdentity({ clientCode: "SYN01" });
-  assert.equal(r.ok, true);
-  if (r.ok) assert.equal(r.organizationId, "org-syn01");
+test("tenant isolation: dual-resolves SYN01 fixture when explicitly enabled", () => {
+  withEnv({ GCC_ALLOW_SYN01_FIXTURE: "true" }, () => {
+    __resetClientCodeMapCache();
+    __setClientCodeMapForTests([
+      {
+        clientCode: "SYN01",
+        organizationId: "org-syn01",
+        status: "INFERRED",
+        confidence: "INFERRED",
+      },
+    ]);
+    const r = dualResolveGccIdentity({ clientCode: "SYN01" });
+    assert.equal(r.ok, true);
+    if (r.ok) assert.equal(r.organizationId, "org-syn01");
+    assert.equal(clientCodeForOrganizationId("org-syn01"), "SYN01");
+  });
+});
+
+test("tenant isolation: SYN01 is not a production entitlement by default", () => {
+  withEnv({ GCC_ALLOW_SYN01_FIXTURE: undefined }, () => {
+    __resetClientCodeMapCache();
+    assert.equal(organizationIdForClientCode("SYN01"), null);
+    assert.equal(dualResolveGccIdentity({ clientCode: "SYN01" }).ok, false);
+  });
 });
 
 test("tenant isolation: rejects cross-tenant injection", () => {
-  const r = dualResolveGccIdentity({
-    clientCode: "SYN01",
-    organizationId: "org-other",
+  withEnv({ GCC_ALLOW_SYN01_FIXTURE: "true" }, () => {
+    __resetClientCodeMapCache();
+    __setClientCodeMapForTests([
+      {
+        clientCode: "SYN01",
+        organizationId: "org-syn01",
+        status: "INFERRED",
+        confidence: "INFERRED",
+      },
+    ]);
+    const r = dualResolveGccIdentity({
+      clientCode: "SYN01",
+      organizationId: "org-other",
+    });
+    assert.equal(r.ok, false);
   });
-  assert.equal(r.ok, false);
 });
 
 test("tenant isolation: org → ClientCode fixture", () => {
-  assert.equal(clientCodeForOrganizationId("org-syn01"), "SYN01");
-  assert.equal(clientCodeForOrganizationId("missing"), null);
+  withEnv({ GCC_ALLOW_SYN01_FIXTURE: "true" }, () => {
+    __resetClientCodeMapCache();
+    __setClientCodeMapForTests([
+      {
+        clientCode: "SYN01",
+        organizationId: "org-syn01",
+        status: "INFERRED",
+        confidence: "INFERRED",
+      },
+    ]);
+    assert.equal(clientCodeForOrganizationId("org-syn01"), "SYN01");
+    assert.equal(clientCodeForOrganizationId("missing"), null);
+  });
 });
 
 test("AUTH_PROVIDER defaults to supabase", () => {
@@ -613,7 +657,7 @@ test("Entra auth enabled without Supabase is true when AUTH_PROVIDER=entra", asy
 });
 
 test("hub ingest does not send module key secret as a header", async () => {
-  const secret = "test-module-ingest-secret";
+  const secret = "test-module-ingest-secret-key-32chars-min!!";
   /** @type {import('node:http').IncomingMessage['headers'] | null} */
   let seenHeaders = null;
 
@@ -628,7 +672,18 @@ test("hub ingest does not send module key secret as a header", async () => {
   assert.ok(addr && typeof addr === "object");
   const base = `http://127.0.0.1:${addr.port}`;
 
+  const prev = process.env.GCC_ALLOW_SYN01_FIXTURE;
+  process.env.GCC_ALLOW_SYN01_FIXTURE = "true";
   try {
+    __resetClientCodeMapCache();
+    __setClientCodeMapForTests([
+      {
+        clientCode: "SYN01",
+        organizationId: "org-syn01",
+        status: "INFERRED",
+        confidence: "INFERRED",
+      },
+    ]);
     const envelope = buildGccValueSignalEnvelope({
       clientCode: "SYN01",
       signalType: "cash_runway",
@@ -655,8 +710,12 @@ test("hub ingest does not send module key secret as a header", async () => {
     const headerBlob = JSON.stringify(seenHeaders);
     assert.equal(headerBlob.includes(secret), false);
   } finally {
+    if (prev === undefined) delete process.env.GCC_ALLOW_SYN01_FIXTURE;
+    else process.env.GCC_ALLOW_SYN01_FIXTURE = prev;
+    __resetClientCodeMapCache();
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
 
 console.log("microsoft-native-cutover tests: PASS");

@@ -5,14 +5,29 @@
 import { createHmac } from 'crypto';
 import {
   dualResolveGccIdentity,
+  dualResolveGccIdentityAsync,
   organizationIdForClientCode,
+  organizationIdForClientCodeAsync,
 } from './clientCodeMap';
+import { getGccHubIngestConfig } from './hubIngestConfig';
 
 export type GccHubIngestConfig = {
   hubBaseUrl: string;
   moduleIngestKey: string;
   moduleIngestKeyId?: string;
 };
+
+export function resolveGccHubIngestConfig(
+  override?: Partial<GccHubIngestConfig>,
+): GccHubIngestConfig | null {
+  const env = getGccHubIngestConfig();
+  const hubBaseUrl = override?.hubBaseUrl?.trim() || env?.hubBaseUrl || '';
+  const moduleIngestKey = override?.moduleIngestKey?.trim() || env?.moduleIngestKey || '';
+  const moduleIngestKeyId =
+    override?.moduleIngestKeyId?.trim() || env?.moduleIngestKeyId || 'gcc';
+  if (!hubBaseUrl || moduleIngestKey.length < 32) return null;
+  return { hubBaseUrl, moduleIngestKey, moduleIngestKeyId };
+}
 
 export function buildGccValueSignalEnvelope(input: {
   clientCode: string;
@@ -62,6 +77,32 @@ export function buildGccValueSignalEnvelope(input: {
       autoProvision: false,
     },
   };
+}
+
+export async function buildGccValueSignalEnvelopeAsync(input: {
+  clientCode: string;
+  organizationId?: string;
+  signalType: string;
+  confidence: 'VERIFIED' | 'ESTIMATED' | 'INFERRED';
+  finding: string;
+  evidence: string;
+  financialImpact?: number;
+  correlationId: string;
+  actor: string;
+}) {
+  const organizationId =
+    input.organizationId ?? (await organizationIdForClientCodeAsync(input.clientCode));
+  const dual = await dualResolveGccIdentityAsync({
+    clientCode: input.clientCode,
+    organizationId,
+  });
+  if (!dual.ok) {
+    throw new Error(`GCC ClientCode dual-resolve failed: ${dual.reason}`);
+  }
+  return buildGccValueSignalEnvelope({
+    ...input,
+    organizationId: dual.organizationId,
+  });
 }
 
 export async function postGccEnvelopeToHub(
